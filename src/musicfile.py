@@ -40,7 +40,7 @@ class MusicFile:
             bpm=str(data.get("bpm", "")),
             keyscale=data.get("keyscale", ""),
             timesignature=data.get("timesignature", ""),
-            language=data.get("language", "ja"),
+            language=data.get("language", ""),
             duration=data.get("duration", ""),
         )
 
@@ -96,7 +96,7 @@ class MusicFile:
         bpm = ""
         keyscale = ""
         timesignature = ""
-        language = "ja"
+        language = ""
         duration = ""
         
         # txtが存在する場合は読み込み
