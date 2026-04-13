@@ -1,11 +1,9 @@
 import argparse
 import sys
 from pathlib import Path
-from collections.abc import Callable, Generator
 
 from nicegui import app, binding, ui
-from nicegui.elements.aggrid import AgGrid
-
+from nicegui.elements.table import Table
 from src.musicfile import MusicFile
 from src.worker import Worker
 from src.musicanalyze import analyze_main
@@ -18,7 +16,7 @@ class MusicCtx:
     def __init__(self):
         self.name = "dataset-ui-music"
         self.files = []
-        self.file_grid: AgGrid
+        self.table: Table
         self.save_json: bool = True
         self.save_lyrics: bool = True
         self.save_aitk: bool = False
@@ -49,17 +47,16 @@ class MusicCtx:
             ui.notify("サポート対象のファイルが見つかりません", type="info")
             return
 
-        self.file_grid.options["rowData"] = self.files
-        # self.file_grid.run_grid_method("ensureIndexVisible", len(self.file_grid.options["rowData"]) - 1)
-        self.file_grid.update()
+        self.table.rows = self.files
+        self.table.update()
 
         ui.notify(f"{len(self.files)} 件のファイルを読み込みました", type="positive")
 
-    async def target_files(self):
+    def target_files(self):
         if self.target == "all":
             return self.files
-        rows = await self.file_grid.get_selected_rows()
-        return rows # type: ignore
+        rows = self.table.selected
+        return rows
     
     def music_file_for_path(self, path: str) -> dict|None:
         if not path:
@@ -75,11 +72,14 @@ class MusicCtx:
             music_file["keyscale"] = info.get("keyscale", music_file["keyscale"])
             music_file["timesignature"] = info.get("timesignature", music_file["timesignature"])
             music_file["duration"] = info.get("duration", music_file["duration"])
-        self.file_grid.options["rowData"] = self.files
-        self.file_grid.update()
-    
+        self.table.rows = self.files
+        self.table.update()
+        
     def save_metadata(self):
-        dicts = self.file_grid.options["rowData"]
+        dicts = self.table.selected
+        if len(dicts)==0:
+            ui.notify("リストが空です")
+            return
         files = [MusicFile.from_dict(item) for item in dicts]
         for file in files:
             if self.save_json:
@@ -96,19 +96,19 @@ def analyze_finished(result):
     ctx.analyzed(result)
     
 async def analyze():
-    files = await ctx.target_files()
+    files = ctx.target_files()
     data = []
     for music_file in files: # type: ignore
         data.append(music_file["path"])
     await ctx.worker.run(analyze_main, data, analyze_finished)
 
 
-def handle_cell_value_change(e):
-    new_row = e.args["data"]
-    ctx.file_grid.options["rowData"][:] = [
-        row | new_row if row["name"] == new_row["name"] else row
-        for row in ctx.file_grid.options["rowData"]
-    ]
+# def handle_cell_value_change(e):
+#     new_row = e.args["data"]
+#     ctx.file_grid.options["rowData"][:] = [
+#         row | new_row if row["name"] == new_row["name"] else row
+#         for row in ctx.file_grid.options["rowData"]
+#     ]
 
 
 @ui.page("/")
@@ -119,7 +119,7 @@ def main_page():
 }
 ''')
     ui.markdown(f"## {ctx.name}")
-
+    ui.label("ACE-Step向けのメタデータを書き出すwebuiです")
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files 
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -157,49 +157,69 @@ def main_page():
         ctx.worker, "progress"
     ).bind_visibility_from(ctx.worker, "is_running")
 
-    ctx.file_grid = (
-        ui.aggrid(
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # ファイル一覧
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    with ui.row().classes("items-center gap-4"):
+        player = ui.audio("")
+        play_info = ui.label("")
+    def play_src(path: str):
+        player.set_source(path)
+        player.play()
+        play_info.set_text(Path(path).name)
+        
+    ctx.table = ui.table(
+        columns=[
+            {"label": "", "field": "path", "name": "play", "style": 'width: 50px'},
+            {"label": "Name", "field": "name", "name": "name", "align": 'left',},
             {
-                "columnDefs": [
-                    {"headerName": "Name", "field": "name"},
-                    {
-                        "headerName": "Lang",
-                        "field": "lang",
-                        "editable": True,
-                        "width": 28,
-                    },
-                    {
-                        "headerName": "BPM",
-                        "field": "bpm",
-                        "editable": True,
-                        "width": 28,
-                    },
-                    {
-                        "headerName": "KEY",
-                        "field": "keyscale",
-                        "editable": True,
-                        "width": 28,
-                    },
-                    {
-                        "headerName": "Timesig",
-                        "field": "timesignature",
-                        "editable": True,
-                        "width": 28,
-                    },
-                    {
-                        "headerName": "Duration",
-                        "field": "duration",
-                        "editable": True,
-                        "width": 28,
-                    },
-                ],
-                "rowData": [],
-                "rowSelection": {"mode": "multiRow"},
-            }
-        )
-        .on("cellValueChanged", handle_cell_value_change)
-        .classes("h-120")
-    )
+                "label": "Lang",
+                "field": "lang",
+                "editable": True,
+                "style": 'width: 80px',
+                "name": "lang",
+            },
+            {
+                "label": "BPM",
+                "field": "bpm",
+                "editable": True,
+                "name": "bpm",
+                "style": 'width: 80px',
+            },
+            {
+                "label": "KEY",
+                "field": "keyscale",
+                "editable": True,
+                "name": "keyscale",
+                "style": 'width: 80px',
+            },
+            {
+                "label": "Timesig",
+                "field": "timesignature",
+                "editable": True,
+                "name": "timesignature",
+                "style": 'width: 80px',
+            },
+            {
+                "label": "Duration",
+                "field": "duration",
+                "editable": True,
+                "name": "duration",
+                "style": 'width: 80px',
+            },
+        ],
+        rows=[],
+        selection="multiple",
+        row_key='name',
+    ).classes('h-120 w-full no-shadow brdr q-pa-none')
+    with ctx.table.add_slot('body-cell-play'):
+        with ctx.table.cell('play'):
+            ui.button(icon="play_circle").props('flat').on(
+                'click',
+                js_handler='() => emit(props.value)',
+                handler=lambda e: play_src(e.args),
+            )
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Save files
