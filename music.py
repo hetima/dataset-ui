@@ -279,10 +279,11 @@ def main_page():
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="dataset-ui-music")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=7869)
-    parser.add_argument("--native", action="store_true")
+    parser = argparse.ArgumentParser(description="ACE-Step向けのメタデータを書き出すwebuiです")
+    parser.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
+    parser.add_argument("--port", type=int, default=7869, help="default: 7869")
+    parser.add_argument("--native", action="store_true", help="ブラウザでなくネイティブウィンドウで開く")
+    parser.add_argument("--auto-reload", default=True, action="store_true", help="ソースコードが編集されたら自動でリロードする")
 
     args = parser.parse_args()
     # music_ctx = MusicCtx()
@@ -292,7 +293,7 @@ def main() -> None:
         host=args.host,
         port=args.port,
         title="dataset-ui-music",
-        # reload=False,
+        reload=args.auto_reload,
         native=args.native,
     )
 
