@@ -136,6 +136,10 @@ def main_page():
     #     ]
 
     ui.add_css('''
+.q-table th, .q-table td {
+    padding: 2px 2px;
+}
+
 .brdr {
     border: 1px solid #ccc;
 }
@@ -208,6 +212,7 @@ def main_page():
                 "editable": True,
                 "style": 'width: 80px',
                 "name": "language",
+                "align": 'left',
             },
             {
                 "label": "BPM",
@@ -215,6 +220,7 @@ def main_page():
                 "editable": True,
                 "name": "bpm",
                 "style": 'width: 80px',
+                "align": 'left',
             },
             {
                 "label": "KEY",
@@ -222,6 +228,7 @@ def main_page():
                 "editable": True,
                 "name": "keyscale",
                 "style": 'width: 80px',
+                "align": 'left',
             },
             {
                 "label": "Timesig",
@@ -229,6 +236,7 @@ def main_page():
                 "editable": True,
                 "name": "timesignature",
                 "style": 'width: 80px',
+                "align": 'left',
             },
             {
                 "label": "Duration",
@@ -236,6 +244,7 @@ def main_page():
                 "editable": True,
                 "name": "duration",
                 "style": 'width: 80px',
+                "align": 'left',
             },
         ],
         rows=[],
