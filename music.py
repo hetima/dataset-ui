@@ -21,7 +21,7 @@ class MusicCtx:
         self.save_json: bool = True
         self.save_lyrics: bool = True
         self.save_aitk: bool = False
-        self.worker: Worker = Worker()
+        self.worker: Worker = _worker
         self.target = "all"
 
     def load_files(self, path: str) -> None:
@@ -79,7 +79,7 @@ class MusicCtx:
     def save_metadata(self) -> None:
         dicts = self.table.selected
         if len(dicts)==0:
-            ui.notify("処理対象がありません")
+            ui.notify("処理対象がありません", type="info")
             return
         files = [MusicFile.from_dict(item) for item in dicts]
         for file in files:
@@ -89,12 +89,12 @@ class MusicCtx:
                 file.save_to_lyrics()
             if self.save_aitk:
                 file.save_to_aitk()
-        ui.notify("保存しました")
+        ui.notify("保存しました", type="positive")
         
     def set_metadata(self, key: str, val: str ) -> None:
         targets = self.target_files()
         if len(targets)==0:
-            ui.notify("処理対象がありません")
+            ui.notify("処理対象がありません", type="info")
             return
         for tgt in targets:
             result = next((item for item in self.files if item.get("name") == tgt.get("name")), None)
@@ -109,33 +109,32 @@ class MusicCtx:
     def set_caption(self, val: str) -> None:
         self.set_metadata("caption", val)
 
-
-ctx = MusicCtx()
-
-def analyze_finished(result) -> None:
-    ctx.analyzed(result)
-    
-async def analyze() -> None:
-    files = ctx.target_files()
-    data = []
-    for music_file in files: # type: ignore
-        data.append(music_file["path"])
-    if len(data) == 0:
-        ui.notify("処理対象がありません")
-        return
-    await ctx.worker.run(analyze_main, data, analyze_finished)
-
-
-# def handle_cell_value_change(e):
-#     new_row = e.args["data"]
-#     ctx.file_grid.options["rowData"][:] = [
-#         row | new_row if row["name"] == new_row["name"] else row
-#         for row in ctx.file_grid.options["rowData"]
-#     ]
-
+_worker: Worker = Worker()
 
 @ui.page("/")
 def main_page():
+    ctx = MusicCtx()
+
+    def analyze_finished(result) -> None:
+        ctx.analyzed(result)
+        
+    async def analyze() -> None:
+        files = ctx.target_files()
+        data = []
+        for music_file in files: # type: ignore
+            data.append(music_file["path"])
+        if len(data) == 0:
+            ui.notify("処理対象がありません", type="info")
+            return
+        await ctx.worker.run(analyze_main, data, analyze_finished)
+
+    # def handle_cell_value_change(e):
+    #     new_row = e.args["data"]
+    #     ctx.file_grid.options["rowData"][:] = [
+    #         row | new_row if row["name"] == new_row["name"] else row
+    #         for row in ctx.file_grid.options["rowData"]
+    #     ]
+
     ui.add_css('''
 .brdr {
     border: 1px solid #ccc;
