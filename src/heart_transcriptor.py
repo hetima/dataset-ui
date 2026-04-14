@@ -10,6 +10,7 @@ from pathlib import Path
 from collections.abc import Generator
 from src.setting import cnfg
 
+
 class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,14 +32,15 @@ class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
 
         return cls(
             model=model,
-            tokenizer=processor.tokenizer, # type: ignore
-            feature_extractor=processor.feature_extractor, # type: ignore
+            tokenizer=processor.tokenizer,  # type: ignore
+            feature_extractor=processor.feature_extractor,  # type: ignore
             device=device,
             dtype=dtype,
             chunk_length_s=30,
             batch_size=16,
             processor=processor,
         )
+
 
 def transcript_main(data, stop_event) -> Generator[tuple[float, str], None, dict]:
     cnfg.load()
@@ -76,10 +78,9 @@ def transcript_main(data, stop_event) -> Generator[tuple[float, str], None, dict
         gc.collect()
         torch.cuda.empty_cache()
 
-def analyze_audio(pipe, audio_path):
-    """
 
-    """
+def analyze_audio(pipe, audio_path):
+    """ """
 
     with torch.no_grad():
         result = pipe(

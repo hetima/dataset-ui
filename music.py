@@ -324,6 +324,7 @@ def main_page():
     with ui.page_sticky(position='top', y_offset=120) as hfd:
         with ui.card():
             ui.button('Close', on_click=lambda e: hfd.set_visibility(False))
+    hfd.set_visibility(False)
 
 
 def main() -> None:
