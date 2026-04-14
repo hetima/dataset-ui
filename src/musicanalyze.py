@@ -1,6 +1,8 @@
+from pathlib import Path
 import librosa
 import numpy as np
-from collections.abc import Callable, Generator
+from collections.abc import Generator
+from src.setting import cnfg
 
 # Key profiles for Krumhansl-Schmuckler key detection
 MAJOR_PROFILE = np.array(
@@ -13,6 +15,7 @@ KEY_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
 def analyze_main(data, stop_event) -> Generator[tuple[float, str], None, list]:
+    cnfg.load()
     new_data = []
     yield 0, "処理開始"
     cnt = len(data)

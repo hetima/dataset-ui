@@ -1,5 +1,5 @@
 import asyncio
-import os
+import sys
 from collections.abc import Callable, Generator
 from multiprocessing import Manager
 from queue import Empty, Queue
@@ -101,6 +101,7 @@ class Worker:
         self.can_run = True
         self._stop_event.clear()
         self.status = ""
+        # self._queue.join()
 
     def request_cancel(self) -> None:
         ui.notify(f"停止要求をしました")

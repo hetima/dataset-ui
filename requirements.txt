@@ -1,2 +1,7 @@
 nicegui
 librosa
+
+transformers<5
+# accelerate #psutil
+# torchcodec #==0.10.0
+

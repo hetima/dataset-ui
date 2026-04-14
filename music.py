@@ -5,9 +5,11 @@ from typing import cast
 
 from nicegui import app, binding, ui
 from nicegui.elements.table import Table
+from src.setting import cnfg
 from src.musicfile import MusicFile
 from src.worker import Worker
 from src.musicanalyze import analyze_main
+from src.heart_transcriptor import transcript_main
 
 SUPPORTED_EXTENSIONS = [".wav", ".flac", ".ogg", ".mp3", ".m4a"]
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -45,7 +47,7 @@ class MusicCtx:
             self.files.append(musicfile.to_dict())
 
         if not self.files:
-            ui.notify("サポート対象のファイルが見つかりません", type="info")
+            ui.notify("サポート対象のファイルが見つかりません")
             return
 
         self.table.rows = self.files
@@ -75,11 +77,26 @@ class MusicCtx:
             music_file["duration"] = info.get("duration", music_file["duration"])
         self.table.rows = self.files
         self.table.update()
+    
+    def transcripted(self, result) -> None:
+        result_files = result.get("result", [])
+        if len(result_files)==0:
+            err = result.get("err", "処理するファイルがありませんでした")
+            print(err)
+            return
+        for music_file in self.files:
+            info = next((d for d in result_files if d["path"] == music_file["path"]), None)
+            if info is None:
+                continue
+            music_file["lyrics"] = info.get("lyrics", music_file["lyrics"])
+        self.table.rows = self.files
+        self.table.update()
+        
         
     def save_metadata(self) -> None:
-        dicts = self.table.selected
+        dicts = self.table.rows
         if len(dicts)==0:
-            ui.notify("処理対象がありません", type="info")
+            ui.notify("処理対象がありません")
             return
         files = [MusicFile.from_dict(item) for item in dicts]
         for file in files:
@@ -94,7 +111,7 @@ class MusicCtx:
     def set_metadata(self, key: str, val: str ) -> None:
         targets = self.target_files()
         if len(targets)==0:
-            ui.notify("処理対象がありません", type="info")
+            ui.notify("処理対象がありません")
             return
         for tgt in targets:
             result = next((item for item in self.files if item.get("name") == tgt.get("name")), None)
@@ -124,9 +141,24 @@ def main_page():
         for music_file in files: # type: ignore
             data.append(music_file["path"])
         if len(data) == 0:
-            ui.notify("処理対象がありません", type="info")
+            ui.notify("処理対象がありません")
             return
+        cnfg.save()
         await ctx.worker.run(analyze_main, data, analyze_finished)
+    
+    def transcript_finished(result) -> None:
+        ctx.transcripted(result)
+        
+    async def transcript() -> None:
+        files = ctx.target_files()
+        data = []
+        for music_file in files: # type: ignore
+            data.append(music_file["path"])
+        if len(data) == 0:
+            ui.notify("処理対象がありません")
+            return
+        cnfg.save()
+        await ctx.worker.run(transcript_main, data, transcript_finished)
 
     # def handle_cell_value_change(e):
     #     new_row = e.args["data"]
@@ -171,8 +203,12 @@ def main_page():
         ui.space()
     
     with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルをlibrosaで解析し、BPM、キー、拍子、時間を取得します")
+        ui.label("処理対象ファイルを librosa で解析し、BPM、キー、拍子、時間を取得します")
         ui.button("曲を解析する", on_click=analyze).bind_enabled_from(ctx.worker, "can_run")
+    
+    with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
+        ui.label("処理対象ファイルを で解析し、歌詞を取得します")
+        ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
@@ -284,6 +320,10 @@ def main_page():
         ui.linear_progress(show_value=False).props("instant-feedback").bind_value_from(
             ctx.worker, "progress"
         ).bind_visibility_from(ctx.worker, "is_running")
+    
+    with ui.page_sticky(position='top', y_offset=120) as hfd:
+        with ui.card():
+            ui.button('Close', on_click=lambda e: hfd.set_visibility(False))
 
 
 def main() -> None:
