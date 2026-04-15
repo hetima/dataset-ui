@@ -1,4 +1,3 @@
-
 import torch
 import torchaudio
 import os
@@ -9,6 +8,20 @@ from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcess
 from src.setting import cnfg
 
 TARGET_SAMPLE_RATE = 16000
+
+
+
+def acestep_transcriber_models() -> list[str]:
+    models_dir = cnfg.models_dir
+    if not models_dir.exists():
+        return []
+    return [
+        p.name
+        for p in models_dir.iterdir()
+        if p.is_dir()
+        and "acestep" in p.name.lower()
+        and "transcriber" in p.name.lower()
+    ]
 
 class AcestepTranscriptorPipeline:
     def __init__(self, model, processor):
@@ -26,33 +39,44 @@ class AcestepTranscriptorPipeline:
                 ],
             }
         ]
-        text = self.processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
+        text = self.processor.apply_chat_template(
+            conversation, add_generation_prompt=True, tokenize=False
+        )
         inputs = self.processor(
-            text=text, audio=[audio_data], images=None, videos=None,
-            return_tensors="pt", padding=True, sampling_rate=sr,
+            text=text,
+            audio=[audio_data],
+            images=None,
+            videos=None,
+            return_tensors="pt",
+            padding=True,
+            sampling_rate=sr,
         )
         inputs = inputs.to(self.model.device).to(self.model.dtype)
         text_ids = self.model.generate(**inputs, return_audio=False)
-        output = self.processor.batch_decode(text_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        output = self.processor.batch_decode(
+            text_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
         result = output[0]
         marker = "assistant\n"
         if marker in result:
-            result = result[result.rfind(marker) + len(marker):]
+            result = result[result.rfind(marker) + len(marker) :]
         return result.strip()
 
     @classmethod
-    def from_pretrained(cls, models_root_path: Path, device: torch.device, dtype: torch.dtype):
-        model_path = str(models_root_path / "acestep-transcriber-4bit")
+    def from_pretrained(cls, device: torch.device, dtype: torch.dtype):
+        model_path = str(cnfg.models_dir / cnfg.acestep_transcriber_model)
         if not os.path.exists(model_path):
             raise FileNotFoundError(
-                f"モデルパス「  {str(models_root_path)}」 に「acestep-transcriber-4bit」フォルダが存在しません。ダウンロードしてください"
+                f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
             )
 
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
             model_path, torch_dtype=dtype, device_map=device, local_files_only=True
         )
         model.disable_talker()
-        processor = Qwen2_5OmniProcessor.from_pretrained(model_path, local_files_only=True)
+        processor = Qwen2_5OmniProcessor.from_pretrained(
+            model_path, local_files_only=True
+        )
 
         return cls(
             model=model,
@@ -60,7 +84,9 @@ class AcestepTranscriptorPipeline:
         )
 
 
-def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
+def transcript_main(
+    data, stop_event
+) -> Generator[tuple[float, str, dict | None], None, dict]:
     cnfg.load()
     new_data = []
     yield 0, "処理開始", None
@@ -70,7 +96,6 @@ def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None],
         return {"err": "処理するファイルがありませんでした"}
     try:
         pipe = AcestepTranscriptorPipeline.from_pretrained(
-            cnfg.morels_dir,
             device=torch.device("cuda"),
             dtype=torch.float16,
         )
@@ -109,8 +134,8 @@ def load_audio_mono_16k(audio_path):
 def analyze_audio(pipe, audio_path):
     try:
         audio_data, sr = load_audio_mono_16k(audio_path)
-        lyrics = pipe.run_qwen_audio(audio_data, sr,
-            "*Task* Transcribe this audio in detail"
+        lyrics = pipe.run_qwen_audio(
+            audio_data, sr, "*Task* Transcribe this audio in detail"
         )
     except Exception as e:
         print(f"\n  Error transcribing {os.path.basename(audio_path)}: {e}")

@@ -1,5 +1,4 @@
 import argparse
-import sys
 from pathlib import Path
 from typing import cast
 
@@ -9,7 +8,7 @@ from src.setting import cnfg
 from src.musicfile import MusicFile
 from src.worker import Worker
 from src.musicanalyze import analyze_main
-from src.acestep_transcriptor import transcript_main
+from src.acestep_transcriptor import transcript_main, acestep_transcriber_models
 
 SUPPORTED_EXTENSIONS = [".wav", ".flac", ".ogg", ".mp3", ".m4a"]
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -147,6 +146,15 @@ def main_page():
         ctx.transcripted(result)
         
     async def transcript() -> None:
+        if not cnfg.acestep_transcriber_model:
+            ui.notify("モデルを選択してください")
+            return
+        model_path = cnfg.models_dir / cnfg.acestep_transcriber_model
+        if not model_path.exists():
+            ui.notify(
+                f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
+            )
+            return
         files = ctx.target_files()
         data = []
         for music_file in files: # type: ignore
@@ -163,6 +171,7 @@ def main_page():
     #         row | new_row if row["name"] == new_row["name"] else row
     #         for row in ctx.file_grid.options["rowData"]
     #     ]
+    
 
     ui.add_css('''
 .q-table th, .q-table td {
@@ -205,7 +214,20 @@ def main_page():
     
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します")
-        ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
+        with ui.row().classes("items-center gap-4"):
+            ui.label("モデル:")
+            opt = acestep_transcriber_models()
+            val = cnfg.acestep_transcriber_model
+            if not val in opt:
+                val = opt[0] if len(opt) > 0 else None
+                cnfg.set_acestep_transcriber_model(val)
+            ace_models = ui.select(options=opt,
+                value = val,
+                on_change=lambda e: cnfg.set_acestep_transcriber_model(e.value)).props('style="min-width: 120px"')
+            ui.button(icon="reload", on_click=lambda: ace_models.set_options(acestep_transcriber_models())).props('flat')
+            ui.button(icon="setting", on_click=lambda: model_dir_panel.set_visibility(True)).props('flat')
+            ui.space()
+            ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
@@ -320,11 +342,25 @@ def main_page():
         ui.linear_progress(show_value=False).props("instant-feedback").bind_value_from(
             ctx.worker, "progress"
         ).bind_visibility_from(ctx.worker, "is_running")
-    
-    with ui.page_sticky(position='top', y_offset=120) as hfd:
+
+    with ui.page_sticky(position='top', y_offset=120) as model_dir_panel:
+        def save_and_close_model_root_path_input():
+            cnfg.set_models_dir(model_root_path_input.value)
+            model_dir_panel.set_visibility(False)
         with ui.card():
-            ui.button('Close', on_click=lambda e: hfd.set_visibility(False))
-    hfd.set_visibility(False)
+            model_root_path_input = (
+                ui.input(
+                    value = str(cnfg.models_dir),
+                    placeholder="フォルダのパスを入力...",
+                )
+                .props('style="min-width: 500px"')
+                .props("clearable")
+            )
+            with ui.row().classes("items-center gap-4").classes('w-full justify-end'):
+                ui.button('キャンセル', on_click=lambda e: model_dir_panel.set_visibility(False))
+                ui.button("設定", on_click=save_and_close_model_root_path_input)
+
+    model_dir_panel.set_visibility(False)
 
 
 def main() -> None:

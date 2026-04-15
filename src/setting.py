@@ -7,7 +7,7 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 REPO_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = Path(__file__).resolve().parent.parent
-MODELS_DIR = Path("G:/venv/dataset-ui/models") # REPO_DIR / "models"
+MODELS_DIR = REPO_DIR / "models"
 OUTPUTS_DIR = REPO_DIR / "outputs"
 OUTPUT_PREFIX = ""
 
@@ -18,8 +18,9 @@ OUTPUT_PREFIX = ""
 class Setting:
     _SAVABLE_SETTINGS: tuple[str, ...] = dataclasses.field(
         default=(
-            "morels_dir",
+            "models_dir",
             "outputs_dir",
+            "acestep_transcriber_model",
         ),
         init=False,
         repr=False,
@@ -28,9 +29,10 @@ class Setting:
     repo_dir: Path = REPO_DIR
     base_dir: Path = BASE_DIR
     setting_path: Path = REPO_DIR / "setting.json"
-    morels_dir: Path = MODELS_DIR
+    models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
     output_prefix: str = OUTPUT_PREFIX
+    acestep_transcriber_model: str = ""
 
 
     def __post_init__(self):
@@ -65,6 +67,20 @@ class Setting:
             if field_type is Path:
                 value = Path(value)
             setattr(self, name, value)
+
+    def set_models_dir(self, path: str|Path):
+        if isinstance(path, str):
+            path = path.strip()
+            if path.startswith('"') and path.endswith('"'):
+                path = path.strip('"')
+            path = Path(path)
+        self.models_dir = path
+        self.save()
+    
+    def set_acestep_transcriber_model(self, name:str|None):
+        if name:
+            self.acestep_transcriber_model = name
+            cnfg.save()
 
 
 cnfg = Setting()
