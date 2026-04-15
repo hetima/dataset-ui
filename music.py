@@ -225,7 +225,7 @@ def main_page():
                 value = val,
                 on_change=lambda e: cnfg.set_acestep_transcriber_model(e.value)).props('style="min-width: 120px"')
             ui.button(icon="reload", on_click=lambda: ace_models.set_options(acestep_transcriber_models())).props('flat')
-            ui.button(icon="setting", on_click=lambda: model_dir_panel.set_visibility(True)).props('flat')
+            ui.button(icon="setting", on_click=lambda: show_model_dir_panel()).props('flat')
             ui.space()
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
@@ -343,24 +343,26 @@ def main_page():
             ctx.worker, "progress"
         ).bind_visibility_from(ctx.worker, "is_running")
 
-    with ui.page_sticky(position='top', y_offset=120) as model_dir_panel:
-        def save_and_close_model_root_path_input():
-            cnfg.set_models_dir(model_root_path_input.value)
-            model_dir_panel.set_visibility(False)
-        with ui.card():
-            model_root_path_input = (
-                ui.input(
-                    value = str(cnfg.models_dir),
-                    placeholder="フォルダのパスを入力...",
-                )
-                .props('style="min-width: 500px"')
-                .props("clearable")
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # モデルパス設定
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.dialog() as model_dir_panel, ui.card():
+        ui.label("モデルのパスを入力してください")
+        model_root_path_input = (
+            ui.input(
+                value = str(cnfg.models_dir),
+                placeholder="フォルダのパスを入力...",
             )
-            with ui.row().classes("items-center gap-4").classes('w-full justify-end'):
-                ui.button('キャンセル', on_click=lambda e: model_dir_panel.set_visibility(False))
-                ui.button("設定", on_click=save_and_close_model_root_path_input)
-
-    model_dir_panel.set_visibility(False)
+            .props('style="min-width: 500px"')
+        )
+        with ui.row().classes("items-center gap-4").classes('w-full justify-end'):
+            ui.button('キャンセル', on_click=lambda: model_dir_panel.submit("No"))
+            ui.button("設定", on_click=lambda: model_dir_panel.submit("Yes"))
+        async def show_model_dir_panel():
+            result = await model_dir_panel
+            if result == "Yes":
+                cnfg.set_models_dir(model_root_path_input.value)
+    # model_dir_panel.set_visibility(False)
 
 
 def main() -> None:
