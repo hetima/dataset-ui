@@ -9,9 +9,12 @@ from nicegui import app, background_tasks, binding, ui
 
 T = TypeVar("T")
 
+PROGRESS = "progress"
+STATUS = "status"
+PROGRESS_RESULT = "prgr"
 
 def _run_generator(
-    func: Callable[..., Generator[tuple[float, str], None, T]],
+    func: Callable[..., Generator[tuple[float, str, dict|None], None, T]],
     queue: Queue,
     stop_event: EventClass,
     data,
@@ -20,15 +23,15 @@ def _run_generator(
         gen = func(data, stop_event)
         while True:
             try:
-                progress, status = next(gen)
-                queue.put({"progress": progress, "status": status})
+                progress, status, progress_result = next(gen)
+                queue.put({PROGRESS: progress, STATUS: status, PROGRESS_RESULT: progress_result})
             except StopIteration as e:
-                queue.put({"progress": 2.0, "status": "完了", "result": e.value})
+                queue.put({PROGRESS: 2.0, STATUS: "完了", "result": e.value})
                 break
     except Exception:
         traceback.print_exc()
         try:
-            queue.put({"progress": 2.0, "status": "エラー"})
+            queue.put({PROGRESS: 2.0, STATUS: "エラー"})
         except Exception:
             pass
 
@@ -54,7 +57,7 @@ class Worker:
 
     async def run(
         self,
-        func: Callable[..., Generator[tuple[float, str], None, T]],
+        func: Callable[..., Generator[tuple[float, str, dict|None], None, T]],
         data,
         on_complete: Callable[[T], None] | None = None,
     ) -> None:
@@ -93,8 +96,12 @@ class Worker:
                 if self._process is not None and not self._process.is_alive():
                     break
                 continue
-            self.progress = msg["progress"]
-            self.status = msg.get("status", "")
+            self.progress = msg.get(PROGRESS, "")
+            self.status = msg.get(STATUS, "")
+            prgr = msg.get(PROGRESS_RESULT, None)
+            if prgr != None and self._on_complete != None:
+                self._on_complete(prgr)
+            
             if "result" in msg:
                 if not self._stop_event.is_set():
                     self.result = msg["result"]
@@ -115,3 +122,8 @@ class Worker:
     def request_cancel(self) -> None:
         ui.notify("停止要求をしました")
         self._stop_event.set()
+
+    def terminate_now(self) -> None:
+        self._stop_event.set()
+        if self._process is not None and self._process.is_alive():
+            self._process.terminate()

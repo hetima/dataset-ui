@@ -14,19 +14,18 @@ MINOR_PROFILE = np.array(
 KEY_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
-def analyze_main(data, stop_event) -> Generator[tuple[float, str], None, list]:
+def analyze_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     cnfg.load()
-    new_data = []
-    yield 0, "処理開始"
+    yield 0, "処理開始", None
     cnt = len(data)
     if cnt == 0:
-        yield 1, "完了"
-        return []
+        yield 1, "完了", None
+        return {"result": []}
     i = 0
     for path in data:
         if stop_event.is_set():
-            yield 1, "キャンセル"
-            return []
+            yield 1, "キャンセル", None
+            return {"result": []}
         # path = str(music_file.path)
         result = analyze_audio(path)
         # music_file.bpm = result.get("bpm", music_file.bpm)
@@ -34,10 +33,9 @@ def analyze_main(data, stop_event) -> Generator[tuple[float, str], None, list]:
         # music_file.timesignature = result.get("timesignature", music_file.timesignature)
         # music_file.duration = result.get("duration", music_file.duration)
         i = i + 1
-        new_data.append(result)
-        yield i / cnt, f"処理 ({i}/{cnt})"
+        yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
     # ctx.file_grid.options["rowData"] = new_data
-    return new_data
+    return {"result": []}
 
 
 def analyze_audio(audio_path):

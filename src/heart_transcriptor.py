@@ -42,13 +42,13 @@ class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
         )
 
 
-def transcript_main(data, stop_event) -> Generator[tuple[float, str], None, dict]:
+def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     cnfg.load()
     new_data = []
-    yield 0, "処理開始"
+    yield 0, "処理開始", None
     cnt = len(data)
     if cnt == 0:
-        yield 1, "完了"
+        yield 1, "完了", None
         return {"err": "処理するファイルがありませんでした"}
     try:
         pipe = HeartTranscriptorPipeline.from_pretrained(
@@ -57,22 +57,22 @@ def transcript_main(data, stop_event) -> Generator[tuple[float, str], None, dict
             dtype=torch.float16,
         )
     except FileNotFoundError as e:
-        yield 1, "エラー"
+        yield 1, "エラー", None
         return {"err": e}
     if pipe.model is None:
-        yield 1, "エラー"
+        yield 1, "エラー", None
         return {"err": "モデルを読み込めませんでした"}
     i = 0
     try:
         for path in data:
             if stop_event.is_set():
-                yield 1, "キャンセル"
+                yield 1, "キャンセル", None
                 return {"result": []}
             result = analyze_audio(pipe, path)
             i = i + 1
             new_data.append(result)
-            yield i / cnt, f"処理 ({i}/{cnt})"
-        return {"result": new_data}
+            yield i / cnt, f"処理 ({i}/{cnt})", {"result": result}
+        return {"result": []}
     finally:
         del pipe
         gc.collect()

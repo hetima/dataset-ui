@@ -9,7 +9,7 @@ from src.setting import cnfg
 from src.musicfile import MusicFile
 from src.worker import Worker
 from src.musicanalyze import analyze_main
-from src.heart_transcriptor import transcript_main
+from src.acestep_transcriptor import transcript_main
 
 SUPPORTED_EXTENSIONS = [".wav", ".flac", ".ogg", ".mp3", ".m4a"]
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -66,9 +66,10 @@ class MusicCtx:
             return None
         return next((d for d in self.files if d["path"] == path), None)
         
-    def analyzed(self, result) -> None:
+    def analyzed(self, result: dict) -> None:
+        result_files = result.get("result", [])
         for music_file in self.files:
-            info = next((d for d in result if d["path"] == music_file["path"]), None)
+            info = next((d for d in result_files if d["path"] == music_file["path"]), None)
             if info is None:
                 continue
             music_file["bpm"] = info.get("bpm", music_file["bpm"])
@@ -78,12 +79,8 @@ class MusicCtx:
         self.table.rows = self.files
         self.table.update()
     
-    def transcripted(self, result) -> None:
+    def transcripted(self, result: dict) -> None:
         result_files = result.get("result", [])
-        if len(result_files)==0:
-            err = result.get("err", "処理するファイルがありませんでした")
-            print(err)
-            return
         for music_file in self.files:
             info = next((d for d in result_files if d["path"] == music_file["path"]), None)
             if info is None:
@@ -207,7 +204,7 @@ def main_page():
         ui.button("曲を解析する", on_click=analyze).bind_enabled_from(ctx.worker, "can_run")
     
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを で解析し、歌詞を取得します")
+        ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します")
         ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
@@ -315,7 +312,10 @@ def main_page():
         with ui.row().classes("items-center gap-4"):
             ui.button("処理を中止する", on_click=ctx.worker.request_cancel).bind_visibility_from(
                 ctx.worker, "is_running"
-            ).props('color="red"')
+            ).props('color="orange"').tooltip("現在の処理が済んだら終了")
+            ui.button("処理を即時中止する", icon='warning', on_click=ctx.worker.terminate_now).bind_visibility_from(
+                ctx.worker, "is_running"
+            ).props('color="red"').tooltip("強制的に子プロセスを終了")
             ui.label().style('color: #010101').bind_text_from(ctx.worker, "status")
         ui.linear_progress(show_value=False).props("instant-feedback").bind_value_from(
             ctx.worker, "progress"
