@@ -1,9 +1,6 @@
 from transformers.pipelines.automatic_speech_recognition import (
     AutomaticSpeechRecognitionPipeline,
 )
-from transformers.models.whisper.modeling_whisper import WhisperForConditionalGeneration
-from transformers.models.whisper.processing_whisper import WhisperProcessor
-import torch
 import os
 import gc
 from pathlib import Path
@@ -16,9 +13,10 @@ class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
         super().__init__(*args, **kwargs)
 
     @classmethod
-    def from_pretrained(
-        cls, models_path: Path, device: torch.device, dtype: torch.dtype
-    ):
+    def from_pretrained(cls, models_path: Path, device, dtype):
+        from transformers.models.whisper.processing_whisper import WhisperProcessor
+        from transformers.models.whisper.modeling_whisper import WhisperForConditionalGeneration
+        
         hearttranscriptor_path = str(models_path / "HeartTranscriptor-oss")
         if os.path.exists(hearttranscriptor_path):
             model = WhisperForConditionalGeneration.from_pretrained(
@@ -43,6 +41,8 @@ class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
 
 
 def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
+    import torch
+    
     cnfg.load()
     new_data = []
     yield 0, "処理開始", None
@@ -52,7 +52,7 @@ def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None],
         return {"err": "処理するファイルがありませんでした"}
     try:
         pipe = HeartTranscriptorPipeline.from_pretrained(
-            cnfg.morels_dir,
+            cnfg.models_dir,
             device=torch.device("cuda"),
             dtype=torch.float16,
         )
@@ -80,8 +80,8 @@ def transcript_main(data, stop_event) -> Generator[tuple[float, str, dict|None],
 
 
 def analyze_audio(pipe, audio_path):
-    """ """
-
+    import torch
+    
     with torch.no_grad():
         result = pipe(
             audio_path,

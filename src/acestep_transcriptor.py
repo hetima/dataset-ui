@@ -1,10 +1,8 @@
-import torch
-import torchaudio
+
 import os
 import gc
 from pathlib import Path
 from collections.abc import Generator
-from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
 from src.setting import cnfg
 
 TARGET_SAMPLE_RATE = 16000
@@ -63,7 +61,9 @@ class AcestepTranscriptorPipeline:
         return result.strip()
 
     @classmethod
-    def from_pretrained(cls, device: torch.device, dtype: torch.dtype):
+    def from_pretrained(cls, device, dtype):
+        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
+        
         model_path = str(cnfg.models_dir / cnfg.acestep_transcriber_model)
         if not os.path.exists(model_path):
             raise FileNotFoundError(
@@ -87,6 +87,8 @@ class AcestepTranscriptorPipeline:
 def transcript_main(
     data, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
+    import torch
+    
     cnfg.load()
     new_data = []
     yield 0, "処理開始", None
@@ -123,6 +125,8 @@ def transcript_main(
 
 
 def load_audio_mono_16k(audio_path):
+    import torchaudio
+    
     waveform, sr = torchaudio.load(audio_path)
     if waveform.shape[0] > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
@@ -132,6 +136,7 @@ def load_audio_mono_16k(audio_path):
 
 
 def analyze_audio(pipe, audio_path):
+    import torch
     try:
         audio_data, sr = load_audio_mono_16k(audio_path)
         lyrics = pipe.run_qwen_audio(
