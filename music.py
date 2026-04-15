@@ -213,7 +213,7 @@ def main_page():
         ui.button("曲を解析する", on_click=analyze).bind_enabled_from(ctx.worker, "can_run")
     
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します")
+        ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
         with ui.row().classes("items-center gap-4"):
             ui.label("モデル:")
             opt = acestep_transcriber_models()
@@ -224,9 +224,10 @@ def main_page():
             ace_models = ui.select(options=opt,
                 value = val,
                 on_change=lambda e: cnfg.set_acestep_transcriber_model(e.value)).props('style="min-width: 120px"')
-            ui.button(icon="reload", on_click=lambda: ace_models.set_options(acestep_transcriber_models())).props('flat')
-            ui.button(icon="setting", on_click=lambda: show_model_dir_panel()).props('flat')
-            ui.space()
+            with ui.button(icon="refresh", on_click=lambda: ace_models.set_options(acestep_transcriber_models())).props('flat'):
+                ui.tooltip("モデル一覧を更新").props('delay=600')
+            with ui.button(icon="settings", on_click=lambda: show_model_dir_panel()).props('flat'):
+                ui.tooltip("モデルフォルダ設定").props('delay=600')
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
@@ -258,7 +259,14 @@ def main_page():
                 "name": "caption",
                 "field": "caption",
                 "label": "Caption",
-                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis;max-width:200px',
+                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px',
+                "align": 'left',
+            },
+            {
+                "name": "lyrics",
+                "field": "lyrics",
+                "label": "Lyrics",
+                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px',
                 "align": 'left',
             },
             {
@@ -335,7 +343,7 @@ def main_page():
             ui.button("処理を中止する", on_click=ctx.worker.request_cancel).bind_visibility_from(
                 ctx.worker, "is_running"
             ).props('color="orange"').tooltip("現在の処理が済んだら終了")
-            ui.button("処理を即時中止する", icon='warning', on_click=ctx.worker.terminate_now).bind_visibility_from(
+            ui.button("処理を強制終了する", icon='warning', on_click=ctx.worker.terminate_now).bind_visibility_from(
                 ctx.worker, "is_running"
             ).props('color="red"').tooltip("強制的に子プロセスを終了")
             ui.label().style('color: #010101').bind_text_from(ctx.worker, "status")
