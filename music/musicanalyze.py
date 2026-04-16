@@ -5,6 +5,7 @@ from music.setting import cnfg
 
 
 def analyze_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
+    print("analyzing task started...")
     cnfg.load()
     yield 0, "処理開始", None
     cnt = len(data)
@@ -25,6 +26,7 @@ def analyze_main(data, stop_event) -> Generator[tuple[float, str, dict|None], No
         i = i + 1
         yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
     # ctx.file_grid.options["rowData"] = new_data
+    print("...analyzing task finished")
     return {"result": []}
 
 

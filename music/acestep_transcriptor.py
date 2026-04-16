@@ -28,6 +28,9 @@ class AcestepTranscriptorPipeline:
 
     def run_qwen_audio(self, audio_data, sr, prompt_text):
         """Run a Qwen2.5-Omni model on audio with a text prompt."""
+        import logging
+        logging.disable(logging.WARNING) 
+
         conversation = [
             {
                 "role": "user",
@@ -64,18 +67,23 @@ class AcestepTranscriptorPipeline:
     def from_pretrained(cls, device, dtype):
         from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
         
+        local_files_only = True
         model_path = str(cnfg.models_dir / cnfg.acestep_transcriber_model)
         if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
-            )
-
+            if cnfg.acestep_transcriber_model.find("/") >= 1:
+                model_path = cnfg.acestep_transcriber_model
+                local_files_only = False
+            else:
+                raise FileNotFoundError(
+                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません"
+                )
+        print(f"model path: {model_path}")
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            model_path, torch_dtype=dtype, device_map=device, local_files_only=True
+            model_path, torch_dtype=dtype, device_map=device, local_files_only=local_files_only
         )
         model.disable_talker()
         processor = Qwen2_5OmniProcessor.from_pretrained(
-            model_path, local_files_only=True
+            model_path, local_files_only=local_files_only
         )
 
         return cls(
@@ -89,6 +97,7 @@ def transcript_main(
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     import torch
     
+    print("transcribe task started...")
     cnfg.load()
     new_data = []
     yield 0, "処理開始", None
@@ -119,9 +128,11 @@ def transcript_main(
             yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
         return {"result": []}
     finally:
+        print("...transcribe task finished")
         del pipe
         gc.collect()
         torch.cuda.empty_cache()
+        
 
 
 def load_audio_mono_16k(audio_path):
@@ -138,6 +149,7 @@ def load_audio_mono_16k(audio_path):
 def analyze_audio(pipe, audio_path):
     import torch
     try:
+        print(audio_path)
         audio_data, sr = load_audio_mono_16k(audio_path)
         lyrics = pipe.run_qwen_audio(
             audio_data, sr, "*Task* Transcribe this audio in detail"

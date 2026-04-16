@@ -33,6 +33,9 @@ class MusicCtx:
             ui.notify(f"フォルダが見つかりません: {folder_path}", type="negative")
             return
 
+        cnfg.last_dataset_path = folder_path
+        cnfg.save()
+        
         self.files = []
         # for ext in SUPPORTED_EXTENSIONS:
         for file in sorted(folder.glob(f"*")):

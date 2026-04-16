@@ -35,10 +35,11 @@ def tab_main(ctx: MusicCtx):
             return
         model_path = cnfg.models_dir / cnfg.acestep_transcriber_model
         if not model_path.exists():
-            ui.notify(
-                f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
-            )
-            return
+            if cnfg.acestep_transcriber_model.find("/") < 1:
+                ui.notify(
+                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
+                )
+                return
         files = ctx.target_files()
         data = []
         for music_file in files: # type: ignore
@@ -64,10 +65,12 @@ def tab_main(ctx: MusicCtx):
     with ui.row().classes("items-center gap-2"):
         path_input = (
             ui.input(
+                value = cnfg.last_dataset_path,
+                label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
             )
-            .props('style="min-width: 500px"')
+            .props('style="min-width: 500px" outlined')
             .props("clearable")
         )
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value.strip()))
@@ -87,22 +90,43 @@ def tab_main(ctx: MusicCtx):
     
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
+        ui.label("モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
+                 "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+                 "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
+                 "標準の acestep_transcriber は大量のメモリを必要とするので、動かない場合は 4-bit バージョンをお試しください").classes('infotxt')
         with ui.row().classes("items-center gap-4"):
-            ui.label("モデル:")
             opt = acestep_transcriber_models()
             val = cnfg.acestep_transcriber_model
             if not val in opt:
-                val = opt[0] if len(opt) > 0 else None
-                cnfg.set_acestep_transcriber_model(val)
-            ace_models = ui.select(options=opt,
-                value = val,
-                on_change=lambda e: cnfg.set_acestep_transcriber_model(e.value)).props('style="min-width: 120px"')
-            with ui.button(icon="refresh", on_click=lambda: reload_acestep_transcriber_model()).props('flat'):
-                ui.tooltip("モデル一覧を更新").props('delay=600')
+                val = opt[0] if len(opt) > 0 else ""
+            ace_model_input = ui.input(
+                label="transcriber model",
+                placeholder="モデルを選択、または入力",
+                on_change=lambda e: setattr(e.sender, "value", e.value),
+            ).props('style="min-width: 300px" outlined').bind_value(cnfg, "acestep_transcriber_model")
+            with ace_model_input.add_slot('append'):
+                with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
+                    ace_models_menu = ui.menu()
+            
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
     
     def reload_acestep_transcriber_model():
-        ace_models.set_options(acestep_transcriber_models())
+        models = acestep_transcriber_models()
+        ace_models_menu.clear()
+        local_added = False
+        with ace_models_menu:
+            for model in models:
+                ui.menu_item(model, lambda:setattr(ace_model_input, "value", model))
+                local_added = True
+            if local_added:
+                ui.separator()
+            ui.menu_item("from huggingface").enabled=False
+            ui.menu_item("ACE-Step/acestep-transcriber", lambda:setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber-4bit"))
+            ui.menu_item("hrktxz/acestep-transcriber-4bit", lambda:setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"))
+            ui.separator()
+            ui.menu_item("メニューを更新", lambda:reload_acestep_transcriber_model())
+            
+    reload_acestep_transcriber_model()
     ctx.model_refresh_func.append(reload_acestep_transcriber_model)
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):

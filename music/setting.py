@@ -19,6 +19,7 @@ class Setting:
             "models_dir",
             "outputs_dir",
             "acestep_transcriber_model",
+            "last_dataset_path",
         ),
         init=False,
         repr=False,
@@ -31,6 +32,7 @@ class Setting:
     outputs_dir: Path = OUTPUTS_DIR
     output_prefix: str = OUTPUT_PREFIX
     acestep_transcriber_model: str = ""
+    last_dataset_path: str = ""
 
 
     def __post_init__(self):

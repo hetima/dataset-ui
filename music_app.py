@@ -19,15 +19,22 @@ def main_page():
     ctx = MusicCtx(_worker)
 
     ui.add_css('''
-.q-table th, .q-table td {
+.infotxt {
+    color: #666;
+}
+.q-table th, .q-table td, .padd2 {
     padding: 2px 2px;
+}
+
+.padd4 {
+    padding: 4px 4px;
 }
 
 .brdr {
     border: 1px solid #ccc;
 }
 ''')
-    
+    ui.colors(secondary='#747474')
     ui.markdown(f"## {ctx.name}")
     ui.label("ACE-Step向けのメタデータを書き出すwebuiです")
     

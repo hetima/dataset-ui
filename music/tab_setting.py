@@ -15,9 +15,10 @@ def tab_setting(ctx: MusicCtx):
             model_root_path_input = (
                 ui.input(
                     value = str(cnfg.models_dir),
+                    label="models root path",
                     placeholder="フォルダのパスを入力...",
                 )
-                .props('style="min-width: 500px"')
+                .props('style="min-width: 500px" outline')
             )
             ui.button("保存", on_click=lambda: ctx.set_models_root(model_root_path_input.value))
 
