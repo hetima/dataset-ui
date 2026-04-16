@@ -70,8 +70,7 @@ def tab_main(ctx: MusicCtx):
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
             )
-            .props('style="min-width: 500px" outlined')
-            .props("clearable")
+            .props('style="min-width: 500px" outlined clearable').classes("w-140")
         )
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value.strip()))
 
@@ -132,10 +131,10 @@ def tab_main(ctx: MusicCtx):
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
         with ui.row().classes("items-center gap-4"):
-            lang = ui.select(options=LANGUAGE_LIST, with_input=True, new_value_mode="add").classes('w-30')
+            lang = ui.select(options=LANGUAGE_LIST, with_input=True, new_value_mode="add", label="language").classes('w-30').props("outlined")
             ui.button("languageを設定", on_click=lambda e: ctx.set_lang(cast(str, lang.value)))
             ui.space()
-            capt = ui.input(placeholder="caption...",).classes('w-100')
+            capt = ui.input(placeholder="captionを入力", label="caption").classes('w-100').props("outlined")
             ui.button("captionを設定", on_click=lambda e: ctx.set_caption(cast(str, capt.value)))
 
     # ═══════════════════════════════════════════════════════════════════════════════

@@ -35,9 +35,9 @@ def main_page():
 }
 ''')
     ui.colors(secondary='#747474')
-    ui.markdown(f"## {ctx.name}")
-    ui.label("ACE-Step向けのメタデータを書き出すwebuiです")
-    
+    ui.markdown("""## dataset-ui-music
+ACE-Step 向けのメタデータを書き出す webui です""")
+
     with ui.tabs().classes('w-full').classes("text-dark").props('inline-label align="left"') as tabs:
         main_Tab = ui.tab('main',label="メイン", icon="music_note")
         setting_tab = ui.tab('setting',label="設定", icon="settings")
@@ -52,13 +52,17 @@ def main_page():
     # ═══════════════════════════════════════════════════════════════════════════════
     with ui.footer(bordered=True).bind_visibility_from(ctx.worker, "is_running").style('background-color: #f2f2f2'):
         with ui.row().classes("items-center gap-4"):
-            ui.button("処理を中止する", on_click=ctx.worker.request_cancel).bind_visibility_from(
-                ctx.worker, "is_running"
-            ).props('color="orange"').tooltip("現在の処理が済んだら終了")
-            ui.button("処理を強制終了する", icon='warning', on_click=ctx.worker.terminate_now).bind_visibility_from(
-                ctx.worker, "is_running"
-            ).props('color="red"').tooltip("強制的に子プロセスを終了")
-            ui.label().style('color: #010101').bind_text_from(ctx.worker, "status")
+            ui.spinner(size='lg')
+            with ui.column():
+                ui.label("バックグラウンド処理を実行しています").style('color: #010101')
+                with ui.row().classes("items-center gap-4"):
+                    ui.button("処理を中止する", on_click=ctx.worker.request_cancel).bind_visibility_from(
+                        ctx.worker, "is_running"
+                    ).props('color="orange"').tooltip("現在の処理が済んだら終了")
+                    ui.button("処理を強制終了する", icon='warning', on_click=ctx.worker.terminate_now).bind_visibility_from(
+                        ctx.worker, "is_running"
+                    ).props('color="red"').tooltip("強制的に子プロセスを終了")
+                    ui.label().style('color: #010101').bind_text_from(ctx.worker, "status")
         ui.linear_progress(show_value=False).props("instant-feedback").bind_value_from(
             ctx.worker, "progress"
         ).bind_visibility_from(ctx.worker, "is_running")
@@ -69,7 +73,7 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
     parser.add_argument("--port", type=int, default=7869, help="default: 7869")
     parser.add_argument("--native", action="store_true", help="ブラウザでなくネイティブウィンドウで開く")
-    parser.add_argument("--auto-reload", default=True, action="store_true", help="ソースコードが編集されたら自動でリロードする")
+    parser.add_argument("--auto-reload", default=False, action="store_true", help="ソースコードが編集されたら自動でリロードする")
 
     args = parser.parse_args()
     # music_ctx = MusicCtx()
