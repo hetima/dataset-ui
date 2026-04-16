@@ -9,10 +9,8 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = REPO_DIR / "models"
 OUTPUTS_DIR = REPO_DIR / "outputs"
+SETTING_FILE = "music_config.json"
 OUTPUT_PREFIX = ""
-
-
-
 
 @dataclasses.dataclass
 class Setting:
@@ -28,7 +26,7 @@ class Setting:
 
     repo_dir: Path = REPO_DIR
     base_dir: Path = BASE_DIR
-    setting_path: Path = REPO_DIR / "setting.json"
+    setting_path: Path = REPO_DIR / SETTING_FILE
     models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
     output_prefix: str = OUTPUT_PREFIX

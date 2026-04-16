@@ -1,6 +1,6 @@
 from pathlib import Path
 from collections.abc import Generator
-from src.setting import cnfg
+from music.setting import cnfg
 
 
 

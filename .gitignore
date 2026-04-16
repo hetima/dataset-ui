@@ -182,4 +182,4 @@ cython_debug/
 
 /models/
 /outputs/
-/setting.json
+/music_config.json
