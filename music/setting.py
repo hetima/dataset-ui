@@ -20,6 +20,7 @@ class Setting:
             "outputs_dir",
             "acestep_transcriber_model",
             "last_dataset_path",
+            "dataset_dirs",
         ),
         init=False,
         repr=False,
@@ -33,7 +34,7 @@ class Setting:
     output_prefix: str = OUTPUT_PREFIX
     acestep_transcriber_model: str = ""
     last_dataset_path: str = ""
-
+    dataset_dirs: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         self.load()
@@ -70,7 +71,7 @@ class Setting:
         if not self.models_dir:
             self.models_dir = MODELS_DIR
 
-    def set_models_dir(self, path: str|Path):
+    def set_models_dir(self, path: str|Path) -> bool:
         if isinstance(path, str):
             path = path.strip()
             if path.startswith('"') and path.endswith('"'):
@@ -79,11 +80,21 @@ class Setting:
         if self.models_dir != path:
             self.models_dir = path
             self.save()
+            return True
+        return False
     
     def set_acestep_transcriber_model(self, name:str|None):
         if name and name != self.acestep_transcriber_model:
             self.acestep_transcriber_model = name
             cnfg.save()
+    
+    def add_dataset_dir(self, path: str) -> bool:
+        if not path or path in self.dataset_dirs:
+            return False
+        self.dataset_dirs.append(path)
+        cnfg.save()
+        return True
+        
 
 
 cnfg = Setting()

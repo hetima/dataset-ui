@@ -17,6 +17,7 @@ _worker: Worker = Worker()
 @ui.page("/")
 def main_page():
     ctx = MusicCtx(_worker)
+    ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
 
     ui.add_css('''
 .infotxt {
@@ -24,14 +25,25 @@ def main_page():
 }
 .q-table th, .q-table td, .padd2 {
     padding: 2px 2px;
+    min-height: 20px;
+    height: auto;
 }
 
 .padd4 {
     padding: 4px 4px;
+    min-height: 20px;
+}
+.padd8 {
+    padding: 8px 8px;
+    min-height: 24px;
 }
 
 .brdr {
     border: 1px solid #ccc;
+}
+
+.q-checkbox__inner {
+    font-size: 34px;
 }
 ''')
     ui.colors(secondary='#747474')

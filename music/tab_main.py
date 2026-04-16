@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import cast
+from functools import partial
 
 from nicegui import ui
+from common.local_file_picker import LocalFilePicker
 from music.setting import cnfg
 from music.musicanalyze import analyze_main
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
@@ -57,6 +59,10 @@ def tab_main(ctx: MusicCtx):
     #         for row in ctx.file_grid.options["rowData"]
     #     ]
     
+    async def pick_folder(path: str) -> None:
+        result = await LocalFilePicker(path, folder_only=True)
+        if isinstance(result, list) and len(result) > 0:
+            path_input.value = result[0]
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files 
@@ -72,8 +78,18 @@ def tab_main(ctx: MusicCtx):
             )
             .props('style="min-width: 500px" outlined clearable').classes("w-140")
         )
+        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value.strip()))
 
+    def update_dataset_dropdown():
+        dataset_dropdown.clear()
+        with dataset_dropdown:
+            for path in cnfg.dataset_dirs:
+                ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
+    
+    update_dataset_dropdown()
+    ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)
+    
     # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -115,15 +131,15 @@ def tab_main(ctx: MusicCtx):
         local_added = False
         with ace_models_menu:
             for model in models:
-                ui.menu_item(model, lambda:setattr(ace_model_input, "value", model))
+                ui.menu_item(model, lambda:setattr(ace_model_input, "value", model)).classes("padd8")
                 local_added = True
             if local_added:
                 ui.separator()
-            ui.menu_item("from huggingface").enabled=False
-            ui.menu_item("ACE-Step/acestep-transcriber", lambda:setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber-4bit"))
-            ui.menu_item("hrktxz/acestep-transcriber-4bit", lambda:setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"))
+            ui.menu_item("from huggingface").classes("padd8").enabled=False
+            ui.menu_item("ACE-Step/acestep-transcriber", lambda:setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber-4bit")).classes("padd8")
+            ui.menu_item("hrktxz/acestep-transcriber-4bit", lambda:setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit")).classes("padd8")
             ui.separator()
-            ui.menu_item("メニューを更新", lambda:reload_acestep_transcriber_model())
+            ui.menu_item("メニューを更新", lambda:reload_acestep_transcriber_model()).classes("padd8")
             
     reload_acestep_transcriber_model()
     ctx.model_refresh_func.append(reload_acestep_transcriber_model)

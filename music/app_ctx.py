@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import cast
+from typing import Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
@@ -20,7 +20,8 @@ class MusicCtx:
         self.save_aitk: bool = False
         self.worker: Worker = worker
         self.target = "all"
-        self.model_refresh_func = []
+        self.model_refresh_func: list[Callable[[], None]] = []
+        self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
 
     def load_files(self, path: str) -> None:
         folder_path = path
@@ -123,8 +124,20 @@ class MusicCtx:
         self.set_metadata("caption", val)
     
     def set_models_root(self, path: str):
-        cnfg.set_models_dir(path)
-        for func in self.model_refresh_func:
-            func()
+        if cnfg.set_models_dir(path):
+            for func in self.model_refresh_func:
+                func()
         ui.notify("モデルパスを保存しました")
 
+    def add_dataset_dir(self, path: str):
+        if not path or path in cnfg.dataset_dirs:
+            return False
+        if not Path(path).is_dir():
+            ui.notify(f"フォルダ「{path}」は存在しません", type="negative")
+            return False
+            
+        if cnfg.add_dataset_dir(path):
+            for func in self.dataset_dirs_refresh_func:
+                func()
+
+        
