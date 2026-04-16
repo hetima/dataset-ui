@@ -20,6 +20,7 @@ class MusicCtx:
         self.save_aitk: bool = False
         self.worker: Worker = worker
         self.target = "all"
+        self.model_refresh_func = []
 
     def load_files(self, path: str) -> None:
         folder_path = path
@@ -117,3 +118,10 @@ class MusicCtx:
 
     def set_caption(self, val: str) -> None:
         self.set_metadata("caption", val)
+    
+    def set_models_root(self, path: str):
+        cnfg.set_models_dir(path)
+        for func in self.model_refresh_func:
+            func()
+        ui.notify("モデルパスを保存しました")
+

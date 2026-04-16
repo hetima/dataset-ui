@@ -65,6 +65,8 @@ class Setting:
             if field_type is Path:
                 value = Path(value)
             setattr(self, name, value)
+        if not self.models_dir:
+            self.models_dir = MODELS_DIR
 
     def set_models_dir(self, path: str|Path):
         if isinstance(path, str):
@@ -72,11 +74,12 @@ class Setting:
             if path.startswith('"') and path.endswith('"'):
                 path = path.strip('"')
             path = Path(path)
-        self.models_dir = path
-        self.save()
+        if self.models_dir != path:
+            self.models_dir = path
+            self.save()
     
     def set_acestep_transcriber_model(self, name:str|None):
-        if name:
+        if name and name != self.acestep_transcriber_model:
             self.acestep_transcriber_model = name
             cnfg.save()
 

@@ -97,11 +97,13 @@ def tab_main(ctx: MusicCtx):
             ace_models = ui.select(options=opt,
                 value = val,
                 on_change=lambda e: cnfg.set_acestep_transcriber_model(e.value)).props('style="min-width: 120px"')
-            with ui.button(icon="refresh", on_click=lambda: ace_models.set_options(acestep_transcriber_models())).props('flat'):
+            with ui.button(icon="refresh", on_click=lambda: reload_acestep_transcriber_model()).props('flat'):
                 ui.tooltip("モデル一覧を更新").props('delay=600')
-            with ui.button(icon="settings", on_click=lambda: show_model_dir_panel()).props('flat'):
-                ui.tooltip("モデルフォルダ設定").props('delay=600')
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
+    
+    def reload_acestep_transcriber_model():
+        ace_models.set_options(acestep_transcriber_models())
+    ctx.model_refresh_func.append(reload_acestep_transcriber_model)
 
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
@@ -208,24 +210,3 @@ def tab_main(ctx: MusicCtx):
             ui.space()
             ui.button("保存", on_click=lambda: ctx.save_metadata())
             
-
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # モデルパス設定
-    # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.dialog() as model_dir_panel, ui.card():
-        ui.label("モデルのパスを入力してください")
-        model_root_path_input = (
-            ui.input(
-                value = str(cnfg.models_dir),
-                placeholder="フォルダのパスを入力...",
-            )
-            .props('style="min-width: 500px"')
-        )
-        with ui.row().classes("items-center gap-4").classes('w-full justify-end'):
-            ui.button('キャンセル', on_click=lambda: model_dir_panel.submit("No"))
-            ui.button("設定", on_click=lambda: model_dir_panel.submit("Yes"))
-        async def show_model_dir_panel():
-            result = await model_dir_panel
-            if result == "Yes":
-                cnfg.set_models_dir(model_root_path_input.value)
-    # model_dir_panel.set_visibility(False)
