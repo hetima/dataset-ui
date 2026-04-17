@@ -6,7 +6,7 @@ from nicegui import ui
 from nicegui.elements.table import Table
 from music.setting import cnfg
 from music.musicfile import MusicFile
-from music.worker import Worker
+from common.worker import Worker
 from music.app_ctx import MusicCtx
 from music.tab_main import tab_main
 from music.tab_setting import tab_setting

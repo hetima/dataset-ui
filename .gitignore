@@ -182,6 +182,7 @@ cython_debug/
 
 /models/
 /outputs/
+/checkpoints/
 /data/
 /dataset/
 /music_config.json

@@ -135,7 +135,7 @@ def transcript_main(
         
 
 
-def load_audio_mono_16k(audio_path):
+def load_audio_mono_16k_torchaudio(audio_path):
     import torchaudio
     
     waveform, sr = torchaudio.load(audio_path)
@@ -150,12 +150,24 @@ def load_audio_mono_16k_librosa(audio_path):
     waveform, _ = librosa.load(audio_path, sr=16000, mono=True)
     return waveform, 16000
 
+def load_audio_mono_16k_pydub(audio_path):
+    import numpy as np
+    from pydub import AudioSegment
+
+    audio = AudioSegment.from_file(audio_path).set_channels(1).set_frame_rate(16000)
+    samples = np.array(audio.get_array_of_samples())
+
+    if audio.sample_width == 2:  # 16-bit
+        samples = samples.astype(np.float32) / 32768.0
+    elif audio.sample_width == 4:  # 32-bit int
+        samples = samples.astype(np.float32) / 2147483648.0
+    return samples
 
 def analyze_audio(pipe, audio_path):
     import torch
     try:
         print(audio_path)
-        audio_data, sr = load_audio_mono_16k(audio_path)
+        audio_data, sr = load_audio_mono_16k_librosa(audio_path)
         lyrics = pipe.run_qwen_audio(
             audio_data, sr, "*Task* Transcribe this audio in detail"
         )
