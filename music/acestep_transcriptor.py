@@ -145,6 +145,11 @@ def load_audio_mono_16k(audio_path):
         waveform = torchaudio.functional.resample(waveform, sr, TARGET_SAMPLE_RATE)
     return waveform.squeeze(0).numpy(), TARGET_SAMPLE_RATE
 
+def load_audio_mono_16k_librosa(audio_path):
+    import librosa
+    waveform, _ = librosa.load(audio_path, sr=16000, mono=True)
+    return waveform, 16000
+
 
 def analyze_audio(pipe, audio_path):
     import torch

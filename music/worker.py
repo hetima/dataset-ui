@@ -1,4 +1,5 @@
 import asyncio
+import time
 import traceback
 from collections.abc import Callable, Generator
 from multiprocessing import Event, Manager, Process
@@ -42,6 +43,7 @@ class Worker:
     progress = binding.BindableProperty()
     result = binding.BindableProperty()
     status = binding.BindableProperty()
+    elapsed_time = binding.BindableProperty()
 
     def __init__(self) -> None:
         self._queue: Queue
@@ -52,6 +54,7 @@ class Worker:
         self.can_run = True
         self.result = None
         self.status = ""
+        self.elapsed_time = "00:00:00"
         self._on_complete: Callable[..., None] | None = None
         app.on_startup(self._create_queue)
 
@@ -83,6 +86,9 @@ class Worker:
         self._stop_event = m.Event()
 
     async def _consume_queue(self) -> None:
+        self.elapsed_time = "00:00:00"
+        _start_time = time.perf_counter()
+        _last_seconds = 0
         self.is_running = True
         self.can_run = False
         self.progress = 0.0
@@ -92,7 +98,13 @@ class Worker:
             try:
                 msg = self._queue.get_nowait()
             except Empty:
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.1)
+                elapsed_time = int(time.perf_counter() - _start_time)
+                if _last_seconds != elapsed_time:
+                    minutes, seconds = divmod(elapsed_time, 60)
+                    hours, minutes = divmod(minutes, 60)
+                    self.elapsed_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+                    _last_seconds = elapsed_time
                 if self._process is not None and not self._process.is_alive():
                     break
                 continue
@@ -118,6 +130,8 @@ class Worker:
         self.can_run = True
         self._stop_event.clear()
         self.status = ""
+        print(f"total time: {self.elapsed_time}")
+        self.elapsed_time = "00:00:00"
 
     def request_cancel(self) -> None:
         ui.notify("停止要求をしました")

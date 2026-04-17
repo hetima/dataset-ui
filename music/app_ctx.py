@@ -3,11 +3,12 @@ from typing import Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
+
+from common.file_util import audio_files_in_folder
 from music.setting import cnfg
 from music.musicfile import MusicFile
 from music.worker import Worker
 
-SUPPORTED_EXTENSIONS = [".wav", ".flac", ".ogg", ".mp3", ".m4a"]
 
 @binding.bindable_dataclass
 class MusicCtx:
@@ -38,11 +39,7 @@ class MusicCtx:
         cnfg.save()
         
         self.files = []
-        # for ext in SUPPORTED_EXTENSIONS:
-        for file in sorted(folder.glob(f"*")):
-            if not file.suffix in SUPPORTED_EXTENSIONS:
-                continue
-
+        for file in audio_files_in_folder(folder_path):
             musicfile = MusicFile.from_audio_file(file)
             self.files.append(musicfile.to_dict())
 

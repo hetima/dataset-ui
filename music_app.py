@@ -66,7 +66,9 @@ ACE-Step 向けのメタデータを書き出す webui です""")
         with ui.row().classes("items-center gap-4"):
             ui.spinner(size='lg')
             with ui.column():
-                ui.label("バックグラウンド処理を実行しています").style('color: #010101')
+                with ui.row().classes("items-center gap-4"):
+                    ui.label("バックグラウンド処理を実行しています").style('color: #010101')
+                    ui.label("").style('color: #010101').bind_text_from(ctx.worker, "elapsed_time")
                 with ui.row().classes("items-center gap-4"):
                     ui.button("処理を中止する", on_click=ctx.worker.request_cancel).bind_visibility_from(
                         ctx.worker, "is_running"
