@@ -1,5 +1,6 @@
 nicegui
 librosa
+mutagen
 
 transformers
 accelerate

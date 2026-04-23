@@ -4,7 +4,7 @@ from music.setting import cnfg
 
 
 
-def analyze_main(data, stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
+def analyze_main(data: list[str], stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     print("analyzing task started...")
     cnfg.load()
     yield 0, "処理開始", None
@@ -17,20 +17,14 @@ def analyze_main(data, stop_event) -> Generator[tuple[float, str, dict|None], No
         if stop_event.is_set():
             yield 1, "キャンセル", None
             return {"result": []}
-        # path = str(music_file.path)
         result = analyze_audio(path)
-        # music_file.bpm = result.get("bpm", music_file.bpm)
-        # music_file.keyscale = result.get("keyscale", music_file.keyscale)
-        # music_file.timesignature = result.get("timesignature", music_file.timesignature)
-        # music_file.duration = result.get("duration", music_file.duration)
         i = i + 1
         yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
-    # ctx.file_grid.options["rowData"] = new_data
     print("...analyzing task finished")
     return {"result": []}
 
 
-def analyze_audio(audio_path):
+def analyze_audio(audio_path: str):
     """
     Extract BPM, key, and time signature from audio using librosa.
     from ai-toolkit

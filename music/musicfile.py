@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from typing import Optional
 import re
 
 @dataclass
 class MusicFile:
     name: str
-    path: Path
+    path: str
     lyrics: str
     caption: str
     bpm: str
@@ -14,12 +15,33 @@ class MusicFile:
     timesignature: str
     language: str
     duration: str
+    
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+    
+    def __setitem__(self, key: str, value):
+        setattr(self, key, value)
 
+    def get(self, key: str, default=None):
+        return getattr(self, key, default)
+
+    def keys(self):
+        return vars(self).keys()
+
+    def values(self):
+        return vars(self).values()
+
+    def items(self):
+        return vars(self).items()
+
+    def as_dict(self):
+        return asdict(self)
+    
     def to_dict(self) -> dict:
         """MusicFile の各フィールドを辞書として返す"""
         return {
             "name": self.name,
-            "path": str(self.path),
+            "path": self.path,
             "lyrics": self.lyrics,
             "caption": self.caption,
             "bpm": self.bpm,
@@ -34,7 +56,7 @@ class MusicFile:
         """辞書から MusicFile インスタンスを生成する"""
         return cls(
             name=data.get("name", ""),
-            path=Path(data.get("path", "")),
+            path=data.get("path", ""),
             lyrics=data.get("lyrics", ""),
             caption=data.get("caption", ""),
             bpm=str(data.get("bpm", "")),
@@ -46,7 +68,7 @@ class MusicFile:
 
     def save_to_json(self) -> None:
         """音声ファイルと同名の .json にメタデータを書き出す（存在すれば上書き）"""
-        json_path = self.path.with_suffix(".json")
+        json_path = Path(self.path).with_suffix(".json")
 
         # bpm は数値として保存できれば変換する
         data = {
@@ -66,7 +88,7 @@ class MusicFile:
         if not self.lyrics.strip():
             return
 
-        lyrics_path = self.path.with_suffix(".lyrics.txt")
+        lyrics_path = Path(self.path).with_suffix(".lyrics.txt")
         with open(lyrics_path, "w", encoding="utf-8") as f:
             f.write(self.lyrics)
 
@@ -78,19 +100,18 @@ class MusicFile:
         output += f"<TIMESIGNATURE>{self.timesignature}</TIMESIGNATURE>\n"
         output += f"<DURATION>{self.duration}</DURATION>\n"
         output += f"<LANGUAGE>{self.language}</LANGUAGE>"
-        aitk_path = self.path.with_suffix(".txt")
+        aitk_path = Path(self.path).with_suffix(".txt")
         with open(aitk_path, "w", encoding="utf-8") as f:
             f.write(output)
-   
 
     @classmethod
     def from_audio_file(cls , file:Path) -> "MusicFile":
         json_path = file.with_suffix(".json")
         lyrics_path = file.with_suffix(".lyrics.txt")
         aitk_path = file.with_suffix(".txt")
-        
+
         name = file.name
-        path = file
+        path = str(file)
         lyrics = ""
         caption = ""
         bpm = ""
@@ -98,7 +119,7 @@ class MusicFile:
         timesignature = ""
         language = ""
         duration = ""
-        
+
         # txtが存在する場合は読み込み
         if aitk_path.exists():
             with open(aitk_path, "r", encoding="utf-8") as f:
@@ -143,4 +164,3 @@ class MusicFile:
             language=language,
             duration=duration,
         )
-

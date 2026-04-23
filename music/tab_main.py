@@ -21,7 +21,7 @@ def tab_main(ctx: MusicCtx):
         files = ctx.target_files()
         data = []
         for music_file in files: # type: ignore
-            data.append(music_file["path"])
+            data.append(music_file.path)
         if len(data) == 0:
             ui.notify("処理対象がありません")
             return
@@ -45,7 +45,7 @@ def tab_main(ctx: MusicCtx):
         files = ctx.target_files()
         data = []
         for music_file in files: # type: ignore
-            data.append(music_file["path"])
+            data.append(music_file.path)
         if len(data) == 0:
             ui.notify("処理対象がありません")
             return

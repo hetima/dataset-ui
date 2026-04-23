@@ -7,7 +7,7 @@ from nicegui.elements.table import Table
 from common.file_util import audio_files_in_folder
 from music.setting import cnfg
 from music.musicfile import MusicFile
-from music.worker import Worker
+from common.worker import Worker
 
 
 @binding.bindable_dataclass
@@ -37,11 +37,11 @@ class MusicCtx:
 
         cnfg.last_dataset_path = folder_path
         cnfg.save()
-        
+
         self.files = []
         for file in audio_files_in_folder(folder_path):
             musicfile = MusicFile.from_audio_file(file)
-            self.files.append(musicfile.to_dict())
+            self.files.append(musicfile)
 
         if not self.files:
             ui.notify("サポート対象のファイルが見つかりません")
@@ -57,42 +57,43 @@ class MusicCtx:
             return self.files
         rows = self.table.selected
         return rows
-    
+
     def music_file_for_path(self, path: str) -> dict|None:
         if not path:
             return None
         return next((d for d in self.files if d["path"] == path), None)
-        
+
     def analyzed(self, result: dict) -> None:
         result_files = result.get("result", [])
         for music_file in self.files:
-            info = next((d for d in result_files if d["path"] == music_file["path"]), None)
+            info = next((d for d in result_files if d["path"] == music_file.path), None)
             if info is None:
                 continue
-            music_file["bpm"] = info.get("bpm", music_file["bpm"])
-            music_file["keyscale"] = info.get("keyscale", music_file["keyscale"])
-            music_file["timesignature"] = info.get("timesignature", music_file["timesignature"])
-            music_file["duration"] = info.get("duration", music_file["duration"])
-        self.table.rows = self.files
+            music_file.bpm = info.get("bpm", music_file.bpm)
+            music_file.keyscale = info.get("keyscale", music_file.keyscale)
+            music_file.timesignature = info.get(
+                "timesignature", music_file.timesignature
+            )
+            music_file.duration = info.get("duration", music_file.duration)
+        # self.table.rows = self.files
         self.table.update()
-    
+
     def transcripted(self, result: dict) -> None:
         result_files = result.get("result", [])
         for music_file in self.files:
-            info = next((d for d in result_files if d["path"] == music_file["path"]), None)
+            info = next((d for d in result_files if d["path"] == music_file.path), None)
             if info is None:
                 continue
-            music_file["lyrics"] = info.get("lyrics", music_file["lyrics"])
-        self.table.rows = self.files
+            music_file.lyrics = info.get("lyrics", music_file.lyrics)
+        # self.table.rows = self.files
         self.table.update()
-        
-        
+
     def save_metadata(self) -> None:
-        dicts = self.table.rows
-        if len(dicts)==0:
+        files = self.files
+        if len(files) == 0:
             ui.notify("処理対象がありません")
             return
-        files = [MusicFile.from_dict(item) for item in dicts]
+        # files = [MusicFile.from_dict(item) for item in dicts]
         for file in files:
             if self.save_json:
                 file.save_to_json()
@@ -101,7 +102,7 @@ class MusicCtx:
             if self.save_aitk:
                 file.save_to_aitk()
         ui.notify("保存しました", type="positive")
-        
+
     def set_metadata(self, key: str, val: str ) -> None:
         targets = self.target_files()
         if len(targets)==0:
@@ -111,7 +112,7 @@ class MusicCtx:
             result = next((item for item in self.files if item.get("name") == tgt.get("name")), None)
             if result != None:
                 result[key] = val
-        self.table.rows = self.files
+        # self.table.rows = self.files
         self.table.update()
 
     def set_lang(self, val: str) -> None:
@@ -119,7 +120,7 @@ class MusicCtx:
 
     def set_caption(self, val: str) -> None:
         self.set_metadata("caption", val)
-    
+
     def set_models_root(self, path: str):
         if cnfg.set_models_dir(path):
             for func in self.model_refresh_func:
@@ -132,9 +133,7 @@ class MusicCtx:
         if not Path(path).is_dir():
             ui.notify(f"フォルダ「{path}」は存在しません", type="negative")
             return False
-            
+
         if cnfg.add_dataset_dir(path):
             for func in self.dataset_dirs_refresh_func:
                 func()
-
-        

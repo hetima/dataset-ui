@@ -93,7 +93,7 @@ class AcestepTranscriptorPipeline:
 
 
 def transcript_main(
-    data, stop_event
+    data: list[str], stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     import torch
     
@@ -135,7 +135,7 @@ def transcript_main(
         
 
 
-def load_audio_mono_16k_torchaudio(audio_path):
+def load_audio_mono_16k_torchaudio(audio_path: str):
     import torchaudio
     
     waveform, sr = torchaudio.load(audio_path)
@@ -145,12 +145,12 @@ def load_audio_mono_16k_torchaudio(audio_path):
         waveform = torchaudio.functional.resample(waveform, sr, TARGET_SAMPLE_RATE)
     return waveform.squeeze(0).numpy(), TARGET_SAMPLE_RATE
 
-def load_audio_mono_16k_librosa(audio_path):
+def load_audio_mono_16k_librosa(audio_path: str):
     import librosa
     waveform, _ = librosa.load(audio_path, sr=16000, mono=True)
     return waveform, 16000
 
-def load_audio_mono_16k_pydub(audio_path):
+def load_audio_mono_16k_pydub(audio_path: str):
     import numpy as np
     from pydub import AudioSegment
 
@@ -163,7 +163,7 @@ def load_audio_mono_16k_pydub(audio_path):
         samples = samples.astype(np.float32) / 2147483648.0
     return samples
 
-def analyze_audio(pipe, audio_path):
+def analyze_audio(pipe, audio_path: str):
     import torch
     try:
         print(audio_path)
