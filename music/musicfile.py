@@ -8,17 +8,20 @@ import re
 class MusicFile:
     name: str
     path: str
-    lyrics: str
-    caption: str
-    bpm: str
-    keyscale: str
-    timesignature: str
-    language: str
-    duration: str
-    
+    lyrics: Optional[str]
+    synced_lyrics: Optional[str]
+    caption: Optional[str]
+    bpm: Optional[str]
+    keyscale: Optional[str]
+    timesignature: Optional[str]
+    language: Optional[str]
+    duration: Optional[str]
+    title: Optional[str] = None
+    artist: Optional[str] = None
+
     def __getitem__(self, key: str):
         return getattr(self, key)
-    
+
     def __setitem__(self, key: str, value):
         setattr(self, key, value)
 
@@ -36,7 +39,7 @@ class MusicFile:
 
     def as_dict(self):
         return asdict(self)
-    
+
     def to_dict(self) -> dict:
         """MusicFile の各フィールドを辞書として返す"""
         return {
@@ -58,6 +61,7 @@ class MusicFile:
             name=data.get("name", ""),
             path=data.get("path", ""),
             lyrics=data.get("lyrics", ""),
+            synced_lyrics=data.get("synced_lyrics", ""),
             caption=data.get("caption", ""),
             bpm=str(data.get("bpm", "")),
             keyscale=data.get("keyscale", ""),
@@ -85,7 +89,7 @@ class MusicFile:
 
     def save_to_lyrics(self) -> None:
         """音声ファイルと同名の .lyrics.txt に歌詞を書き出す（存在すれば上書き、空なら何もしない）"""
-        if not self.lyrics.strip():
+        if not self.lyrics:
             return
 
         lyrics_path = Path(self.path).with_suffix(".lyrics.txt")
@@ -113,6 +117,7 @@ class MusicFile:
         name = file.name
         path = str(file)
         lyrics = ""
+        synced_lyrics = ""
         caption = ""
         bpm = ""
         keyscale = ""
@@ -157,6 +162,7 @@ class MusicFile:
             name=name,
             path=path,
             lyrics=lyrics,
+            synced_lyrics=synced_lyrics,
             caption=caption,
             bpm=bpm,
             keyscale=keyscale,
