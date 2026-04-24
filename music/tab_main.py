@@ -3,7 +3,7 @@ from typing import cast
 from functools import partial
 
 from nicegui import ui
-from common.local_file_picker import LocalFilePicker
+from common.folder_picker import FolderPicker
 from music.setting import cnfg
 from music.musicanalyze import analyze_main
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
@@ -60,7 +60,7 @@ def tab_main(ctx: MusicCtx):
     #     ]
     
     async def pick_folder(path: str) -> None:
-        result = await LocalFilePicker(path, folder_only=True)
+        result = await FolderPicker(path, read_all=False)
         if isinstance(result, list) and len(result) > 0:
             path_input.value = result[0]
 
