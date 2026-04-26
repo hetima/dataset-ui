@@ -6,3 +6,10 @@ transformers
 accelerate
 bitsandbytes
 # torchcodec #==0.10.0
+
+# roforner
+rotary_embedding_torch
+einops
+huggingface_hub
+BS-RoFormer
+pyloudnorm
