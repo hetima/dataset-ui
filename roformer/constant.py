@@ -1,0 +1,307 @@
+# HuggingFace model registry.
+# Each entry has: display_name, repo_id, filename, recommend.
+# recommend=True  →  appears in the curated / latest-only loader.
+
+# type values: vocals, instrumental, big, karaoke, vocals_inst,
+#              multi_stem, dereverb, denoise, aspiration, dereverb
+
+KNOWN_MODELS = [
+    # ── Vocals ──────────────────────────────────────────────────────���───────
+    {
+        "display_name": "Vocals · Kim fp16 ⭐ [Kijai]",
+        "repo_id": "Kijai/MelBandRoFormer_comfy",
+        "filename": "MelBandRoformer_fp16.safetensors",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals · Kim fp32 [Kijai]",
+        "repo_id": "Kijai/MelBandRoFormer_comfy",
+        "filename": "MelBandRoformer_fp32.safetensors",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "Vocals · Kim original [KimberleyJSN]",
+        "repo_id": "KimberleyJSN/melbandroformer",
+        "filename": "MelBandRoformer.ckpt",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "Vocals · Kim FT v2 ⭐ [pcunwa]",
+        "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
+        "filename": "kimmel_unwa_ft2.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals · Kim FT v2 bleedless [pcunwa]",
+        "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
+        "filename": "kimmel_unwa_ft2_bleedless.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals · Kim FT v1 [pcunwa]",
+        "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
+        "filename": "kimmel_unwa_ft.ckpt",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "Vocals · becruily",
+        "repo_id": "becruily/mel-band-roformer-vocals",
+        "filename": "mel_band_roformer_vocals_becruily.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals · GaboxR67 fv7",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/vocals/voc_fv7.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals · GaboxR67 fv6",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/vocals/voc_fv6.ckpt",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "Vocals small · pcunwa",
+        "repo_id": "pcunwa/Mel-Band-Roformer-small",
+        "filename": "melband_roformer_small_v1.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    # ── Instrumental ────────────────────────────────────────────────────────
+    {
+        "display_name": "Instrumental · becruily",
+        "repo_id": "becruily/mel-band-roformer-instrumental",
+        "filename": "mel_band_roformer_instrumental_becruily.ckpt",
+        "type": "instrumental",
+        "recommend": True,
+    },
+    {
+        "display_name": "Instrumental v2 (depth-12) · pcunwa ⭐",
+        "repo_id": "pcunwa/Mel-Band-Roformer-Inst",
+        "filename": "melband_roformer_inst_v2.ckpt",
+        "type": "instrumental",
+        "recommend": True,
+    },
+    {
+        "display_name": "Instrumental v1 · pcunwa",
+        "repo_id": "pcunwa/Mel-Band-Roformer-Inst",
+        "filename": "melband_roformer_inst_v1.ckpt",
+        "type": "instrumental",
+        "recommend": False,
+    },
+    {
+        "display_name": "Instrumental · GaboxR67 INSTV6 ⭐",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/instrumental/INSTV6.ckpt",
+        "type": "instrumental",
+        "recommend": True,
+    },
+    {
+        "display_name": "Instrumental · GaboxR67 Fv9",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/instrumental/Inst_GaboxFv9.ckpt",
+        "type": "instrumental",
+        "recommend": False,
+    },
+    {
+        "display_name": "Instrumental · GaboxR67 Fv8",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/instrumental/Inst_GaboxFv8.ckpt",
+        "type": "instrumental",
+        "recommend": False,
+    },
+    # ── Big models (dim=512) ─────────────────────────────────────────────────
+    {
+        "display_name": "Vocals big beta6 (dim=512) · pcunwa ⭐",
+        "repo_id": "pcunwa/Mel-Band-Roformer-big",
+        "filename": "big_beta6.ckpt",
+        "type": "big",
+        "recommend": True,
+    },
+    {
+        "display_name": "Vocals big beta6x (dim=512) · pcunwa",
+        "repo_id": "pcunwa/Mel-Band-Roformer-big",
+        "filename": "big_beta6x.ckpt",
+        "type": "big",
+        "recommend": False,
+    },
+    {
+        "display_name": "Vocals big beta7 · pcunwa",
+        "repo_id": "pcunwa/Mel-Band-Roformer-big",
+        "filename": "big_beta7.ckpt",
+        "type": "big",
+        "recommend": True,
+    },
+    # ── Karaoke ────────────────────────────────────────
+    {
+        "display_name": "Karaoke · aufr33/viperx ⭐",
+        "repo_id": "jarredou/aufr33-viperx-karaoke-melroformer-model",
+        "filename": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+        "type": "karaoke",
+        "recommend": True,
+    },
+    {
+        "display_name": "Karaoke · becruily (2-stem)",
+        "repo_id": "becruily/mel-band-roformer-karaoke",
+        "filename": "mel_band_roformer_karaoke_becruily.ckpt",
+        "type": "karaoke",
+        "recommend": True,
+    },
+    {
+        "display_name": "Karaoke · GaboxR67 V1",
+        "repo_id": "GaboxR67/MelBandRoformers",
+        "filename": "melbandroformers/karaoke/Karaoke_GaboxV1.ckpt",
+        "type": "karaoke",
+        "recommend": True,
+    },
+    # ── Vocals + Inst 2-stem ────────────────────────────────────────
+    {
+        "display_name": "Vocals+Instrumental 2-stem · becruily",
+        "repo_id": "becruily/mel-band-roformer-deux",
+        "filename": "becruily_deux.ckpt",
+        "type": "vocals_inst",
+        "recommend": True,
+    },
+    # ── 4-stem ─────────────────────────────────
+    {
+        "display_name": "4-stem large · Aname-Tommy [stem_1=vox only]",
+        "repo_id": "Aname-Tommy/melbandroformer4stems",
+        "filename": "mel_band_roformer_4stems_large_ver1.ckpt",
+        "type": "multi_stem",
+        "recommend": True,
+    },
+    {
+        "display_name": "4-stem XL · Aname-Tommy [stem_1=vox only]",
+        "repo_id": "Aname-Tommy/melbandroformer4stems",
+        "filename": "mel_band_roformer_4stems_xl_ver1.ckpt",
+        "type": "multi_stem",
+        "recommend": True,
+    },
+    # ── Dereverb ─────────────────────────────────────────────
+    {
+        "display_name": "Dereverb · anvuew ⭐ (SDR 19.17)",
+        "repo_id": "anvuew/dereverb_mel_band_roformer",
+        "filename": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb less-aggressive · anvuew (SDR 18.80)",
+        "repo_id": "anvuew/dereverb_mel_band_roformer",
+        "filename": "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb mono-optimized · anvuew (SDR 20.40)",
+        "repo_id": "anvuew/dereverb_mel_band_roformer",
+        "filename": "dereverb_mel_band_roformer_mono_anvuew_sdr_20.4029.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb+Echo v2 · Sucial",
+        "repo_id": "Sucial/Dereverb-Echo_Mel_Band_Roformer",
+        "filename": "dereverb_echo_mbr_v2_sdr_dry_13.4843.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb+Echo fused · Sucial",
+        "repo_id": "Sucial/Dereverb-Echo_Mel_Band_Roformer",
+        "filename": "dereverb_echo_mbr_fused_0.5_v2_0.25_big_0.25_super.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb big reverb · Sucial",
+        "repo_id": "Sucial/Dereverb-Echo_Mel_Band_Roformer",
+        "filename": "de_big_reverb_mbr_ep_362.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb super-big reverb · Sucial",
+        "repo_id": "Sucial/Dereverb-Echo_Mel_Band_Roformer",
+        "filename": "de_super_big_reverb_mbr_ep_346.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+    {
+        "display_name": "Dereverb+Echo v1 · Sucial",
+        "repo_id": "Sucial/Dereverb-Echo_Mel_Band_Roformer",
+        "filename": "dereverb-echo_mel_band_roformer_sdr_10.0169.ckpt",
+        "type": "dereverb",
+        "recommend": False,
+    },
+    # ── Denoise ─────────────────────────────────────────────────────────────
+    {
+        "display_name": "Denoise · aufr33 ⭐",
+        "repo_id": "poiqazwsx/melband-roformer-denoise",
+        "filename": "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
+        "type": "denoise",
+        "recommend": True,
+    },
+    {
+        "display_name": "Denoise aggressive · aufr33",
+        "repo_id": "poiqazwsx/melband-roformer-denoise",
+        "filename": "denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768.ckpt",
+        "type": "denoise",
+        "recommend": True,
+    },
+    # ── Aspiration (breath/mouth sounds) ────────────────────────────────────
+    {
+        "display_name": "Aspiration · Sucial ⭐",
+        "repo_id": "Sucial/Aspiration_Mel_Band_Roformer",
+        "filename": "aspiration_mel_band_roformer_sdr_18.9845.ckpt",
+        "type": "aspiration",
+        "recommend": True,
+    },
+    {
+        "display_name": "Aspiration less-aggressive · Sucial",
+        "repo_id": "Sucial/Aspiration_Mel_Band_Roformer",
+        "filename": "aspiration_mel_band_roformer_less_aggr_sdr_18.1201.ckpt",
+        "type": "aspiration",
+        "recommend": True,
+    },
+    # ── BS-RoFormer: Vocals ─────────────────────────────────────────────────
+    {
+        "display_name": "[BS] Vocals revive v3e ⭐ · pcunwa",
+        "repo_id": "pcunwa/BS-Roformer-Revive",
+        "filename": "bs_roformer_revive3e.ckpt",
+        "type": "vocals",
+        "recommend": True,
+    },
+    {
+        "display_name": "[BS] Vocals revive v2 · pcunwa",
+        "repo_id": "pcunwa/BS-Roformer-Revive",
+        "filename": "bs_roformer_revive2.ckpt",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "[BS] Vocals revive v1 · pcunwa",
+        "repo_id": "pcunwa/BS-Roformer-Revive",
+        "filename": "bs_roformer_revive.ckpt",
+        "type": "vocals",
+        "recommend": False,
+    },
+    # ── BS-RoFormer: Dereverb ────────────────────────────────────────────────
+    {
+        "display_name": "[BS] Dereverb · anvuew ⭐ (SDR 22.51)",
+        "repo_id": "anvuew/deverb_bs_roformer",
+        "filename": "dereverb_bs_roformer_anvuew_sdr_22.5050.ckpt",
+        "type": "dereverb",
+        "recommend": True,
+    },
+]

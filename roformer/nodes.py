@@ -16,10 +16,16 @@ except ImportError:
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
-from comfy import model_management as mm
-from comfy.utils import load_torch_file, ProgressBar
-device = mm.get_torch_device()
-offload_device = mm.unet_offload_device()
+def _load_torch_file(path):
+    """Load model weights from .safetensors or .ckpt files (standalone replacement for comfy.utils.load_torch_file)."""
+    if path.endswith(".safetensors"):
+        from safetensors.torch import load_file
+        return load_file(path)
+    return torch.load(path, map_location="cpu", weights_only=False)
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+offload_device = torch.device("cpu")
 
 # ---------------------------------------------------------------------------
 # Base configs — variable fields are overridden by infer_* functions
@@ -399,7 +405,7 @@ class MelBandRoFormerModelLoader:
         else:
             model_path = folder_paths.get_full_path_or_raise("MelBandRoFormer", model_name)
 
-        sd = load_torch_file(model_path)
+        sd = _load_torch_file(model_path)
         model_type, config = infer_config(sd)
         print(f"[MelBandRoFormer] Detected {model_type}: dim={config['dim']}, depth={config['depth']}, "
               f"num_stems={config['num_stems']}, time_depth={config['time_transformer_depth']}, "
@@ -496,7 +502,6 @@ class MelBandRoFormerSampler:
         cnt = torch.zeros(num_stems, *audio_input.shape, dtype=torch.float32, device=device)
 
         model.to(device)
-        comfy_pbar = ProgressBar(num_chunks)
 
         with torch.no_grad():
             for b_start in tqdm(range(0, num_chunks, batch_size), desc="Processing chunks"):
@@ -530,8 +535,6 @@ class MelBandRoFormerSampler:
 
                     acc[..., i:i + eff] += out[..., :eff] * window[..., :eff]
                     cnt[..., i:i + eff] += window[..., :eff]
-
-                comfy_pbar.update(len(batch_starts))
 
         model.to(offload_device)
 
@@ -853,7 +856,6 @@ class MelBandRoFormerSampler4Stem(MelBandRoFormerSampler):
         cnt = torch.zeros(num_stems, *audio_input.shape, dtype=torch.float32, device=device)
 
         model.to(device)
-        comfy_pbar = ProgressBar(num_chunks)
 
         with torch.no_grad():
             for b_start in tqdm(range(0, num_chunks, batch_size), desc="Processing chunks"):
@@ -883,8 +885,6 @@ class MelBandRoFormerSampler4Stem(MelBandRoFormerSampler):
                         window[-fade_samples:] = 1
                     acc[..., i:i + eff] += out[..., :eff] * window[..., :eff]
                     cnt[..., i:i + eff] += window[..., :eff]
-
-                comfy_pbar.update(len(batch_starts))
 
         model.to(offload_device)
         estimated = acc / cnt.clamp(min=1e-8)
