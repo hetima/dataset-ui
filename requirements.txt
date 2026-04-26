@@ -13,3 +13,4 @@ einops
 huggingface_hub
 BS-RoFormer
 pyloudnorm
+picklescan
