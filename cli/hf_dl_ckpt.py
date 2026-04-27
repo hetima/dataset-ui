@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 def try_url_to_hf_repo(url: str):
@@ -14,7 +15,7 @@ def try_url_to_hf_repo(url: str):
 def download_hf_model(repo_id: str, filename: str, output_dir: str):
     """Download a model from HuggingFace into ComfyUI's diffusion_models folder."""
     try:
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download, snapshot_download
     except ImportError:
         raise ImportError(
             "huggingface_hub is required for auto-download. "
@@ -28,15 +29,29 @@ def download_hf_model(repo_id: str, filename: str, output_dir: str):
     repo_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
     os.makedirs(repo_dir, exist_ok=True)
     save_path = os.path.join(repo_dir, filename)
-    if not os.path.exists(save_path):
-        safetensors_path = Path(save_path).with_suffix(".safetensors")
-        if safetensors_path.exists():
-            print(f"safetensors file already exists at {str(safetensors_path)}, skipping download.")
-        print(f"Downloading {filename} from {repo_id} ...")
-        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
-        print(f"Saved to {save_path}")
+    # filenameがサブフォルダを含む場合、allow_patternsもそのパスに合わせる
+    file_parent = str(Path(filename).parent)
+    if file_parent and file_parent != ".":
+        yaml_pattern = f"{file_parent}/*.yaml"
     else:
-        print(f"File already exists at {save_path}, skipping download.")
+        yaml_pattern = "*.yaml"
+
+    # safetensors_path = Path(save_path).with_suffix(".safetensors")
+    # if safetensors_path.exists():
+    #     print(f"safetensors file already exists at {str(safetensors_path)}, skipping download.")
+    print(f"Downloading {filename} from {repo_id} ...")
+    hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
+    snapshot_download(
+        repo_id=repo_id,
+        local_dir=repo_dir,
+        allow_patterns=yaml_pattern,
+    )
+    # tqdmの出力が別スレッドで書き込まれるため、フラッシュして出力を同期する
+    sys.stdout.flush()
+    sys.stderr.flush()
+    print("")
+    print(f"Saved to {save_path}")
+
     return save_path
 
 def post_processing(path: Path, convert: bool = False):
