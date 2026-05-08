@@ -86,13 +86,13 @@ class Setting:
     def set_acestep_transcriber_model(self, name:str|None):
         if name and name != self.acestep_transcriber_model:
             self.acestep_transcriber_model = name
-            cnfg.save()
+            self.save()
 
     def add_dataset_dir(self, path: str) -> bool:
         if not path or path in self.dataset_dirs:
             return False
         self.dataset_dirs.append(path)
-        cnfg.save()
+        self.save()
         return True
 
     def delete_dataset_dir(self, path: str) -> bool:
@@ -103,9 +103,8 @@ class Setting:
 
     def set_dataset_dir(self, new_list: list) -> bool:
         self.dataset_dirs = new_list
-        cnfg.save()
+        self.save()
         return True
 
 
 cnfg = Setting()
-cnfg.load()
