@@ -4,6 +4,7 @@ from functools import partial
 
 from nicegui import ui
 from common.folder_picker import FolderPicker
+from common.download_repo import download_repo
 from music.music_setting import cnfg
 from music.musicanalyze import analyze_main
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
@@ -16,7 +17,7 @@ def tab_main(ctx: MusicCtx):
 
     def analyze_finished(result) -> None:
         ctx.analyzed(result)
-        
+
     async def analyze() -> None:
         files = ctx.target_files()
         data = []
@@ -27,10 +28,10 @@ def tab_main(ctx: MusicCtx):
             return
         cnfg.save()
         await ctx.worker.run(analyze_main, data, analyze_finished)
-    
+
     def transcript_finished(result) -> None:
         ctx.transcripted(result)
-        
+
     async def transcript() -> None:
         if not cnfg.acestep_transcriber_model:
             ui.notify("モデルを選択してください")
@@ -58,14 +59,14 @@ def tab_main(ctx: MusicCtx):
     #         row | new_row if row["name"] == new_row["name"] else row
     #         for row in ctx.file_grid.options["rowData"]
     #     ]
-    
+
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)
         if isinstance(result, list) and len(result) > 0:
             path_input.value = result[0]
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Load files 
+    # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
 
     with ui.row().classes("items-center gap-2"):
@@ -86,10 +87,10 @@ def tab_main(ctx: MusicCtx):
         with dataset_dropdown:
             for path in cnfg.dataset_dirs:
                 ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
-    
+
     update_dataset_dropdown()
     ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)
-    
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -98,11 +99,11 @@ def tab_main(ctx: MusicCtx):
         ui.label("処理対象:")
         ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
         ui.space()
-    
+
     with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを librosa で解析し、BPM、キー、拍子、時間を取得します")
         ui.button("曲を解析する", on_click=analyze).bind_enabled_from(ctx.worker, "can_run")
-    
+
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
         ui.label("モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
@@ -122,25 +123,63 @@ def tab_main(ctx: MusicCtx):
             with ace_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     ace_models_menu = ui.menu()
-            
+
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
-    
+
+    def download_model(model_id: str):
+        download_repo(model_id, str(cnfg.models_dir))
+        # TODO: 完了したらメニュー更新
+
     def reload_acestep_transcriber_model():
         models = acestep_transcriber_models()
         ace_models_menu.clear()
         local_added = False
         with ace_models_menu:
             for model in models:
-                ui.menu_item(model, lambda:setattr(ace_model_input, "value", model)).classes("padd8")
+                ui.menu_item(model, lambda m=model: setattr(ace_model_input, "value", m)).classes("padd8")
                 local_added = True
             if local_added:
                 ui.separator()
             ui.menu_item("from huggingface").classes("padd8").enabled=False
-            ui.menu_item("ACE-Step/acestep-transcriber", lambda:setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber")).classes("padd8")
-            ui.menu_item("hrktxz/acestep-transcriber-4bit", lambda:setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit")).classes("padd8")
+            # ACE-Step/acestep-transcriber
+            if "acestep-transcriber" not in models:
+                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber"), ace_models_menu.close()]).classes("padd8 items-center"):
+                    ui.item_section("ACE-Step/acestep-transcriber")
+                    ui.button(
+                        "ダウンロードする",
+                        on_click=lambda: [
+                            ace_models_menu.close(),
+                            download_model("ACE-Step/acestep-transcriber"),
+                        ],
+                    ).props("flat dense color=primary").style("margin-left: 8px").on(
+                        "click", js_handler="(e) => e.stopPropagation()"
+                    )
+            else:
+                ui.menu_item(
+                    "ACE-Step/acestep-transcriber",
+                    lambda: setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber"),
+                ).classes("padd8")
+            # hrktxz/acestep-transcriber-4bit
+            if "acestep-transcriber-4bit" not in models:
+                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"), ace_models_menu.close()]).classes("padd8 items-center"):
+                    ui.item_section("hrktxz/acestep-transcriber-4bit")
+                    ui.button(
+                        "ダウンロードする",
+                        on_click=lambda: [
+                            ace_models_menu.close(),
+                            download_model("hrktxz/acestep-transcriber-4bit"),
+                        ],
+                    ).props("flat dense color=primary").style("margin-left: 8px").on(
+                        "click", js_handler="(e) => e.stopPropagation()"
+                    )
+            else:
+                ui.menu_item(
+                    "hrktxz/acestep-transcriber-4bit",
+                    lambda: setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"),
+                ).classes("padd8")
             ui.separator()
-            ui.menu_item("メニューを更新", lambda:reload_acestep_transcriber_model()).classes("padd8")
-            
+            ui.menu_item("メニューを更新", lambda: reload_acestep_transcriber_model()).classes("padd8")
+
     reload_acestep_transcriber_model()
     ctx.model_refresh_func.append(reload_acestep_transcriber_model)
 
@@ -164,7 +203,7 @@ def tab_main(ctx: MusicCtx):
         player.set_source(path)
         player.play()
         play_info.set_text(Path(path).name)
-        
+
     ctx.table = ui.table(
         columns=[
             {"label": "", "field": "path", "name": "play", "style": 'width: 50px'},
