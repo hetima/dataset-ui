@@ -20,74 +20,50 @@ def asr_models() -> list[str]:
     ]
 
 
-class AcestepTranscriptorPipeline:
-    def __init__(self, model, processor):
+class QwenASRPipeline:
+    def __init__(self, model):
         self.model = model
-        self.processor = processor
 
     def run_qwen_audio(self, audio_data, sr, prompt_text):
         """Run a Qwen2.5-Omni model on audio with a text prompt."""
         import logging
         logging.disable(logging.WARNING) 
 
-        conversation = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "audio", "audio": "<|audio_bos|><|AUDIO|><|audio_eos|>"},
-                    {"type": "text", "text": prompt_text},
-                ],
-            }
-        ]
-        text = self.processor.apply_chat_template(
-            conversation, add_generation_prompt=True, tokenize=False
+        results = self.model.transcribe(
+            audio=(audio_data, sr),
+            language="Japanese",  # set "English" to force the language
         )
-        inputs = self.processor(
-            text=text,
-            audio=[audio_data],
-            images=None,
-            videos=None,
-            return_tensors="pt",
-            padding=True,
-            sampling_rate=sr,
-        )
-        inputs = inputs.to(self.model.device).to(self.model.dtype)
-        text_ids = self.model.generate(**inputs, return_audio=False)
-        output = self.processor.batch_decode(
-            text_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )
-        result = output[0]
-        marker = "assistant\n"
-        if marker in result:
-            result = result[result.rfind(marker) + len(marker) :]
-        return result.strip()
+        return results[0].text.strip()
 
     @classmethod
     def from_pretrained(cls, device, dtype):
-        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
-        
+        import torch
+        from qwen_asr import Qwen3ASRModel
+        from transformers import AutoConfig, AutoModel
+
         local_files_only = True
-        model_path = str(cnfg.models_dir / cnfg.acestep_transcriber_model)
+        model_path = str(cnfg.models_dir / cnfg.asr_model)
         if not os.path.exists(model_path):
-            if cnfg.acestep_transcriber_model.find("/") >= 1:
-                model_path = cnfg.acestep_transcriber_model
+            if cnfg.asr_model.find("/") >= 1:
+                model_path = cnfg.asr_model
                 local_files_only = False
             else:
                 raise FileNotFoundError(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません"
+                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.asr_model}」フォルダが存在しません"
                 )
         print(f"model path: {model_path}")
-        model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            model_path, torch_dtype=dtype, device_map=device, local_files_only=local_files_only
-        )
-        model.disable_talker()
-        processor = Qwen2_5OmniProcessor.from_pretrained(
-            model_path, local_files_only=local_files_only
+        # config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+        model = Qwen3ASRModel.from_pretrained(
+            model_path,
+            dtype=torch.bfloat16,
+            device_map="cuda:0",
+            # attn_implementation="flash_attention_2",
+            max_inference_batch_size=1,  # Batch size limit for inference. -1 means unlimited. Smaller values can help avoid OOM.
+            max_new_tokens=256,  # Maximum number of tokens to generate. Set a larger value for long audio input.
         )
 
         return cls(
             model=model,
-            processor=processor,
         )
 
 
@@ -95,7 +71,7 @@ def transcript_main(
     data: list[str], stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     import torch
-    
+
     print("transcribe task started...")
     cnfg.load()
     new_data = []
@@ -105,7 +81,7 @@ def transcript_main(
         yield 1, "完了", None
         return {"err": "処理するファイルがありませんでした"}
     try:
-        pipe = AcestepTranscriptorPipeline.from_pretrained(
+        pipe = QwenASRPipeline.from_pretrained(
             device=torch.device("cuda"),
             dtype=torch.float16,
         )

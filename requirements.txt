@@ -3,7 +3,7 @@ librosa
 soundfile
 mutagen
 
-transformers
+transformers>=5.4
 accelerate
 bitsandbytes
 # torchcodec #==0.10.0
@@ -17,8 +17,8 @@ pyloudnorm
 picklescan
 
 # uv pip install qwen_asr --no-deps
-# nagisa
-# soynlp
+nagisa
+soynlp
 # qwen-omni-utils
 # sox
 # flask

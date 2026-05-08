@@ -5,7 +5,7 @@ from functools import partial
 from nicegui import ui
 from common.folder_picker import FolderPicker
 from voice.voice_setting import cnfg
-from voice.asr_transcriptor import transcript_main, asr_models
+from voice.qwen3_asr_transcriptor import transcript_main, asr_models
 from voice.voice_app_ctx import VoiceCtx
 
 def tab_main(ctx: VoiceCtx):
@@ -27,7 +27,7 @@ def tab_main(ctx: VoiceCtx):
         files = ctx.target_files()
         data = []
         for music_file in files: # type: ignore
-            data.append(music_file.path)
+            data.append(music_file["path"])
         if len(data) == 0:
             ui.notify("処理対象がありません")
             return
