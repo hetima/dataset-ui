@@ -8,6 +8,7 @@ from common.worker import Worker
 from music.index import main_page as main_page_music
 
 _worker: Worker = Worker()
+_auto_reload_flag = False
 
 def header():
     ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
@@ -39,6 +40,11 @@ def header():
 }
 ''')
     ui.colors(secondary='#747474')
+    if _auto_reload_flag:
+        ui.label(
+            "※ --auto-reload フラグが有効になっています。ソースコードを編集すると自動でリロードされます。"
+        ).style("color: #cc2222")
+
 
 def footer():
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -91,6 +97,7 @@ def make_startup_message(host: str, port: int):
     return startup_message
 
 def main() -> None:
+    global _auto_reload_flag
     parser = argparse.ArgumentParser(description="ACE-Step向けのメタデータを書き出すwebuiです")
     parser.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
     parser.add_argument("--port", type=int, default=7869, help="default: 7869")
@@ -98,6 +105,7 @@ def main() -> None:
     parser.add_argument("--auto-reload", default=False, action="store_true", help="ソースコードが編集されたら自動でリロードする")
 
     args = parser.parse_args()
+    _auto_reload_flag = args.auto_reload
     app.on_startup(make_startup_message(args.host, args.port))
     ui.run(
         host=args.host,
