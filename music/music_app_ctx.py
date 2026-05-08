@@ -48,14 +48,15 @@ class MusicCtx:
             musicfile = MusicFile.from_audio_file(file)
             self.files.append(musicfile)
 
-        if not self.files:
-            self.notify("サポート対象のファイルが見つかりません")
-            return
 
         self.table.rows = self.files
+        self.table.selected = []
         self.table.update()
 
-        self.notify(f"{len(self.files)} 件のファイルを読み込みました", type="positive")
+        if not self.files:
+            self.notify("サポート対象のファイルが見つかりません")
+        else:
+            self.notify(f"{len(self.files)} 件のファイルを読み込みました", type="positive")
 
     def target_files(self) -> list:
         if self.target == "all":
