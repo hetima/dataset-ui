@@ -66,12 +66,9 @@ class XtermDialog(ui.dialog):
         self.style("max-width: none")
         with self, ui.card().classes("").style("max-width: 70vw"):
             ui.label(self.title).classes("text-sm")
-            self._terminal = ui.xterm(xterm_option)
-            ui.add_head_html(
-                f'<style>#c{self._terminal.id} .terminal {{ padding:6px 22px 6px 6px; }}</style>'
-            )
+            self._terminal = ui.xterm(xterm_option).classes("dialog-xterm")
             with ui.row().classes("w-full justify-end"):
-                self._stop_btn = ui.button("停止", on_click=self._stop_download)
+                self._stop_btn = ui.button("停止", on_click=self._stop_command)
                 self._stop_btn.set_enabled(False)
                 self._close_btn = ui.button("閉じる", on_click=self._safe_close)
                 self._close_btn.set_enabled(False)
@@ -115,7 +112,7 @@ class XtermDialog(ui.dialog):
             self._terminal.write("\r\n[キャンセルされました(タスク)]\r\n")
         except Exception as e:
             tb = traceback.format_exc()
-            self._terminal.write(f"\r\n[エラー] {type(e).__name__}: {e}\r\n{tb}\r\n")
+            self._terminal.write(f"\r\n[エラー] {type(e).__name__}: {e}")
         finally:
             self._is_running = False
             self._process = None
@@ -126,7 +123,7 @@ class XtermDialog(ui.dialog):
         """安全にダイアログを閉じる"""
         self.delete()
 
-    def _stop_download(self):
+    def _stop_command(self):
         """ダウンロードプロセスを停止"""
         if self._process and self._is_running:
             self._cancelled = True

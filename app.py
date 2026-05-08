@@ -35,6 +35,11 @@ def header():
 .q-checkbox__inner {
     font-size: 34px;
 }
+
+.dialog-xterm .terminal {
+    padding: 6px 22px 6px 6px;
+}
+
 ''')
     ui.colors(secondary='#747474')
     if _auto_reload_flag:
