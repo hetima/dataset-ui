@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 from typing import cast
 
-from nicegui import ui
+from nicegui import ui, app
 from nicegui.elements.table import Table
 from music.setting import cnfg
 from music.musicfile import MusicFile
@@ -58,7 +58,7 @@ ACE-Step 向けのメタデータを書き出す webui です""")
             tab_main(ctx)
         with ui.tab_panel(setting_tab):
             tab_setting(ctx)
-            
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # 処理中UI
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -82,6 +82,16 @@ ACE-Step 向けのメタデータを書き出す webui です""")
         ).bind_visibility_from(ctx.worker, "is_running")
 
 
+@ui.page("/test")
+def test_page():
+    ui.label("test")
+
+
+def make_startup_message(host: str, port: int):
+    async def startup_message():
+        print(f"dataset-ui ready  http://{host}:{port}", flush=True)
+    return startup_message
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="ACE-Step向けのメタデータを書き出すwebuiです")
     parser.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
@@ -90,15 +100,14 @@ def main() -> None:
     parser.add_argument("--auto-reload", default=False, action="store_true", help="ソースコードが編集されたら自動でリロードする")
 
     args = parser.parse_args()
-    # music_ctx = MusicCtx()
-    # main_page(music_ctx)
-    # music_ctx.worker._create_queue()
+    app.on_startup(make_startup_message(args.host, args.port))
     ui.run(
         host=args.host,
         port=args.port,
         title="dataset-ui-music",
         reload=args.auto_reload,
         native=args.native,
+        show_welcome_message=False,
     )
 
 
