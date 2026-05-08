@@ -81,9 +81,11 @@ def tab_main(ctx: VoiceCtx):
         ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
         ui.space()
 
-    with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを解析します。")
-        ui.label("モデルフォルダの中にある asr のフォルダ名を入力してください。"
+    with ui.expansion("音声認識", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label("処理対象ファイルを QWEN3-ASR で音声認識します。")
+        ui.label("モデルフォルダの中にある QWEN3-ASR のフォルダ名を入力してください。"
                  "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
                  "（デフォルトのキャッシュにダウンロードされ再利用されます）。").classes('infotxt')
         with ui.row().classes("items-center gap-4"):

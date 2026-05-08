@@ -16,7 +16,7 @@ def asr_models() -> list[str]:
         for p in models_dir.iterdir()
         if p.is_dir()
         and "asr" in p.name.lower()
-        # and "transcriber" in p.name.lower()
+        and "qwen" in p.name.lower()
     ]
 
 
@@ -24,7 +24,7 @@ class QwenASRPipeline:
     def __init__(self, model):
         self.model = model
 
-    def run_qwen_audio(self, audio_data, sr, prompt_text):
+    def run_qwen_audio(self, audio_data, sr):
         """Run a Qwen2.5-Omni model on audio with a text prompt."""
         import logging
         logging.disable(logging.WARNING) 
@@ -142,9 +142,7 @@ def analyze_audio(pipe, audio_path: str):
     try:
         print(audio_path)
         audio_data, sr = load_audio_mono_16k_librosa(audio_path)
-        caption = pipe.run_qwen_audio(
-            audio_data, sr, "*Task* Transcribe this audio in detail"
-        )
+        caption = pipe.run_qwen_audio(audio_data, sr)
     except Exception as e:
         print(f"\n  Error transcribing {os.path.basename(audio_path)}: {e}")
         caption = ""
