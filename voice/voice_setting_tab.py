@@ -1,10 +1,10 @@
 from pathlib import Path
 from nicegui import binding, ui
-from music.setting import cnfg
-from music.app_ctx import MusicCtx
+from voice.voice_setting import cnfg
+from voice.voice_app_ctx import VoiceCtx
 
 
-def tab_setting(ctx: MusicCtx):
+def tab_setting(ctx: VoiceCtx):
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # モデルパス設定
@@ -45,8 +45,8 @@ def tab_setting(ctx: MusicCtx):
             ui.button("追加", on_click=lambda: add_dataset_dir(dataset_dir_input.value))
         dataset_dirs = ui.list().props("bordered separator").classes("padd4 w-full")
 
-        def add_dataset_dir(path: str):
-            if ctx.add_dataset_dir(path):
+        def add_dataset_dir(path: str|None):
+            if path and ctx.add_dataset_dir(path):
                 dataset_dir_input.value = ""
 
         def update_dataset_dirs():

@@ -1,5 +1,6 @@
 nicegui
 librosa
+soundfile
 mutagen
 
 transformers
@@ -14,3 +15,11 @@ huggingface_hub
 BS-RoFormer
 pyloudnorm
 picklescan
+
+# uv pip install qwen_asr --no-deps
+# nagisa
+# soynlp
+# qwen-omni-utils
+# sox
+# flask
+# pytz

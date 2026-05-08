@@ -1,11 +1,8 @@
 import argparse
-from pathlib import Path
-from typing import cast
-
 from nicegui import ui, app
-from music.setting import cnfg
 from common.worker import Worker
-from music.index import main_page as main_page_music
+from music.index import main_page as page_music
+from voice.index import main_page as page_voice
 
 _worker: Worker = Worker()
 _auto_reload_flag = False
@@ -77,14 +74,21 @@ def footer():
         ).bind_visibility_from(_worker, "is_running")
 
 
-@ui.page("/")
+@ui.page("/", title="dataset-ui-music")
 def main_page():
     header()
-    main_page_music(_worker)
+    page_music(_worker)
     footer()
 
 
-@ui.page("/test")
+@ui.page("/voice", title="dataset-ui-voice")
+def main_page_voice():
+    header()
+    page_voice(_worker)
+    footer()
+
+
+@ui.page("/test", title="dataset-ui")
 def test_page():
     header()
     ui.label("test")
@@ -110,7 +114,7 @@ def main() -> None:
     ui.run(
         host=args.host,
         port=args.port,
-        title="dataset-ui-music",
+        title="dataset-ui",
         reload=args.auto_reload,
         native=args.native,
         show_welcome_message=False,

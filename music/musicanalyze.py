@@ -1,8 +1,6 @@
 from pathlib import Path
 from collections.abc import Generator
-from music.setting import cnfg
-
-
+from music.music_setting import cnfg
 
 def analyze_main(data: list[str], stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     print("analyzing task started...")

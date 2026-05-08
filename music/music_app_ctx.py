@@ -5,7 +5,7 @@ from nicegui import binding, ui
 from nicegui.elements.table import Table
 
 from common.file_util import audio_files_in_folder
-from music.setting import cnfg
+from music.music_setting import cnfg
 from music.musicfile import MusicFile
 from common.worker import Worker
 
@@ -29,13 +29,13 @@ class MusicCtx:
         with self.client:
             ui.notify(text, type=type)
 
-    def load_files(self, path: str) -> None:
+    def load_files(self, path: str | None) -> None:
         folder_path = path
         if not folder_path:
             self.notify("フォルダパスを入力してください", type="warning")
             return
 
-        folder = Path(folder_path)
+        folder = Path(folder_path.strip())
         if not folder.is_dir():
             self.notify(f"フォルダが見つかりません: {folder_path}", type="negative")
             return
@@ -129,8 +129,8 @@ class MusicCtx:
     def set_caption(self, val: str) -> None:
         self.set_metadata("caption", val)
 
-    def set_models_root(self, path: str):
-        if cnfg.set_models_dir(path):
+    def set_models_root(self, path: str | None):
+        if path and cnfg.set_models_dir(path):
             for func in self.model_refresh_func:
                 func()
         self.notify("モデルパスを保存しました")

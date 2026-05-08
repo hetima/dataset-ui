@@ -2,15 +2,15 @@ from nicegui import ui
 
 
 from common.worker import Worker
-from music.music_app_ctx import MusicCtx
-from music.music_main_tab import tab_main
-from music.music_setting_tab import tab_setting
+from voice.voice_app_ctx import VoiceCtx
+from voice.voice_main_tab import tab_main
+from voice.voice_setting_tab import tab_setting
 
 def main_page(worker: Worker):
-    ctx = MusicCtx(worker)
-    
-    ui.markdown("""## dataset-ui-music
-ACE-Step 向けのメタデータを書き出す webui です""")
+    ctx = VoiceCtx(worker)
+
+    ui.markdown("""## dataset-ui-voice
+音声ファイルのメタデータを書き出す webui です""")
 
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'

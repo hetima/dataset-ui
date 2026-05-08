@@ -1,15 +1,13 @@
-
 import os
 import gc
 from pathlib import Path
 from collections.abc import Generator
-from music.music_setting import cnfg
+from voice.voice_setting import cnfg
 
 TARGET_SAMPLE_RATE = 16000
 
 
-
-def acestep_transcriber_models() -> list[str]:
+def asr_models() -> list[str]:
     models_dir = cnfg.models_dir
     if not models_dir.exists():
         return []
@@ -17,9 +15,10 @@ def acestep_transcriber_models() -> list[str]:
         p.name
         for p in models_dir.iterdir()
         if p.is_dir()
-        and "acestep" in p.name.lower()
-        and "transcriber" in p.name.lower()
+        and "asr" in p.name.lower()
+        # and "transcriber" in p.name.lower()
     ]
+
 
 class AcestepTranscriptorPipeline:
     def __init__(self, model, processor):
@@ -132,7 +131,6 @@ def transcript_main(
         del pipe
         gc.collect()
         torch.cuda.empty_cache()
-        
 
 
 def load_audio_mono_16k_torchaudio(audio_path: str):
@@ -168,17 +166,17 @@ def analyze_audio(pipe, audio_path: str):
     try:
         print(audio_path)
         audio_data, sr = load_audio_mono_16k_librosa(audio_path)
-        lyrics = pipe.run_qwen_audio(
+        caption = pipe.run_qwen_audio(
             audio_data, sr, "*Task* Transcribe this audio in detail"
         )
     except Exception as e:
         print(f"\n  Error transcribing {os.path.basename(audio_path)}: {e}")
-        lyrics = "[Instrumental]"
+        caption = ""
     finally:
         del audio_data
 
     torch.cuda.empty_cache()
     return {
         "path": audio_path,
-        "lyrics": lyrics,
+        "caption": caption,
     }

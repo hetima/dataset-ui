@@ -9,18 +9,18 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = REPO_DIR / "models"
 OUTPUTS_DIR = REPO_DIR / "outputs"
-SETTING_FILE = "music_config.json"
+SETTING_FILE = "voice_config.json"
 OUTPUT_PREFIX = ""
 
 @dataclasses.dataclass
-class Setting:
+class VoiceSetting:
     _SAVABLE_SETTINGS: tuple[str, ...] = dataclasses.field(
         default=(
             "models_dir",
             "outputs_dir",
-            "acestep_transcriber_model",
             "last_dataset_path",
             "dataset_dirs",
+            "asr_model",
         ),
         init=False,
         repr=False,
@@ -32,7 +32,7 @@ class Setting:
     models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
     output_prefix: str = OUTPUT_PREFIX
-    acestep_transcriber_model: str = ""
+    asr_model: str = ""
     last_dataset_path: str = ""
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
 
@@ -83,11 +83,6 @@ class Setting:
             return True
         return False
 
-    def set_acestep_transcriber_model(self, name:str|None):
-        if name and name != self.acestep_transcriber_model:
-            self.acestep_transcriber_model = name
-            self.save()
-
     def add_dataset_dir(self, path: str) -> bool:
         if not path or path in self.dataset_dirs:
             return False
@@ -106,5 +101,10 @@ class Setting:
         self.save()
         return True
 
+    def set_asr_model(self, name: str | None):
+        if name and name != self.asr_model:
+            self.asr_model = name
+            self.save()
 
-cnfg = Setting()
+
+cnfg = VoiceSetting()

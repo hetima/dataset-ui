@@ -185,4 +185,5 @@ cython_debug/
 /checkpoints/
 /data/
 /dataset/
-/music_config.json
+/*_config.json
+/config.json
