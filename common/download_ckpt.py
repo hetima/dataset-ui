@@ -44,7 +44,7 @@ def check_download_params(
     return True, "", repo_id, filename
 
 
-def download_model(
+def download_ckpt(
     output_dir: str,
     repo_id: str | None = None,
     filename: str | None = None,
