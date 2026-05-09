@@ -1010,6 +1010,12 @@ class Qwen3ASRThinkerTextModel(Qwen3ASRPreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[tuple, BaseModelOutputWithPast]:
+        r"""
+        Args:
+            cache_position (`torch.LongTensor` of shape `(sequence_length)`, *optional*):
+                Indices depicting the position of the input sequence tokens in the sequence. If not provided, it is
+                computed from `past_key_values` and `inputs_embeds`.
+        """
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 

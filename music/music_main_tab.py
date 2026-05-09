@@ -53,7 +53,7 @@ def tab_main(ctx: MusicCtx):
         if not model_path.exists():
             if cnfg.acestep_transcriber_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。ダウンロードしてください"
+                    f"モデルパス「  {str(cnfg.models_dir / "acestep_transcriber")}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。"
                 )
                 return
         files = ctx.target_files()
@@ -119,10 +119,13 @@ def tab_main(ctx: MusicCtx):
 
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
-        ui.label("モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
-                 "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
-                 "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
-                 "標準の acestep_transcriber は大量のメモリを必要とするので、動かない場合は 4-bit バージョンをお試しください").classes('infotxt')
+        ui.label(
+            "モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
+            "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+            "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
+            "「ダウンロードする」を押すとモデルフォルダにダウンロードされます。"
+            "標準の acestep_transcriber は大量のメモリを必要とするので、動かない場合は 4-bit バージョンをお試しください"
+        ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             opt = acestep_transcriber_models()
             val = cnfg.acestep_transcriber_model

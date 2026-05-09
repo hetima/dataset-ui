@@ -30,7 +30,7 @@ def tab_main(ctx: VoiceCtx):
         if not model_path.exists():
             if cnfg.asr_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.asr_model}」フォルダが存在しません。ダウンロードしてください"
+                    f"モデルパス「  {str(cnfg.models_dir / "qwen_asr")}」 に「{cnfg.asr_model}」フォルダが存在しません。"
                 )
                 return
         files = ctx.target_files()
@@ -94,9 +94,12 @@ def tab_main(ctx: VoiceCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを QWEN3-ASR で音声認識します。")
-        ui.label("モデルフォルダの中にある QWEN3-ASR のフォルダ名を入力してください。"
-                 "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
-                 "（デフォルトのキャッシュにダウンロードされ再利用されます）。").classes('infotxt')
+        ui.label(
+            "モデルフォルダの中にある QWEN3-ASR のフォルダ名を入力してください。"
+            "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+            "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
+            "「ダウンロードする」を押すとモデルフォルダにダウンロードされます。"
+        ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             opt = asr_models()
             val = cnfg.asr_model
