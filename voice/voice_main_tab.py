@@ -1,15 +1,23 @@
+import asyncio
 from pathlib import Path
 from typing import cast
 from functools import partial
 
 from nicegui import ui
 from common.folder_picker import FolderPicker
-from common.download_repo import download_repo
+from common.download_repo import download_repo_main
 from voice.voice_setting import cnfg
 from voice.qwen3_asr_transcriptor import transcript_main, asr_models
 from voice.voice_app_ctx import VoiceCtx
 
 def tab_main(ctx: VoiceCtx):
+
+    def asr_download_finished(result) -> None:
+        reload_asr_model()
+
+    async def asr_download(repo_id: str) -> None:
+        data = {"repo_id": repo_id, "output_dir": cnfg.models_dir / "qwen_asr"}
+        await ctx.worker.run(download_repo_main, data, asr_download_finished)
 
     def transcript_finished(result) -> None:
         ctx.transcripted(result)
@@ -18,7 +26,7 @@ def tab_main(ctx: VoiceCtx):
         if not cnfg.asr_model:
             ui.notify("モデルを選択してください")
             return
-        model_path = cnfg.models_dir / cnfg.asr_model
+        model_path = cnfg.models_dir / "qwen_asr" / cnfg.asr_model
         if not model_path.exists():
             if cnfg.asr_model.find("/") < 1:
                 ui.notify(
@@ -109,10 +117,6 @@ def tab_main(ctx: VoiceCtx):
 
             ui.button("解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
-    def download_model(model_id: str):
-        download_repo(model_id, str(cnfg.models_dir))
-        # TODO: 完了したらメニュー更新
-
     def reload_asr_model():
         models = asr_models()
         ace_models_menu.clear()
@@ -132,7 +136,7 @@ def tab_main(ctx: VoiceCtx):
                         "ダウンロードする",
                         on_click=lambda: [
                             ace_models_menu.close(),
-                            download_model("Qwen/Qwen3-ASR-1.7B"),
+                            asyncio.ensure_future(asr_download("Qwen/Qwen3-ASR-1.7B")),
                         ],
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"
@@ -150,7 +154,7 @@ def tab_main(ctx: VoiceCtx):
                         "ダウンロードする",
                         on_click=lambda: [
                             ace_models_menu.close(),
-                            download_model("Qwen/Qwen3-ASR-0.6B"),
+                            asyncio.ensure_future(asr_download("Qwen/Qwen3-ASR-0.6B")),
                         ],
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"

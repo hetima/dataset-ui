@@ -1,4 +1,3 @@
-
 import os
 import gc
 from pathlib import Path
@@ -8,17 +7,16 @@ from music.music_setting import cnfg
 TARGET_SAMPLE_RATE = 16000
 
 
-
 def acestep_transcriber_models() -> list[str]:
-    models_dir = cnfg.models_dir
+    models_dir = cnfg.models_dir / "acestep_transcriber"
     if not models_dir.exists():
         return []
     return [
         p.name
         for p in models_dir.iterdir()
         if p.is_dir()
-        and "acestep" in p.name.lower()
-        and "transcriber" in p.name.lower()
+        # and "acestep" in p.name.lower()
+        # and "transcriber" in p.name.lower()
     ]
 
 class AcestepTranscriptorPipeline:
@@ -66,9 +64,11 @@ class AcestepTranscriptorPipeline:
     @classmethod
     def from_pretrained(cls, device, dtype):
         from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
-        
+
         local_files_only = True
-        model_path = str(cnfg.models_dir / cnfg.acestep_transcriber_model)
+        model_path = str(
+            cnfg.models_dir / "acestep_transcriber" / cnfg.acestep_transcriber_model
+        )
         if not os.path.exists(model_path):
             if cnfg.acestep_transcriber_model.find("/") >= 1:
                 model_path = cnfg.acestep_transcriber_model
@@ -132,7 +132,6 @@ def transcript_main(
         del pipe
         gc.collect()
         torch.cuda.empty_cache()
-        
 
 
 def load_audio_mono_16k_torchaudio(audio_path: str):

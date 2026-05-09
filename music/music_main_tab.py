@@ -1,10 +1,11 @@
+import asyncio
 from pathlib import Path
 from typing import cast
 from functools import partial
 
 from nicegui import ui
 from common.folder_picker import FolderPicker
-from common.download_repo import download_repo
+from common.download_repo import download_repo_main
 from music.music_setting import cnfg
 from music.musicanalyze import analyze_main
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
@@ -14,6 +15,18 @@ LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
 
 def tab_main(ctx: MusicCtx):
+
+    def acestep_transcriber_download_finished(result) -> None:
+        reload_acestep_transcriber_model()
+
+    async def acestep_transcriber_download(repo_id: str) -> None:
+        data = {
+            "repo_id": repo_id,
+            "output_dir": cnfg.models_dir / "acestep_transcriber",
+        }
+        await ctx.worker.run(
+            download_repo_main, data, acestep_transcriber_download_finished
+        )
 
     def analyze_finished(result) -> None:
         ctx.analyzed(result)
@@ -36,7 +49,7 @@ def tab_main(ctx: MusicCtx):
         if not cnfg.acestep_transcriber_model:
             ui.notify("モデルを選択してください")
             return
-        model_path = cnfg.models_dir / cnfg.acestep_transcriber_model
+        model_path = cnfg.models_dir / "acestep_transcriber" / cnfg.acestep_transcriber_model
         if not model_path.exists():
             if cnfg.acestep_transcriber_model.find("/") < 1:
                 ui.notify(
@@ -126,10 +139,6 @@ def tab_main(ctx: MusicCtx):
 
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
-    def download_model(model_id: str):
-        download_repo(model_id, str(cnfg.models_dir))
-        # TODO: 完了したらメニュー更新
-
     def reload_acestep_transcriber_model():
         models = acestep_transcriber_models()
         ace_models_menu.clear()
@@ -149,7 +158,9 @@ def tab_main(ctx: MusicCtx):
                         "ダウンロードする",
                         on_click=lambda: [
                             ace_models_menu.close(),
-                            download_model("ACE-Step/acestep-transcriber"),
+                            asyncio.ensure_future(acestep_transcriber_download(
+                                "ACE-Step/acestep-transcriber"
+                            )),
                         ],
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"
@@ -167,7 +178,9 @@ def tab_main(ctx: MusicCtx):
                         "ダウンロードする",
                         on_click=lambda: [
                             ace_models_menu.close(),
-                            download_model("hrktxz/acestep-transcriber-4bit"),
+                            asyncio.ensure_future(acestep_transcriber_download(
+                                "hrktxz/acestep-transcriber-4bit"
+                            )),
                         ],
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"

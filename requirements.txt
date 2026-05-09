@@ -2,6 +2,7 @@ nicegui
 librosa
 soundfile
 mutagen
+tenacity
 
 transformers>=5.4
 accelerate

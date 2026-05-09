@@ -2,8 +2,9 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from collections.abc import Generator
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-from common.xterm_dialog import XtermDialog
 from common.message_dialog import show_error_dialog
 
 
@@ -19,13 +20,15 @@ def try_url_to_hf_repo(url: str) -> tuple[str | None, str | None]:
 
 
 def check_download_params(
-    output_dir: str,
     repo_id: str | None,
+    output_dir: Path,
 ) -> tuple[bool, str, str | None]:
     """ダウンロード事前チェック。OK なら (True, "", repo_id) を返す。
     エラー時は (False, err_msg, None, None) を返す。"""
-    if not shutil.which("hf"):
-        return False, "Error: hfコマンドが見つかりません。pip install huggingface-hub でインストールしてください", None
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        return False, "Error: huggingface_hub が見つかりません。pip install huggingface-hub でインストールしてください", None
 
     if not output_dir:
         return False, "Error: output_dir が指定されていません", None
@@ -36,28 +39,35 @@ def check_download_params(
     return True, "", repo_id
 
 
-def download_repo(
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
+def hf_download(
     repo_id: str,
-    output_dir: str,
+    output_dir: Path,
 ) -> None:
-    """HuggingFace からファイルをダウンロードする。
-    事前チェック → XtermDialog ダイアログでコマンド実行。"""
-    ok, err, resolved_repo = check_download_params(
-        output_dir, repo_id
-    )
+    """HuggingFace からファイルをダウンロードする。"""
+    from huggingface_hub import snapshot_download
+
+    snapshot_download(repo_id=repo_id, local_dir=str(output_dir))
+
+
+def download_repo_main(
+    data: dict, stop_event
+) -> Generator[tuple[float, str, dict | None], None, dict]:
+    print("download task started...")
+    yield 0, "処理開始", None
+    repo_id = data["repo_id"]
+    output_dir = data["output_dir"]
+    ok, err, resolved_repo = check_download_params(repo_id, output_dir)
     if not ok:
-        show_error_dialog(err)
-        return
+        yield 1, "エラー", None
+        return {"err": err}
+    try:
+        yield 0, f"{repo_id} のダウンロードを開始しました。進捗はターミナルを参照してください", None
+        output_path = output_dir.resolve()
+        output_path.mkdir(parents=True, exist_ok=True)
+        local_dir = output_path / repo_id.split("/")[-1]
 
-    assert resolved_repo is not None
-
-    output_path = Path(output_dir).resolve()
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    local_dir = str(output_path / resolved_repo.split("/")[-1])
-
-    args = [
-        "hf", "download", resolved_repo,
-        "--local-dir", local_dir,
-    ]
-    XtermDialog(args, title=f"ダウンロード: {resolved_repo}").open()
+        hf_download(repo_id, local_dir)
+        return {"result": []}
+    finally:
+        print("...download task finished")

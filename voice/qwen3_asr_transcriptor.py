@@ -8,15 +8,15 @@ TARGET_SAMPLE_RATE = 16000
 
 
 def asr_models() -> list[str]:
-    models_dir = cnfg.models_dir
+    models_dir = cnfg.models_dir / "qwen_asr"
     if not models_dir.exists():
         return []
     return [
         p.name
         for p in models_dir.iterdir()
         if p.is_dir()
-        and "asr" in p.name.lower()
-        and "qwen" in p.name.lower()
+        # and "asr" in p.name.lower()
+        # and "qwen" in p.name.lower()
     ]
 
 
@@ -42,7 +42,7 @@ class QwenASRPipeline:
         from transformers import AutoConfig, AutoModel
 
         local_files_only = True
-        model_path = str(cnfg.models_dir / cnfg.asr_model)
+        model_path = str(cnfg.models_dir / "qwen_asr" / cnfg.asr_model)
         if not os.path.exists(model_path):
             if cnfg.asr_model.find("/") >= 1:
                 model_path = cnfg.asr_model
