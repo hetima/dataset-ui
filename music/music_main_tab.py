@@ -83,6 +83,7 @@ def tab_main(ctx: MusicCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
 
     with ui.row().classes("items-center gap-2"):
+        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         path_input = (
             ui.input(
                 value = cnfg.last_dataset_path,
@@ -92,7 +93,6 @@ def tab_main(ctx: MusicCtx):
             )
             .props('style="min-width: 500px" outlined clearable').classes("w-140")
         )
-        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value))
 
     def update_dataset_dropdown():

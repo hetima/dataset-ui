@@ -20,7 +20,7 @@ class MusicCtx:
         self.save_lyrics: bool = True
         self.save_aitk: bool = False
         self.worker: Worker = worker
-        self.target = "all"
+        self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.client = ui.context.client

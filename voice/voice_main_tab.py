@@ -60,6 +60,7 @@ def tab_main(ctx: VoiceCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
 
     with ui.row().classes("items-center gap-2"):
+        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         path_input = (
             ui.input(
                 value = cnfg.last_dataset_path,
@@ -69,7 +70,6 @@ def tab_main(ctx: VoiceCtx):
             )
             .props('style="min-width: 500px" outlined clearable').classes("w-140")
         )
-        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value))
 
     def update_dataset_dropdown():
@@ -93,9 +93,9 @@ def tab_main(ctx: VoiceCtx):
     with ui.expansion("音声認識", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを QWEN3-ASR で音声認識します。")
+        ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")
         ui.label(
-            "モデルフォルダの中にある QWEN3-ASR のフォルダ名を入力してください。"
+            "モデルフォルダの中にある Qwen3-ASR のフォルダ名を入力してください。"
             "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
             "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
             "「ダウンロードする」を押すとモデルフォルダにダウンロードされます。"

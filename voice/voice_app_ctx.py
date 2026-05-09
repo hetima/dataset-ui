@@ -19,7 +19,7 @@ class VoiceCtx:
         self.save_json: bool = False
         self.save_txt: bool = True
         self.worker: Worker = worker
-        self.target = "all"
+        self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.client = ui.context.client
