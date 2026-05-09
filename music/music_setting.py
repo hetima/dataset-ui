@@ -14,17 +14,11 @@ OUTPUT_PREFIX = ""
 
 @dataclasses.dataclass
 class MusicSetting:
-    _SAVABLE_SETTINGS: tuple[str, ...] = dataclasses.field(
-        default=(
-            "models_dir",
-            "outputs_dir",
-            "acestep_transcriber_model",
-            "last_dataset_path",
-            "dataset_dirs",
-        ),
-        init=False,
-        repr=False,
-    )
+    _EXCLUDED_SETTINGS: frozenset[str] = frozenset({
+        "base_dir",
+        "repo_dir",
+        "setting_path",
+    })
 
     repo_dir: Path = REPO_DIR
     base_dir: Path = BASE_DIR
@@ -47,7 +41,11 @@ class MusicSetting:
                 return [_serialize(v) for v in value]
             return value
 
-        data = {name: _serialize(getattr(self, name)) for name in self._SAVABLE_SETTINGS}
+        data = {
+            f.name: _serialize(getattr(self, f.name))
+            for f in dataclasses.fields(self)
+            if f.name not in self._EXCLUDED_SETTINGS and not f.name.startswith("_")
+        }
         self.setting_path.write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
@@ -56,18 +54,15 @@ class MusicSetting:
         if not self.setting_path.exists():
             return
         data = json.loads(self.setting_path.read_text(encoding="utf-8"))
-        for name in self._SAVABLE_SETTINGS:
-            if name not in data:
+        for f in dataclasses.fields(self):
+            if f.name in self._EXCLUDED_SETTINGS or f.name.startswith("_"):
                 continue
-            value = data[name]
-            field_type = None
-            for f in dataclasses.fields(self):
-                if f.name == name:
-                    field_type = f.type
-                    break
-            if field_type is Path:
+            if f.name not in data:
+                continue
+            value = data[f.name]
+            if f.type is Path:
                 value = Path(value)
-            setattr(self, name, value)
+            setattr(self, f.name, value)
         if not self.models_dir:
             self.models_dir = MODELS_DIR
 
