@@ -1,6 +1,6 @@
 from pathlib import Path
 from nicegui import binding, ui
-from music.music_setting import cnfg
+from common.setting import cnfg
 from music.music_app_ctx import MusicCtx
 
 def tab_setting(ctx: MusicCtx):
@@ -76,9 +76,9 @@ def tab_setting(ctx: MusicCtx):
             dataset_dirs.clear()
             with dataset_dirs:
                 disable_up = " disable"
-                last_index = len(cnfg.dataset_dirs) - 1
+                last_index = len(cnfg.music.dataset_dirs) - 1
 
-                for i, itm in enumerate(cnfg.dataset_dirs):
+                for i, itm in enumerate(cnfg.music.dataset_dirs):
                     disable_down = " disable" if i == last_index else ""
                     _list_item(itm, disable_up, disable_down)
                     disable_up = ""

@@ -2,7 +2,7 @@ import os
 import gc
 from pathlib import Path
 from collections.abc import Generator
-from voice.voice_setting import cnfg
+from common.setting import cnfg
 
 TARGET_SAMPLE_RATE = 16000
 
@@ -42,14 +42,14 @@ class QwenASRPipeline:
         from transformers import AutoConfig, AutoModel
 
         local_files_only = True
-        model_path = str(cnfg.models_dir / "qwen_asr" / cnfg.asr_model)
+        model_path = str(cnfg.models_dir / "qwen_asr" / cnfg.voice.asr_model)
         if not os.path.exists(model_path):
-            if cnfg.asr_model.find("/") >= 1:
-                model_path = cnfg.asr_model
+            if cnfg.voice.asr_model.find("/") >= 1:
+                model_path = cnfg.voice.asr_model
                 local_files_only = False
             else:
                 raise FileNotFoundError(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.asr_model}」フォルダが存在しません"
+                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.voice.asr_model}」フォルダが存在しません"
                 )
         print(f"model path: {model_path}")
         # config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)

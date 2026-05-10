@@ -6,7 +6,7 @@ from functools import partial
 from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
-from music.music_setting import cnfg
+from common.setting import cnfg
 from music.musicanalyze import analyze_main
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
 from music.music_app_ctx import MusicCtx
@@ -46,14 +46,14 @@ def tab_main(ctx: MusicCtx):
         ctx.transcripted(result)
 
     async def transcript() -> None:
-        if not cnfg.acestep_transcriber_model:
+        if not cnfg.music.acestep_transcriber_model:
             ui.notify("モデルを選択してください")
             return
-        model_path = cnfg.models_dir / "acestep_transcriber" / cnfg.acestep_transcriber_model
+        model_path = cnfg.models_dir / "acestep_transcriber" / cnfg.music.acestep_transcriber_model
         if not model_path.exists():
-            if cnfg.acestep_transcriber_model.find("/") < 1:
+            if cnfg.music.acestep_transcriber_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir / "acestep_transcriber")}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません。"
+                    f"モデルパス「  {str(cnfg.models_dir / "acestep_transcriber")}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません。"
                 )
                 return
         files = ctx.target_files()
@@ -86,7 +86,7 @@ def tab_main(ctx: MusicCtx):
         dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         path_input = (
             ui.input(
-                value = cnfg.last_dataset_path,
+                value = cnfg.music.last_dataset_path,
                 label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
@@ -98,7 +98,7 @@ def tab_main(ctx: MusicCtx):
     def update_dataset_dropdown():
         dataset_dropdown.clear()
         with dataset_dropdown:
-            for path in cnfg.dataset_dirs:
+            for path in cnfg.music.dataset_dirs:
                 ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
 
     update_dataset_dropdown()
@@ -128,14 +128,14 @@ def tab_main(ctx: MusicCtx):
         ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             opt = acestep_transcriber_models()
-            val = cnfg.acestep_transcriber_model
+            val = cnfg.music.acestep_transcriber_model
             if not val in opt:
                 val = opt[0] if len(opt) > 0 else ""
             ace_model_input = ui.input(
                 label="transcriber model",
                 placeholder="モデルを選択、または入力",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
-            ).props('style="min-width: 300px" outlined').bind_value(cnfg, "acestep_transcriber_model")
+            ).props('style="min-width: 300px" outlined').bind_value(cnfg.music, "acestep_transcriber_model")
             with ace_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     ace_models_menu = ui.menu()

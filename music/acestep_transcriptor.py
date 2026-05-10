@@ -2,7 +2,7 @@ import os
 import gc
 from pathlib import Path
 from collections.abc import Generator
-from music.music_setting import cnfg
+from common.setting import cnfg
 
 TARGET_SAMPLE_RATE = 16000
 
@@ -67,15 +67,15 @@ class AcestepTranscriptorPipeline:
 
         local_files_only = True
         model_path = str(
-            cnfg.models_dir / "acestep_transcriber" / cnfg.acestep_transcriber_model
+            cnfg.models_dir / "acestep_transcriber" / cnfg.music.acestep_transcriber_model
         )
         if not os.path.exists(model_path):
-            if cnfg.acestep_transcriber_model.find("/") >= 1:
-                model_path = cnfg.acestep_transcriber_model
+            if cnfg.music.acestep_transcriber_model.find("/") >= 1:
+                model_path = cnfg.music.acestep_transcriber_model
                 local_files_only = False
             else:
                 raise FileNotFoundError(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.acestep_transcriber_model}」フォルダが存在しません"
+                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません"
                 )
         print(f"model path: {model_path}")
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(

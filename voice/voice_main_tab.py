@@ -6,7 +6,7 @@ from functools import partial
 from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
-from voice.voice_setting import cnfg
+from common.setting import cnfg
 from voice.qwen3_asr_transcriptor import transcript_main, asr_models
 from voice.voice_app_ctx import VoiceCtx
 
@@ -23,14 +23,14 @@ def tab_main(ctx: VoiceCtx):
         ctx.transcripted(result)
 
     async def transcript() -> None:
-        if not cnfg.asr_model:
+        if not cnfg.voice.asr_model:
             ui.notify("モデルを選択してください")
             return
-        model_path = cnfg.models_dir / "qwen_asr" / cnfg.asr_model
+        model_path = cnfg.models_dir / "qwen_asr" / cnfg.voice.asr_model
         if not model_path.exists():
-            if cnfg.asr_model.find("/") < 1:
+            if cnfg.voice.asr_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir / "qwen_asr")}」 に「{cnfg.asr_model}」フォルダが存在しません。"
+                    f"モデルパス「  {str(cnfg.models_dir / "qwen_asr")}」 に「{cnfg.voice.asr_model}」フォルダが存在しません。"
                 )
                 return
         files = ctx.target_files()
@@ -63,7 +63,7 @@ def tab_main(ctx: VoiceCtx):
         dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
         path_input = (
             ui.input(
-                value = cnfg.last_dataset_path,
+                value = cnfg.voice.last_dataset_path,
                 label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
@@ -75,7 +75,7 @@ def tab_main(ctx: VoiceCtx):
     def update_dataset_dropdown():
         dataset_dropdown.clear()
         with dataset_dropdown:
-            for path in cnfg.dataset_dirs:
+            for path in cnfg.voice.dataset_dirs:
                 ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
 
     update_dataset_dropdown()
@@ -102,7 +102,7 @@ def tab_main(ctx: VoiceCtx):
         ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             opt = asr_models()
-            val = cnfg.asr_model
+            val = cnfg.voice.asr_model
             if not val in opt:
                 val = opt[0] if len(opt) > 0 else ""
             ace_model_input = (
@@ -112,7 +112,7 @@ def tab_main(ctx: VoiceCtx):
                     on_change=lambda e: setattr(e.sender, "value", e.value),
                 )
                 .props('style="min-width: 300px" outlined')
-                .bind_value(cnfg, "asr_model")
+                .bind_value(cnfg.voice, "asr_model")
             )
             with ace_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):

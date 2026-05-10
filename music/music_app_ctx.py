@@ -5,7 +5,7 @@ from nicegui import binding, ui
 from nicegui.elements.table import Table
 
 from common.file_util import audio_files_in_folder
-from music.music_setting import cnfg
+from common.setting import cnfg
 from music.musicfile import MusicFile
 from common.worker import Worker
 
@@ -40,7 +40,7 @@ class MusicCtx:
             self.notify(f"フォルダが見つかりません: {folder_path}", type="negative")
             return
 
-        cnfg.last_dataset_path = folder_path
+        cnfg.music.last_dataset_path = folder_path
         cnfg.save()
 
         self.files = []
@@ -137,13 +137,13 @@ class MusicCtx:
         self.notify("モデルパスを保存しました")
 
     def add_dataset_dir(self, path: str) -> bool:
-        if not path or path in cnfg.dataset_dirs:
+        if not path or path in cnfg.music.dataset_dirs:
             return False
         if not Path(path).is_dir():
             self.notify(f"フォルダ「{path}」は存在しません", type="negative")
             return False
 
-        if cnfg.add_dataset_dir(path):
+        if cnfg.music.add_dataset_dir(path):
             for func in self.dataset_dirs_refresh_func:
                 func()
             self.notify("データセットフォルダを追加しました")
@@ -151,7 +151,7 @@ class MusicCtx:
         return False
 
     def shift_dataset_dir(self, path: str, up: bool) -> None:
-        dirs = cnfg.dataset_dirs
+        dirs = cnfg.music.dataset_dirs
         idx = dirs.index(path) if path in dirs else -1
         if idx < 0:
             return
@@ -164,7 +164,7 @@ class MusicCtx:
             func()
 
     def delete_dataset_dir(self, path: str) -> bool:
-        if cnfg.delete_dataset_dir(path):
+        if cnfg.music.delete_dataset_dir(path):
             for func in self.dataset_dirs_refresh_func:
                 func()
             self.notify("データセットフォルダの登録を解除しました")
