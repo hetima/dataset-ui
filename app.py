@@ -49,6 +49,10 @@ def header():
 
 
 def footer():
+    ui.html(
+        '<a href="/">dataset-ui</a> ・ <a href="https://github.com/hetima/dataset-ui">GitHub</a>'
+    ).classes("text-center w-full").style("color:#999999; font-size: 1em;")
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # 処理中UI
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -79,12 +83,22 @@ def footer():
         ).bind_visibility_from(_worker, "is_running")
 
 
-@ui.page("/", title="dataset-ui-music")
+@ui.page("/", title="dataset-ui")
 def main_page():
+    header()
+    ui.markdown("""## dataset-ui""")
+    ui.link("music", "/music").style('text-decoration: none; font-size: 3em;')
+    ui.label("ACE-Step 向けのメタデータを編集")
+    ui.link("voice", "/voice").style('text-decoration: none; font-size: 3em;')
+    ui.label("音声データを編集")
+    footer()
+
+
+@ui.page("/music", title="dataset-ui-music")
+def main_page_music():
     header()
     page_music(_worker)
     footer()
-
 
 @ui.page("/voice", title="dataset-ui-voice")
 def main_page_voice():
