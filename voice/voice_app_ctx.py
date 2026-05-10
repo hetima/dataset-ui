@@ -72,7 +72,6 @@ class VoiceCtx:
         if len(files) == 0:
             self.notify("処理対象がありません")
             return
-        # files = [MusicFile.from_dict(item) for item in dicts]
         for file in files:
             if self.save_json:
                 file.save_to_json()

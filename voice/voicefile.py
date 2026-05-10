@@ -8,6 +8,7 @@ class VoiceFile:
     name: str
     path: str
     caption: Optional[str]
+    default: Optional["VoiceFile"] = None
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -28,7 +29,7 @@ class VoiceFile:
         return vars(self).items()
 
     def as_dict(self):
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if k != "default"}
 
     def to_dict(self) -> dict:
         """VoiceFile の各フィールドを辞書として返す"""
@@ -74,8 +75,15 @@ class VoiceFile:
 
             caption = text.strip()
 
+        default = cls(
+            name=name,
+            path=path,
+            caption=caption,
+        )
+
         return cls(
             name=name,
             path=path,
             caption=caption,
+            default=default,
         )

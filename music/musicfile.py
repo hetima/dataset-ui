@@ -18,6 +18,9 @@ class MusicFile:
     duration: Optional[str]
     title: Optional[str] = None
     artist: Optional[str] = None
+    album_artist: Optional[str] = None
+    ttml: Optional[str] = None
+    default: Optional["MusicFile"] = None
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -38,7 +41,7 @@ class MusicFile:
         return vars(self).items()
 
     def as_dict(self):
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if k != "default"}
 
     def to_dict(self) -> dict:
         """MusicFile の各フィールドを辞書として返す"""
@@ -52,6 +55,9 @@ class MusicFile:
             "timesignature": self.timesignature,
             "language": self.language,
             "duration": self.duration,
+            "artist": self.artist,
+            "album_artist": self.album_artist,
+            "ttml": self.ttml,
         }
 
     @classmethod
@@ -68,6 +74,9 @@ class MusicFile:
             timesignature=data.get("timesignature", ""),
             language=data.get("language", ""),
             duration=data.get("duration", ""),
+            artist=data.get("ttml", ""),
+            album_artist=data.get("ttml", ""),
+            ttml=data.get("ttml", ""),
         )
 
     def save_to_json(self) -> None:
@@ -158,6 +167,19 @@ class MusicFile:
             language = data.get("language", language)
             duration = data.get("duration", duration)
 
+        default = cls(
+            name=name,
+            path=path,
+            lyrics=lyrics,
+            synced_lyrics=synced_lyrics,
+            caption=caption,
+            bpm=bpm,
+            keyscale=keyscale,
+            timesignature=timesignature,
+            language=language,
+            duration=duration,
+        )
+
         return cls(
             name=name,
             path=path,
@@ -169,4 +191,5 @@ class MusicFile:
             timesignature=timesignature,
             language=language,
             duration=duration,
+            default=default,
         )
