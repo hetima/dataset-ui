@@ -79,13 +79,18 @@ def tab_main(ctx: MusicCtx):
         result = await FolderPicker(path, read_all=False)
         if isinstance(result, list) and len(result) > 0:
             path_input.value = result[0]
+            ctx.load_files(path_input.value)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
 
     with ui.row().classes("items-center gap-2"):
-        dataset_dropdown = ui.dropdown_button(icon="folder", auto_close=True).props('outline')
+        dataset_dropdown = (
+            ui.dropdown_button(icon="folder", auto_close=True)
+            .props("outline")
+            .style("padding: 4px 8px;")
+        )
         path_input = (
             ui.input(
                 value = cnfg.music.last_dataset_path,
@@ -280,7 +285,7 @@ def tab_main(ctx: MusicCtx):
                 'click',
                 js_handler='() => emit(props.value)',
                 handler=lambda e: play_src(e.args),
-            )
+            ).style('padding: 4px 8px;')
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Save files

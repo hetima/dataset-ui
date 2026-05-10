@@ -9,7 +9,7 @@ from music.music_setting_tab import tab_setting
 def main_page(worker: Worker):
     ctx = MusicCtx(worker)
     
-    ui.markdown("""## dataset-ui-music
+    ui.markdown("""# dataset-ui-music
 ACE-Step 向けのメタデータを書き出す webui です""")
 
     with ui.tabs().classes("w-full").classes("text-dark").props(

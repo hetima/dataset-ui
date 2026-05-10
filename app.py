@@ -9,7 +9,15 @@ _auto_reload_flag = False
 
 def header():
     ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
-    ui.add_css('''
+    ui.add_css("""
+h1 {
+    font-size: 3.4em;
+    margin: 0.2em 0 0.2em 0;
+}
+h2 {
+    font-size: 2em;
+    margin: 0.2em 0 0.2em 0;
+}
 .infotxt {
     color: #666;
 }
@@ -40,7 +48,7 @@ def header():
     padding: 6px 22px 6px 6px;
 }
 
-''')
+""")
     ui.colors(secondary='#747474')
     if _auto_reload_flag:
         ui.label(
