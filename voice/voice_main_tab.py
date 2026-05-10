@@ -184,20 +184,25 @@ def tab_main(ctx: VoiceCtx):
 
     ctx.table = ui.table(
         columns=[
-            {"label": "", "field": "path", "name": "play", "style": 'width: 50px'},
-            {"label": "Name", "field": "name", "name": "name", "align": 'left',},
+            {"label": "", "field": "path", "name": "play", "style": "width: 50px"},
             {
-                "name": "caption",
-                "field": "caption",
-                "label": "Caption",
-                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px;',
-                "align": 'left',
+                "label": "Name",
+                "field": "name",
+                "name": "name",
+                "align": "left",
+            },
+            {
+                "name": "transcript",
+                "field": "transcript",
+                "label": "Transcript",
+                "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px;",
+                "align": "left",
             },
         ],
         rows=[],
         selection="multiple",
-        row_key='name',
-    ).classes('h-120 w-full no-shadow brdr q-pa-none')
+        row_key="name",
+    ).classes("h-120 w-full no-shadow brdr q-pa-none")
     with ctx.table.add_slot('body-cell-play'):
         with ctx.table.cell('play'):
             ui.button(icon="play_circle").props('flat').on(

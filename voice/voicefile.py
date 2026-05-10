@@ -7,7 +7,7 @@ from typing import Optional
 class VoiceFile:
     name: str
     path: str
-    caption: Optional[str]
+    transcript: Optional[str]
     default: Optional["VoiceFile"] = None
 
     def __getitem__(self, key: str):
@@ -37,7 +37,7 @@ class VoiceFile:
         return {
             "name": self.name,
             "path": self.path,
-            "caption": self.caption,
+            "caption": self.transcript,
         }
 
     @classmethod
@@ -47,7 +47,7 @@ class VoiceFile:
         return cls(
             name=data.get("name", ""),
             path=data.get("path", ""),
-            caption=data.get("caption", ""),
+            transcript=data.get("transcript", ""),
         )
 
     def save_to_json(self) -> None:
@@ -55,7 +55,7 @@ class VoiceFile:
         pass
 
     def save_to_txt(self) -> None:
-        output = self.caption
+        output = self.transcript
         if output:
             txt_path = Path(self.path).with_suffix(".txt")
             with open(txt_path, "w", encoding="utf-8") as f:
@@ -78,12 +78,12 @@ class VoiceFile:
         default = cls(
             name=name,
             path=path,
-            caption=caption,
+            transcript=caption,
         )
 
         return cls(
             name=name,
             path=path,
-            caption=caption,
+            transcript=caption,
             default=default,
         )

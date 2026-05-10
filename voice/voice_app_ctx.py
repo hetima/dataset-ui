@@ -76,7 +76,7 @@ class VoiceCtx:
             if self.save_json:
                 file.save_to_json()
             if self.save_txt:
-                file.save_to_aitk()
+                file.save_to_txt()
         self.notify("保存しました", type="positive")
 
     def set_metadata(self, key: str, val: str) -> None:
@@ -94,8 +94,8 @@ class VoiceCtx:
         # self.table.rows = self.files
         self.table.update()
 
-    def set_caption(self, val: str) -> None:
-        self.set_metadata("caption", val)
+    def set_transcript(self, val: str) -> None:
+        self.set_metadata("transcript", val)
 
     def set_models_root(self, path: str | None):
         if path and cnfg.set_models_dir(path):
@@ -144,6 +144,6 @@ class VoiceCtx:
             info = next((d for d in result_files if d["path"] == voice_file.path), None)
             if info is None:
                 continue
-            voice_file.caption = info.get("caption", voice_file.caption)
+            voice_file.transcript = info.get("transcript", voice_file.transcript)
         # self.table.rows = self.files
         self.table.update()
