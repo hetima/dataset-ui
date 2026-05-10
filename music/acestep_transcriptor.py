@@ -62,21 +62,16 @@ class AcestepTranscriptorPipeline:
         return result.strip()
 
     @classmethod
-    def from_pretrained(cls, device, dtype):
+    def from_pretrained(cls, model_path: str, device, dtype):
         from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
 
         local_files_only = True
-        model_path = str(
-            cnfg.models_dir / "acestep_transcriber" / cnfg.music.acestep_transcriber_model
-        )
+
         if not os.path.exists(model_path):
-            if cnfg.music.acestep_transcriber_model.find("/") >= 1:
-                model_path = cnfg.music.acestep_transcriber_model
+            if model_path.find("/") >= 1:
                 local_files_only = False
             else:
-                raise FileNotFoundError(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません"
-                )
+                raise FileNotFoundError(f"「{model_path}」が存在しません")
         print(f"model path: {model_path}")
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
             model_path, torch_dtype=dtype, device_map=device, local_files_only=local_files_only
@@ -93,20 +88,21 @@ class AcestepTranscriptorPipeline:
 
 
 def transcript_main(
-    data: list[str], stop_event
+    data: dict, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     import torch
-    
+
     print("transcribe task started...")
-    cnfg.load()
-    new_data = []
+    files = data.get("files", [])
+
     yield 0, "処理開始", None
-    cnt = len(data)
+    cnt = len(files)
     if cnt == 0:
         yield 1, "完了", None
         return {"err": "処理するファイルがありませんでした"}
     try:
         pipe = AcestepTranscriptorPipeline.from_pretrained(
+            data["model_path"],
             device=torch.device("cuda"),
             dtype=torch.float16,
         )
@@ -118,13 +114,12 @@ def transcript_main(
         return {"err": "モデルを読み込めませんでした"}
     i = 0
     try:
-        for path in data:
+        for path in files:
             if stop_event.is_set():
                 yield 1, "キャンセル", None
                 return {"result": []}
             result = analyze_audio(pipe, path)
             i = i + 1
-            new_data.append(result)
             yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
         return {"result": []}
     finally:

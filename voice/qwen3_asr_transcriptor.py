@@ -36,21 +36,17 @@ class QwenASRPipeline:
         return results[0].text.strip()
 
     @classmethod
-    def from_pretrained(cls, device, dtype):
+    def from_pretrained(cls, model_path: str, device, dtype):
         import torch
         from qwen_asr import Qwen3ASRModel
         from transformers import AutoConfig, AutoModel
 
         local_files_only = True
-        model_path = str(cnfg.models_dir / "qwen_asr" / cnfg.voice.asr_model)
         if not os.path.exists(model_path):
-            if cnfg.voice.asr_model.find("/") >= 1:
-                model_path = cnfg.voice.asr_model
+            if model_path.find("/") >= 1:
                 local_files_only = False
             else:
-                raise FileNotFoundError(
-                    f"モデルパス「  {str(cnfg.models_dir)}」 に「{cnfg.voice.asr_model}」フォルダが存在しません"
-                )
+                raise FileNotFoundError(f"「{model_path}」が存在しません")
         print(f"model path: {model_path}")
         # config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
         model = Qwen3ASRModel.from_pretrained(
@@ -68,20 +64,21 @@ class QwenASRPipeline:
 
 
 def transcript_main(
-    data: list[str], stop_event
+    data: dict, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     import torch
 
     print("transcribe task started...")
-    cnfg.load()
-    new_data = []
+    files = data.get("files", [])
+
     yield 0, "処理開始", None
-    cnt = len(data)
+    cnt = len(files)
     if cnt == 0:
         yield 1, "完了", None
         return {"err": "処理するファイルがありませんでした"}
     try:
         pipe = QwenASRPipeline.from_pretrained(
+            data["model_path"],
             device=torch.device("cuda"),
             dtype=torch.float16,
         )
@@ -93,13 +90,12 @@ def transcript_main(
         return {"err": "モデルを読み込めませんでした"}
     i = 0
     try:
-        for path in data:
+        for path in files:
             if stop_event.is_set():
                 yield 1, "キャンセル", None
                 return {"result": []}
             result = analyze_audio(pipe, path)
             i = i + 1
-            new_data.append(result)
             yield i / cnt, f"処理 ({i}/{cnt})", {"result": [result]}
         return {"result": []}
     finally:

@@ -33,14 +33,16 @@ def tab_main(ctx: VoiceCtx):
                     f"モデルパス「  {str(cnfg.models_dir / "qwen_asr")}」 に「{cnfg.voice.asr_model}」フォルダが存在しません。"
                 )
                 return
+            model_path_str = cnfg.music.acestep_transcriber_model
+        else:
+            model_path_str = str(model_path)
         files = ctx.target_files()
-        data = []
+        data = {"model_path": model_path_str, "files": []}
         for music_file in files: # type: ignore
-            data.append(music_file["path"])
-        if len(data) == 0:
+            data["files"].append(music_file["path"])
+        if len(data["files"]) == 0:
             ui.notify("処理対象がありません")
             return
-        cnfg.save()
         await ctx.worker.run(transcript_main, data, transcript_finished)
 
     # def handle_cell_value_change(e):
@@ -96,16 +98,16 @@ def tab_main(ctx: VoiceCtx):
         ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")
         ui.label(
             "モデルフォルダの中にある Qwen3-ASR のフォルダ名を入力してください。"
-            "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+            "リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
             "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
-            "「ダウンロードする」を押すとモデルフォルダにダウンロードされます。"
+            "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
         ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             opt = asr_models()
             val = cnfg.voice.asr_model
             if not val in opt:
                 val = opt[0] if len(opt) > 0 else ""
-            ace_model_input = (
+            qwen_model_input = (
                 ui.input(
                     label="transcriber model",
                     placeholder="モデルを選択、または入力",
@@ -114,59 +116,49 @@ def tab_main(ctx: VoiceCtx):
                 .props('style="min-width: 300px" outlined')
                 .bind_value(cnfg.voice, "asr_model")
             )
-            with ace_model_input.add_slot('append'):
+            with qwen_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
-                    ace_models_menu = ui.menu()
+                    qwen_models_menu = ui.menu()
 
             ui.button("解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     def reload_asr_model():
+        def hf_menu_item(models: list, repo_id: str):
+            rid = repo_id.split("/")[-1]
+            if rid not in models:
+                with ui.item(
+                    on_click=lambda: [
+                        setattr(qwen_model_input, "value", repo_id),
+                        qwen_models_menu.close(),
+                    ]
+                ).classes("padd8 items-center"):
+                    ui.item_section(repo_id)
+                    ui.button(
+                        "ダウンロード",
+                        on_click=lambda: [
+                            qwen_models_menu.close(),
+                            asyncio.ensure_future(asr_download(repo_id)),
+                        ],
+                    ).props("flat dense color=primary").style("margin-left: 8px").on(
+                        "click", js_handler="(e) => e.stopPropagation()"
+                    )
+            else:
+                ui.menu_item(
+                    repo_id,
+                    lambda: setattr(qwen_model_input, "value", repo_id),
+                ).classes("padd8")
         models = asr_models()
-        ace_models_menu.clear()
+        qwen_models_menu.clear()
         local_added = False
-        with ace_models_menu:
+        with qwen_models_menu:
             for model in models:
-                ui.menu_item(model, lambda m=model: setattr(ace_model_input, "value", m)).classes("padd8")
+                ui.menu_item(model, lambda m=model: setattr(qwen_model_input, "value", m)).classes("padd8")
                 local_added = True
             if local_added:
                 ui.separator()
             ui.menu_item("from huggingface").classes("padd8").enabled=False
-            # Qwen3-ASR-1.7B
-            if "Qwen3-ASR-1.7B" not in models:
-                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "Qwen/Qwen3-ASR-1.7B"), ace_models_menu.close()]).classes("padd8 items-center"):
-                    ui.item_section("Qwen/Qwen3-ASR-1.7B")
-                    ui.button(
-                        "ダウンロードする",
-                        on_click=lambda: [
-                            ace_models_menu.close(),
-                            asyncio.ensure_future(asr_download("Qwen/Qwen3-ASR-1.7B")),
-                        ],
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    "Qwen/Qwen3-ASR-1.7B",
-                    lambda: setattr(ace_model_input, "value", "Qwen/Qwen3-ASR-1.7B"),
-                ).classes("padd8")
-            # Qwen3-ASR-0.6B
-            if "Qwen3-ASR-0.6B" not in models:
-                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "Qwen/Qwen3-ASR-0.6B"), ace_models_menu.close()]).classes("padd8 items-center"):
-                    ui.item_section("Qwen/Qwen3-ASR-0.6B")
-                    ui.button(
-                        "ダウンロードする",
-                        on_click=lambda: [
-                            ace_models_menu.close(),
-                            asyncio.ensure_future(asr_download("Qwen/Qwen3-ASR-0.6B")),
-                        ],
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    "Qwen/Qwen3-ASR-0.6B",
-                    lambda: setattr(ace_model_input, "value", "Qwen/Qwen3-ASR-0.6B"),
-                ).classes("padd8")
+            hf_menu_item(models, "Qwen/Qwen3-ASR-1.7B")
+            hf_menu_item(models, "Qwen/Qwen3-ASR-0.6B")
             ui.separator()
             ui.menu_item("メニューを更新", lambda: reload_asr_model()).classes("padd8")
 

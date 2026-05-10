@@ -56,14 +56,16 @@ def tab_main(ctx: MusicCtx):
                     f"モデルパス「  {str(cnfg.models_dir / "acestep_transcriber")}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません。"
                 )
                 return
+            model_path_str = cnfg.music.acestep_transcriber_model
+        else:
+            model_path_str = str(model_path)
         files = ctx.target_files()
-        data = []
+        data = {"model_path": model_path_str, "files": []}
         for music_file in files: # type: ignore
-            data.append(music_file["path"])
-        if len(data) == 0:
+            data["files"].append(music_file["path"])
+        if len(data["files"]) == 0:
             ui.notify("処理対象がありません")
             return
-        cnfg.save()
         await ctx.worker.run(transcript_main, data, transcript_finished)
 
     # def handle_cell_value_change(e):
@@ -121,9 +123,9 @@ def tab_main(ctx: MusicCtx):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
         ui.label(
             "モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
-            "huggingface リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+            "リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
             "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
-            "「ダウンロードする」を押すとモデルフォルダにダウンロードされます。"
+            "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
             "標準の acestep_transcriber は大量のメモリを必要とするので、動かない場合は 4-bit バージョンをお試しください"
         ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
@@ -143,6 +145,32 @@ def tab_main(ctx: MusicCtx):
             ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
 
     def reload_acestep_transcriber_model():
+        def hf_menu_item(models:list, repo_id:str):
+            rid = repo_id.split("/")[-1]
+            if rid not in models:
+                with ui.item(
+                    on_click=lambda: [
+                        setattr(ace_model_input, "value", repo_id),
+                        ace_models_menu.close(),
+                    ]
+                ).classes("padd8 items-center"):
+                    ui.item_section(repo_id)
+                    ui.button(
+                        "ダウンロード",
+                        on_click=lambda: [
+                            ace_models_menu.close(),
+                            asyncio.ensure_future(
+                                acestep_transcriber_download(repo_id)
+                            ),
+                        ],
+                    ).props("flat dense color=primary").style("margin-left: 8px").on(
+                        "click", js_handler="(e) => e.stopPropagation()"
+                    )
+            else:
+                ui.menu_item(
+                    repo_id,
+                    lambda: setattr(ace_model_input, "value", repo_id),
+                ).classes("padd8")
         models = acestep_transcriber_models()
         ace_models_menu.clear()
         local_added = False
@@ -154,45 +182,8 @@ def tab_main(ctx: MusicCtx):
                 ui.separator()
             ui.menu_item("from huggingface").classes("padd8").enabled=False
             # ACE-Step/acestep-transcriber
-            if "acestep-transcriber" not in models:
-                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber"), ace_models_menu.close()]).classes("padd8 items-center"):
-                    ui.item_section("ACE-Step/acestep-transcriber")
-                    ui.button(
-                        "ダウンロードする",
-                        on_click=lambda: [
-                            ace_models_menu.close(),
-                            asyncio.ensure_future(acestep_transcriber_download(
-                                "ACE-Step/acestep-transcriber"
-                            )),
-                        ],
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    "ACE-Step/acestep-transcriber",
-                    lambda: setattr(ace_model_input, "value", "ACE-Step/acestep-transcriber"),
-                ).classes("padd8")
-            # hrktxz/acestep-transcriber-4bit
-            if "acestep-transcriber-4bit" not in models:
-                with ui.item(on_click=lambda: [setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"), ace_models_menu.close()]).classes("padd8 items-center"):
-                    ui.item_section("hrktxz/acestep-transcriber-4bit")
-                    ui.button(
-                        "ダウンロードする",
-                        on_click=lambda: [
-                            ace_models_menu.close(),
-                            asyncio.ensure_future(acestep_transcriber_download(
-                                "hrktxz/acestep-transcriber-4bit"
-                            )),
-                        ],
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    "hrktxz/acestep-transcriber-4bit",
-                    lambda: setattr(ace_model_input, "value", "hrktxz/acestep-transcriber-4bit"),
-                ).classes("padd8")
+            hf_menu_item(models, "ACE-Step/acestep-transcriber")
+            hf_menu_item(models, "hrktxz/acestep-transcriber-4bit")
             ui.separator()
             ui.menu_item("メニューを更新", lambda: reload_acestep_transcriber_model()).classes("padd8")
 
