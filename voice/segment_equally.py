@@ -9,6 +9,18 @@ def process_one_file(
     path_str: str, output_dir_str: str, segment_sec: float, output_format: str
 ) -> list[str]:
     path = Path(path_str)
+    """
+    音声ファイルを均等に分割する関数です。
+
+    Args:
+        path_str (str): 分割対象の音声ファイルのパス。
+        output_dir_str (str): 出力ディレクトリのパス。
+        segment_sec (float): 分割後の各セグメントの長さ（秒単位）。
+        output_format (str): 出力ファイルの形式（例: "wav", "flac"）。
+
+    Returns:
+        list[str]: 分割されたファイルのパスのリスト。
+    """
     base = path.stem
     if output_dir_str is None:
         output_dir = path.parent
@@ -45,7 +57,7 @@ def segment_equally_main(
     print("segment silence task started...")
 
     files = data.get("files", [])
-    output_dir = data.get("output_dir", None)
+    output_dir_root = data.get("output_dir", None)
     overwrite = data.get("overwrite", False)
     segment_sec = data.get("segment_sec", 5)
     output_format = data.get("format", "wav")
@@ -64,11 +76,11 @@ def segment_equally_main(
             if stop_event.is_set():
                 yield 1, "キャンセル", None
                 return {"result": {}}
-            if not output_dir:
-                parent = Path(path).parent
-                output_dir_str = str(parent / Path(path).stem)
+            if not output_dir_root:
+                parent_path = Path(path).parent
+                output_dir_str = str(parent_path / Path(path).stem)
             else:
-                output_dir_str = str(Path(output_dir) / Path(path).stem)
+                output_dir_str = str(Path(output_dir_root) / Path(path).stem)
 
             if os.path.exists(output_dir_str):
                 if overwrite and os.path.isdir(output_dir_str):
