@@ -68,7 +68,7 @@ def segment_equally_main(
                 parent = Path(path).parent
                 output_dir_str = str(parent / Path(path).stem)
             else:
-                output_dir_str = output_dir
+                output_dir_str = str(Path(output_dir) / Path(path).stem)
 
             if os.path.exists(output_dir_str):
                 if overwrite and os.path.isdir(output_dir_str):
