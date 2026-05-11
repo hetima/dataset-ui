@@ -99,6 +99,30 @@ def tab_main(ctx: VoiceCtx):
         }
         await ctx.worker.run(segment_silence_main, data, segment_finished)
 
+    async def segment_equally(frame_count=5, fps=1, output_format: str = "wav") -> None:
+        """均等に分割して保存するタスクを実行
+        Args: frame_count: フレーム数
+              fps: フレームレート。1にするとフレーム数=秒数になるので、秒数で分割したい場合は1を指定してください。
+              output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
+        """
+        from voice.segment_equally import segment_equally_main
+
+        segment_sec = float(frame_count) / float(fps)
+        files = ctx.target_files()
+        if len(files) == 0:
+            ui.notify("処理対象がありません")
+            return
+        if not await confirm_dir_exists(files):
+            return
+        data = {
+            "files": [f["path"] for f in files],
+            "output_dir": None,
+            "overwrite": True,
+            "format": output_format,
+            "segment_sec": segment_sec,
+        }
+        await ctx.worker.run(segment_equally_main, data, segment_finished)
+
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)
         if isinstance(result, list) and len(result) > 0:
@@ -182,7 +206,7 @@ def tab_main(ctx: VoiceCtx):
                 ui.label("処理対象ファイルを無音区間で分割します。")
                 ui.label(
                     "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」という名前で保存されます。"
-                )
+                ).classes("infotxt")
                 with ui.row().classes("items-center gap-4"):
                     input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined style='width: 100px;'")
                     input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined style='width: 100px;'")
@@ -204,7 +228,28 @@ def tab_main(ctx: VoiceCtx):
                 ui.label("処理対象ファイルを均等に分割します。")
                 ui.label(
                     "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」という名前で保存されます。"
-                )
+                ).classes("infotxt")
+                ui.label("フレーム数とfpsから秒数を計算して分割します。fpsを1にするとフレーム数=秒数になるので、秒数で分割したい場合はfpsを1にしてください。").classes("infotxt")
+
+                with ui.row().classes("items-center gap-4"):
+                    input_parts = ui.input(
+                        label="フレーム数", placeholder="例: 5", value="5"
+                    ).props("outlined style='width: 100px;'")
+                    input_fps = ui.input(label="FPS", placeholder="例: 24", value="1").props("outlined style='width: 100px;'")
+                    input_format2 = ui.select(
+                        label="出力",
+                        options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
+                        value="wav",
+                    ).props("outlined style='width: 120px;'")
+                    ui.button("分割する").bind_enabled_from(
+                        ctx.worker, "can_run"
+                    ).on_click(
+                        lambda: segment_equally(
+                            frame_count=input_parts.value,  # type: ignore
+                            fps=input_fps.value,  # type: ignore
+                            output_format=input_format2.value,
+                        )
+                    )
 
     def reload_asr_model():
         def hf_menu_item(models: list, repo_id: str):
