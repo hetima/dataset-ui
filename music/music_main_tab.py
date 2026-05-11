@@ -218,74 +218,91 @@ def tab_main(ctx: MusicCtx):
 
     ctx.table = ui.table(
         columns=[
-            {"label": "", "field": "path", "name": "play", "style": 'width: 50px'},
-            {"label": "Name", "field": "name", "name": "name", "align": 'left',},
+            {"label": "", "field": "path", "name": "expand", "style": "width: 30px"},
+            {"label": "", "field": "path", "name": "play", "style": "width: 30px"},
+            {
+                "label": "Name",
+                "field": "name",
+                "name": "name",
+                "align": "left",
+            },
             {
                 "name": "caption",
                 "field": "caption",
                 "label": "Caption",
-                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px',
-                "align": 'left',
+                "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
+                "align": "left",
             },
             {
                 "name": "lyrics",
                 "field": "lyrics",
                 "label": "Lyrics",
-                "style": 'white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px',
-                "align": 'left',
+                "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
+                "align": "left",
             },
             {
                 "label": "Lang",
                 "field": "language",
                 "editable": True,
-                "style": 'width: 80px',
+                "style": "width: 80px",
                 "name": "language",
-                "align": 'left',
+                "align": "left",
             },
             {
                 "label": "BPM",
                 "field": "bpm",
                 "editable": True,
                 "name": "bpm",
-                "style": 'width: 80px',
-                "align": 'left',
+                "style": "width: 80px",
+                "align": "left",
             },
             {
                 "label": "KEY",
                 "field": "keyscale",
                 "editable": True,
                 "name": "keyscale",
-                "style": 'width: 80px',
-                "align": 'left',
+                "style": "width: 80px",
+                "align": "left",
             },
             {
                 "label": "Timesig",
                 "field": "timesignature",
                 "editable": True,
                 "name": "timesignature",
-                "style": 'width: 80px',
-                "align": 'left',
+                "style": "width: 80px",
+                "align": "left",
             },
             {
                 "label": "Duration",
                 "field": "duration",
                 "editable": True,
                 "name": "duration",
-                "style": 'width: 80px',
-                "align": 'left',
+                "style": "width: 80px",
+                "align": "left",
             },
         ],
         rows=[],
         selection="multiple",
-        row_key='name',
-    ).classes('h-120 w-full no-shadow brdr q-pa-none')
+        row_key="name",
+    ).classes("h-120 w-full no-shadow brdr q-pa-none")
     with ctx.table.add_slot('body-cell-play'):
         with ctx.table.cell('play'):
             ui.button(icon="play_circle").props('flat').on(
                 'click',
                 js_handler='() => emit(props.value)',
                 handler=lambda e: play_src(e.args),
-            ).style('padding: 4px 8px;')
+            ).style('padding: 2px 4px;')
+    with ctx.table.add_slot("body-cell-expand"):
+        with ctx.table.cell("expand"):
+            ui.button().props(
+                "flat"
+                " :icon=\"props.expand ? 'expand_less' : 'expand_more'\""
+                " :style=\"props.row.is_expandable ? 'padding: 2px 4px' : 'padding: 2px 4px; display: none'\""
+            ).on(
+                "click",
+                js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
+                handler=lambda e: print(e.args),
+            )
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Save files

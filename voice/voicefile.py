@@ -9,6 +9,7 @@ class VoiceFile:
     path: str
     transcript: Optional[str]
     default: Optional["VoiceFile"] = None
+    is_expandable: bool = False
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -78,12 +79,14 @@ class VoiceFile:
         default = cls(
             name=name,
             path=path,
+            is_expandable=False,
             transcript=caption,
         )
 
         return cls(
             name=name,
             path=path,
+            is_expandable=True,
             transcript=caption,
             default=default,
         )

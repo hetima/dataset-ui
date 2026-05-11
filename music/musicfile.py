@@ -21,6 +21,7 @@ class MusicFile:
     album_artist: Optional[str] = None
     ttml: Optional[str] = None
     default: Optional["MusicFile"] = None
+    is_expandable: bool = False
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -191,5 +192,6 @@ class MusicFile:
             timesignature=timesignature,
             language=language,
             duration=duration,
+            is_expandable=False,
             default=default,
         )

@@ -184,7 +184,8 @@ def tab_main(ctx: VoiceCtx):
 
     ctx.table = ui.table(
         columns=[
-            {"label": "", "field": "path", "name": "play", "style": "width: 50px"},
+            {"label": "", "field": "path", "name": "expand", "style": "width: 30px"},
+            {"label": "", "field": "path", "name": "play", "style": "width: 30px"},
             {
                 "label": "Name",
                 "field": "name",
@@ -209,7 +210,18 @@ def tab_main(ctx: VoiceCtx):
                 'click',
                 js_handler='() => emit(props.value)',
                 handler=lambda e: play_src(e.args),
-            ).style('padding: 4px 8px;')
+            ).style('padding: 2px 4px;')
+    with ctx.table.add_slot("body-cell-expand"):
+        with ctx.table.cell("expand"):
+            ui.button().props(
+                'flat'
+                ' :icon="props.expand ? \'expand_less\' : \'expand_more\'"'
+                ' :style="props.row.is_expandable ? \'padding: 2px 4px\' : \'padding: 2px 4px; display: none\'"'
+            ).on(
+                "click",
+                js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
+                handler=lambda e: print(e.args),
+            )
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Save files
