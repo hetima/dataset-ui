@@ -56,7 +56,7 @@ def tab_main(ctx: VoiceCtx):
               max_sec: チャンクの最大長さ(秒)
               output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
         """
-        from voice.split import transcript_main
+        from voice.split_silence import split_silence_main
 
         min_sec = float(min_sec)
         max_sec = float(max_sec)
@@ -84,8 +84,9 @@ def tab_main(ctx: VoiceCtx):
             "format": output_format,
             "min_sec": min_sec,
             "max_sec": max_sec,
+            "silence_thresh": -60,
         }
-        await ctx.worker.run(transcript_main, data, split_silence_finished)
+        await ctx.worker.run(split_silence_main, data, split_silence_finished)
 
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)

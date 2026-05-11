@@ -1,6 +1,19 @@
-#
-# from https://github.com/yesiampapa/rvc_split_audio/blob/main/split.py
-#
+"""
+## 元ソース
+https://github.com/yesiampapa/rvc_split_audio
+
+純正の `pydub` では問題ないが、`pozalabs-pydub` だと落ちるので修正
+
+### 1. `split_by_low_volume` の再帰無限ループ（`RecursionError`）
+再帰構造を while ループに変更し、反復上限ガードを追加。分割位置が不正の場合は等間隔分割（`_split_chunk_evenly`）にフォールバック
+
+### 2. `find_lowest_volume_split` の最小分割サイズ未保証
+`min_split_ms=500` を追加し、戻り値が両端から500ms以上を保証するよう探索範囲を制限
+
+### 3. pydub の `fade_out`/`fade_in` で `ValueError`
+短いセグメント（数ms）に対するフェード呼び出しで、内部のミリ秒→バイト変換の丸め誤差により `ValueError: invalid start_byte/end_byte range` が発生。`_safe_fade` ヘルパーで `try/except` + リトライを実装
+"""
+
 import os
 import shutil
 from pydub import AudioSegment, silence
@@ -102,8 +115,13 @@ def split_by_low_volume(ch: AudioSegment, max_sec=5, fade_ms=10, search_ms=1000)
             result.extend(_split_chunk_evenly(remaining, max_len))
             return result
 
-        left = remaining[:split_pos].fade_out(fade_ms)
-        right = remaining[split_pos:].fade_in(fade_ms)
+        left = remaining[:split_pos]
+        right = remaining[split_pos:]
+        # 安全なフェード
+        fade_l = min(fade_ms, len(left) // 2) if len(left) > 0 else 0
+        fade_r = min(fade_ms, len(right) // 2) if len(right) > 0 else 0
+        left = _safe_fade(left, fade_l, "out")
+        right = _safe_fade(right, fade_r, "in")
 
         result.append(left)
         remaining = right
@@ -158,10 +176,37 @@ def merge_chunks(chunks, min_sec=1, max_sec=5, ideal_pad_sec=4, fade_ms=10, gap_
     return result
 
 
+def _safe_fade(seg: AudioSegment, fade_ms: int, direction: str) -> AudioSegment:
+    """pydubの丸め誤差による ValueError を回避するフェードヘルパー。
+    direction: 'out' or 'in'
+    """
+    if fade_ms <= 0 or len(seg) == 0:
+        return seg
+    # fade_ms がセグメント長を超えないようにクランプ
+    fade_ms = min(fade_ms, len(seg))
+    try:
+        if direction == "out":
+            return seg.fade_out(fade_ms)
+        else:
+            return seg.fade_in(fade_ms)
+    except (ValueError, Exception):
+        # さらに半分に縮めてリトライ
+        try:
+            fade_ms = max(1, fade_ms // 2)
+            if direction == "out":
+                return seg.fade_out(fade_ms)
+            else:
+                return seg.fade_in(fade_ms)
+        except (ValueError, Exception):
+            return seg  # フェード諦める
+
+
 def fade_merge(ch1: AudioSegment, ch2: AudioSegment, fade_ms=10, gap_ms=100):
     gap = AudioSegment.silent(duration=gap_ms)
-    ch1_faded = ch1.fade_out(fade_ms)
-    ch2_faded = ch2.fade_in(fade_ms)
+    fade1 = min(fade_ms, len(ch1) // 2) if len(ch1) > 0 else 0
+    fade2 = min(fade_ms, len(ch2) // 2) if len(ch2) > 0 else 0
+    ch1_faded = _safe_fade(ch1, fade1, "out")
+    ch2_faded = _safe_fade(ch2, fade2, "in")
     return ch1_faded + gap + ch2_faded
 
 
@@ -219,7 +264,7 @@ def process_one_file(
     return files
 
 
-def transcript_main(
+def split_silence_main(
     data: dict, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     """音声ファイルを無音で分割して保存するタスクのメイン処理
@@ -229,6 +274,7 @@ def transcript_main(
             "output_dir": str|None,  # 分割後のファイルの出力先フォルダ (Noneなら元と同じ場所)
             "min_sec": int|float,  # チャンクの最小長さ(秒)
             "max_sec": int|float,  # チャンクの最大長さ(秒)
+            "silence_thresh": int|float,  # 無音とみなす音量の閾値 (dB)
             "format": str,   # 出力フォーマット ("wav", "mp3", "flac" のいずれか)
             "overwrite": bool, # 出力先に同名フォルダがある場合に上書きするかどうか
         }
@@ -275,6 +321,7 @@ def transcript_main(
                 output_dir_str=output_dir_str,
                 min_sec=min_sec,
                 max_sec=max_sec,
+                silence_thresh=data.get("silence_thresh", -60),
                 output_format=output_format,
             )
             yield i / cnt, f"処理 ({i}/{cnt})", {"result": [{"src": path, "dst": result}]}
