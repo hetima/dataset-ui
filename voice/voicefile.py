@@ -10,6 +10,7 @@ class VoiceFile:
     transcript: Optional[str]
     default: Optional["VoiceFile"] = None
     is_expandable: bool = False
+    children: Optional[list["VoiceFile"]] = None
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -41,6 +42,13 @@ class VoiceFile:
             "caption": self.transcript,
         }
 
+    def add_child(self, child: "VoiceFile") -> None:
+        """子要素を追加する"""
+        if self.children is None:
+            self.children = []
+        self.children.append(child)
+        self.is_expandable = True
+
     @classmethod
     def from_dict(cls, data: dict) -> "VoiceFile":
         """辞書から VoiceFile インスタンスを生成する"""
@@ -64,6 +72,7 @@ class VoiceFile:
 
     @classmethod
     def from_audio_file(cls, file: Path) -> "VoiceFile":
+        file = Path(file)
         txt_path = file.with_suffix(".txt")
         name = file.name
         path = str(file)

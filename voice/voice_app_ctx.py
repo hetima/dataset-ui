@@ -62,10 +62,10 @@ class VoiceCtx:
         rows = self.table.selected
         return rows
 
-    def voice_file_for_path(self, path: str) -> dict | None:
+    def voice_file_for_path(self, path: str) -> VoiceFile | None:
         if not path:
             return None
-        return next((d for d in self.files if d["path"] == path), None)
+        return next((d for d in self.files if d.path == path), None)
 
     def save_metadata(self) -> None:
         files = self.files
@@ -147,3 +147,16 @@ class VoiceCtx:
             voice_file.transcript = info.get("transcript", voice_file.transcript)
         # self.table.rows = self.files
         self.table.update()
+
+    def split_silence_finished(self, result: dict) -> None:
+        results = result.get("result", [])
+        for result in results:
+            src = result.get("src", "")
+            dst_list = result.get("dst", [])
+            parent_file = self.voice_file_for_path(src)
+            for dst in dst_list:
+                voicefile = VoiceFile.from_audio_file(dst)
+                if parent_file:
+                    parent_file.add_child(voicefile)
+        self.table.update()
+                    

@@ -7,6 +7,7 @@ from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
 from common.setting import cnfg
+from common.message_dialog import show_confirm_dialog
 from voice.qwen3_asr_transcriptor import transcript_main, asr_models
 from voice.voice_app_ctx import VoiceCtx
 
@@ -23,6 +24,7 @@ def tab_main(ctx: VoiceCtx):
         ctx.transcripted(result)
 
     async def transcript() -> None:
+        """処理対象のファイルを Qwen3-ASR で音声認識するタスクを実行"""
         if not cnfg.voice.asr_model:
             ui.notify("モデルを選択してください")
             return
@@ -45,12 +47,45 @@ def tab_main(ctx: VoiceCtx):
             return
         await ctx.worker.run(transcript_main, data, transcript_finished)
 
-    # def handle_cell_value_change(e):
-    #     new_row = e.args["data"]
-    #     ctx.file_grid.options["rowData"][:] = [
-    #         row | new_row if row["name"] == new_row["name"] else row
-    #         for row in ctx.file_grid.options["rowData"]
-    #     ]
+    def split_silence_finished(result) -> None:
+        ctx.split_silence_finished(result)
+
+    async def split_silence(min_sec=2, max_sec=5, output_format: str = "wav") -> None:
+        """無音区間で分割して保存するタスクを実行
+        Args: min_sec: チャンクの最小長さ(秒)
+              max_sec: チャンクの最大長さ(秒)
+              output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
+        """
+        from voice.split import transcript_main
+
+        min_sec = float(min_sec)
+        max_sec = float(max_sec)
+
+        files = ctx.target_files()
+        exists_dirs = []
+        for f in files:
+            output_dir = Path(f["path"]).stem
+            dst = Path(f["path"]).parent / output_dir
+            if dst.exists():
+                exists_dirs.append(dst)
+        if len(exists_dirs) > 0:
+            msg = "分割ファイルの出力先が存在しています。<br><br>"
+            for d in exists_dirs:
+                msg += f"- {str(d)}<br>"
+            confirm = await show_confirm_dialog(
+                msg + "<br>これらのフォルダを削除して処理を続行しますか？"
+            )
+            if not confirm:
+                return
+        data = {
+            "files": [f["path"] for f in files],
+            "output_dir": None,
+            "overwrite": True,
+            "format": output_format,
+            "min_sec": min_sec,
+            "max_sec": max_sec,
+        }
+        await ctx.worker.run(transcript_main, data, split_silence_finished)
 
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)
@@ -126,6 +161,27 @@ def tab_main(ctx: VoiceCtx):
                     qwen_models_menu = ui.menu()
 
             ui.button("解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
+
+    with ui.expansion("音声分割", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label("処理対象ファイルを無音区間で分割します。")
+        ui.label(
+            "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」のような名前で保存されます。"
+        )
+        with ui.row().classes("items-center gap-4"):
+            input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined style='width: 120px;'")
+            input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined style='width: 120px;'")
+            input_format = ui.select(
+                label="出力フォーマット",
+                options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
+                value="wav",
+            ).props("outlined style='width: 150px;'")
+            ui.button("分割する").bind_enabled_from(ctx.worker, "can_run").on_click(lambda: split_silence(
+                min_sec=input_min_sec.value, # type: ignore
+                max_sec=input_max_sec.value, # type: ignore
+                output_format=input_format.value
+            ))
 
     def reload_asr_model():
         def hf_menu_item(models: list, repo_id: str):

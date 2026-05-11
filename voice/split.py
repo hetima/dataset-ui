@@ -2,8 +2,7 @@
 # from https://github.com/yesiampapa/rvc_split_audio/blob/main/split.py
 #
 import os
-import multiprocessing
-from functools import partial
+import shutil
 from pydub import AudioSegment, silence
 
 from pathlib import Path
@@ -27,18 +26,26 @@ def split_into_phrases(audio: AudioSegment, min_silence_len=300, silence_thresh=
 ########################################
 # 2) 5秒を超えるフレーズを "音量の低い部分" で分割
 ########################################
-def find_lowest_volume_split(ch: AudioSegment, search_range_ms=1000):
+def find_lowest_volume_split(ch: AudioSegment, search_range_ms=1000, min_split_ms=500):
     """
     チャンク中央付近 ± (search_range_ms/2) を探索し、
-    RMS(平均振幅)が最小の位置を探す簡易実装。
+    RMS(平均振幅)が最小の位置を探す。
+    戻り値は min_split_ms <= pos <= len(ch) - min_split_ms を保証。
     """
     length = len(ch)
+    # 最小分割サイズを確保できない場合は等分フォールバック
+    if length < min_split_ms * 2:
+        return length // 2
+
     if length <= search_range_ms:
         return length // 2  # 中央で切る
 
     mid = length // 2
-    start_search = max(0, mid - search_range_ms // 2)
-    end_search = min(length, mid + search_range_ms // 2)
+    start_search = max(min_split_ms, mid - search_range_ms // 2)
+    end_search = min(length - min_split_ms, mid + search_range_ms // 2)
+
+    if start_search >= end_search:
+        return mid  # 探索範囲が取れないなら中央
 
     min_rms = float("inf")
     best_pos = mid
@@ -54,31 +61,56 @@ def find_lowest_volume_split(ch: AudioSegment, search_range_ms=1000):
     return best_pos
 
 
+def _split_chunk_evenly(ch: AudioSegment, max_ms: int):
+    """
+    チャンクを max_ms 以下の等間隔に分割するフォールバック。
+    「音量の低い箇所」が見つからない場合に使用。
+    """
+    length = len(ch)
+    n = max(2, (length + max_ms - 1) // max_ms)
+    chunk_size = length // n
+    result = []
+    for i in range(n):
+        start = i * chunk_size
+        end = (i + 1) * chunk_size if i < n - 1 else length
+        result.append(ch[start:end])
+    return result
+
+
 def split_by_low_volume(ch: AudioSegment, max_sec=5, fade_ms=10, search_ms=1000):
     """
     チャンクが max_sec(秒)超なら、
-    "音量の低い箇所"でフェード分割(再帰)。
+    "音量の低い箇所"でフェード分割。
+    再帰ではなくループで処理し、進まない場合は等間隔フォールバック。
     """
     max_len = max_sec * 1000
     if len(ch) <= max_len:
         return [ch]
 
+    min_split_ms = 500  # 分割位置の両端の最低確保(ms)
     result = []
     remaining = ch
-    while len(remaining) > max_len:
-        split_pos = find_lowest_volume_split(remaining, search_ms)
+    max_iterations = 10000  # 安全ガード
+    iteration = 0
+
+    while len(remaining) > max_len and iteration < max_iterations:
+        iteration += 1
+        split_pos = find_lowest_volume_split(remaining, search_ms, min_split_ms)
+
+        # split_pos が短すぎる/長すぎる場合は等間隔フォールバック
+        if split_pos <= min_split_ms or split_pos >= len(remaining) - min_split_ms:
+            result.extend(_split_chunk_evenly(remaining, max_len))
+            return result
+
         left = remaining[:split_pos].fade_out(fade_ms)
         right = remaining[split_pos:].fade_in(fade_ms)
 
-        # leftがまだ長すぎれば再帰
-        if len(left) > max_len:
-            result.extend(split_by_low_volume(left, max_sec, fade_ms, search_ms))
-        else:
-            result.append(left)
-
+        result.append(left)
         remaining = right
+
     # 最後の残り
-    result.append(remaining)
+    if len(remaining) > 0:
+        result.append(remaining)
     return result
 
 
@@ -144,7 +176,7 @@ def pad_to_length(ch: AudioSegment, target_ms: int):
 # メイン処理: 1ファイル単位
 ########################################
 def process_one_file(
-    path_str: str, output_dir_str:str|None = None, min_silence_len=300, silence_thresh=-60, min_sec=1, max_sec=5, fade_ms=10, gap_ms=100, output_format="wav"
+    path_str: str, output_dir_str:str|None = None, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100, output_format="wav"
 ) -> list[str]:
     path = Path(path_str)
     base = path.stem
@@ -190,11 +222,25 @@ def process_one_file(
 def transcript_main(
     data: dict, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
+    """音声ファイルを無音で分割して保存するタスクのメイン処理
+    Args:
+        data: {
+            "files": [str],  # 分割する音声ファイルのパス
+            "output_dir": str|None,  # 分割後のファイルの出力先フォルダ (Noneなら元と同じ場所)
+            "min_sec": int|float,  # チャンクの最小長さ(秒)
+            "max_sec": int|float,  # チャンクの最大長さ(秒)
+            "format": str,   # 出力フォーマット ("wav", "mp3", "flac" のいずれか)
+            "overwrite": bool, # 出力先に同名フォルダがある場合に上書きするかどうか
+        }
+        stop_event: タスクキャンセル用イベント
+    """
+
     print("split task started...")
 
     files = data.get("files", [])
     output_dir = data.get("output_dir", None)
-    min_sec = data.get("min_sec", 1)
+    overwrite = data.get("overwrite", False)
+    min_sec = data.get("min_sec", 2)
     max_sec = data.get("max_sec", 5)
     output_format = data.get("format", "wav")
     if output_format not in ["wav", "mp3", "flac"]:
@@ -207,14 +253,23 @@ def transcript_main(
         return {"err": "処理するファイルがありませんでした"}
 
     try:
-        for path in files:
+        for i, path in enumerate(files, start=1):
+            print(f"processing: {path}")
             if stop_event.is_set():
                 yield 1, "キャンセル", None
                 return {"result": {}}
             if not output_dir:
-                output_dir_str = str(Path(path).stem)
+                parent = Path(path).parent
+                output_dir_str = str(parent / Path(path).stem)
             else:
                 output_dir_str = output_dir
+
+            if os.path.exists(output_dir_str):
+                if overwrite and os.path.isdir(output_dir_str):
+                    shutil.rmtree(output_dir_str)
+                else:
+                    yield 1, "エラー", None
+                    return {"err": f"出力先の「{output_dir_str}」はすでに存在しています"}
             result = process_one_file(
                 path_str=path,
                 output_dir_str=output_dir_str,
@@ -222,11 +277,10 @@ def transcript_main(
                 max_sec=max_sec,
                 output_format=output_format,
             )
-            i = i + 1
-            yield i / cnt, f"処理 ({i}/{cnt})", {"result": {"src": path, "dst": result}}
+            yield i / cnt, f"処理 ({i}/{cnt})", {"result": [{"src": path, "dst": result}]}
         return {"result": {}}
     except Exception as e:
         yield 1, "エラー", None
         return {"err": str(e)}
     finally:
-        print("...transcribe task finished")
+        print("...split task finished")
