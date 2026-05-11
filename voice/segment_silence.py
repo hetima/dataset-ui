@@ -264,7 +264,7 @@ def process_one_file(
     return files
 
 
-def split_silence_main(
+def segment_silence_main(
     data: dict, stop_event
 ) -> Generator[tuple[float, str, dict | None], None, dict]:
     """音声ファイルを無音で分割して保存するタスクのメイン処理
@@ -281,7 +281,7 @@ def split_silence_main(
         stop_event: タスクキャンセル用イベント
     """
 
-    print("split task started...")
+    print("segment silence task started...")
 
     files = data.get("files", [])
     output_dir = data.get("output_dir", None)
@@ -330,4 +330,4 @@ def split_silence_main(
         yield 1, "エラー", None
         return {"err": str(e)}
     finally:
-        print("...split task finished")
+        print("...segment silence task finished")

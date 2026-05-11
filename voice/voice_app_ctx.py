@@ -148,15 +148,15 @@ class VoiceCtx:
         # self.table.rows = self.files
         self.table.update()
 
-    def split_silence_finished(self, result: dict) -> None:
+    def segment_finished(self, result: dict) -> None:
         results = result.get("result", [])
         for result in results:
             src = result.get("src", "")
             dst_list = result.get("dst", [])
             parent_file = self.voice_file_for_path(src)
-            for dst in dst_list:
-                voicefile = VoiceFile.from_audio_file(dst)
-                if parent_file:
+            if parent_file:
+                for dst in dst_list:
+                    voicefile = VoiceFile.from_audio_file(dst)
                     parent_file.add_child(voicefile)
         self.table.update()
-                    
+

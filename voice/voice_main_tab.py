@@ -39,33 +39,20 @@ def tab_main(ctx: VoiceCtx):
         else:
             model_path_str = str(model_path)
         files = ctx.target_files()
+        if len(files) == 0:
+            ui.notify("処理対象がありません")
+            return
         data = {"model_path": model_path_str, "files": []}
         for music_file in files: # type: ignore
             data["files"].append(music_file["path"])
-        if len(data["files"]) == 0:
-            ui.notify("処理対象がありません")
-            return
         await ctx.worker.run(transcript_main, data, transcript_finished)
 
-    def split_silence_finished(result) -> None:
-        ctx.split_silence_finished(result)
-
-    async def split_silence(min_sec=2, max_sec=5, output_format: str = "wav") -> None:
-        """無音区間で分割して保存するタスクを実行
-        Args: min_sec: チャンクの最小長さ(秒)
-              max_sec: チャンクの最大長さ(秒)
-              output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
-        """
-        from voice.split_silence import split_silence_main
-
-        min_sec = float(min_sec)
-        max_sec = float(max_sec)
-
-        files = ctx.target_files()
+    async def confirm_dir_exists(files: list) -> bool:
         exists_dirs = []
         for f in files:
-            output_dir = Path(f["path"]).stem
-            dst = Path(f["path"]).parent / output_dir
+            path = Path(f["path"])
+            output_dir = path.stem
+            dst = path.parent / output_dir
             if dst.exists():
                 exists_dirs.append(dst)
         if len(exists_dirs) > 0:
@@ -75,8 +62,32 @@ def tab_main(ctx: VoiceCtx):
             confirm = await show_confirm_dialog(
                 msg + "<br>これらのフォルダを削除して処理を続行しますか？"
             )
-            if not confirm:
-                return
+            return confirm
+        return True
+
+    def segment_finished(result) -> None:
+        ctx.segment_finished(result)
+
+    async def segment_silence(
+        min_sec=2, max_sec=5, silence_thresh: int = -60, output_format: str = "wav"
+    ) -> None:
+        """無音区間で分割して保存するタスクを実行
+        Args: min_sec: チャンクの最小長さ(秒)
+              max_sec: チャンクの最大長さ(秒)
+              output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
+              silence_thresh: 無音とみなす音量の閾値 (dB)
+        """
+        from voice.segment_silence import segment_silence_main
+
+        min_sec = float(min_sec)
+        max_sec = float(max_sec)
+
+        files = ctx.target_files()
+        if len(files) == 0:
+            ui.notify("処理対象がありません")
+            return
+        if not await confirm_dir_exists(files):
+            return
         data = {
             "files": [f["path"] for f in files],
             "output_dir": None,
@@ -84,9 +95,9 @@ def tab_main(ctx: VoiceCtx):
             "format": output_format,
             "min_sec": min_sec,
             "max_sec": max_sec,
-            "silence_thresh": -60,
+            "silence_thresh": silence_thresh,
         }
-        await ctx.worker.run(split_silence_main, data, split_silence_finished)
+        await ctx.worker.run(segment_silence_main, data, segment_finished)
 
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)
@@ -166,23 +177,34 @@ def tab_main(ctx: VoiceCtx):
     with ui.expansion("音声分割", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを無音区間で分割します。")
-        ui.label(
-            "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」のような名前で保存されます。"
-        )
-        with ui.row().classes("items-center gap-4"):
-            input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined style='width: 120px;'")
-            input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined style='width: 120px;'")
-            input_format = ui.select(
-                label="出力フォーマット",
-                options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
-                value="wav",
-            ).props("outlined style='width: 150px;'")
-            ui.button("分割する").bind_enabled_from(ctx.worker, "can_run").on_click(lambda: split_silence(
-                min_sec=input_min_sec.value, # type: ignore
-                max_sec=input_max_sec.value, # type: ignore
-                output_format=input_format.value
-            ))
+        with ui.splitter().classes("q-splitter--no-margin").props('separator-class="q-mx-md"') as segment_splitter:
+            with segment_splitter.before:
+                ui.label("処理対象ファイルを無音区間で分割します。")
+                ui.label(
+                    "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」という名前で保存されます。"
+                )
+                with ui.row().classes("items-center gap-4"):
+                    input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined style='width: 100px;'")
+                    input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined style='width: 100px;'")
+                    input_thresh = ui.input(label="無音閾値(dB)", placeholder="例: -60", value="-60").props("outlined style='width: 100px;'")
+                    input_format = ui.select(
+                        label="出力",
+                        options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
+                        value="wav",
+                    ).props("outlined style='width: 120px;'")
+                    ui.button("分割する").bind_enabled_from(ctx.worker, "can_run").on_click(
+                        lambda: segment_silence(
+                            min_sec=input_min_sec.value,  # type: ignore
+                            max_sec=input_max_sec.value,  # type: ignore
+                            silence_thresh=input_thresh.value,  # type: ignore
+                            output_format=input_format.value,
+                        )
+                    )
+            with segment_splitter.after:
+                ui.label("処理対象ファイルを均等に分割します。")
+                ui.label(
+                    "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」という名前で保存されます。"
+                )
 
     def reload_asr_model():
         def hf_menu_item(models: list, repo_id: str):
