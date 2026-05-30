@@ -59,7 +59,7 @@ var/                      # 試験的スクリプト — メインアプリの�
 
 `MusicCtx` / `VoiceCtx` は `@binding.bindable_dataclass` — UI 要素をフィールドにバインドする。コールバックリスト（`model_refresh_func`、`dataset_dirs_refresh_func`）で設定変更を UI に通知する。
 
-### Worker / Generator コントラクト
+### Worker / Generator コントラクト（廃止予定）
 
 バックグラウンドタスクは `(progress: float, status: str, partial_result: dict | None)` を yield するジェネレータ関数として実装し、最終結果の dict を return する。キャンセルは `stop_event.is_set()` で確認する。
 
@@ -72,6 +72,47 @@ def task(data, stop_event):
         yield (i+1)/len(items), f"処理中 {i+1}/{len(items)}", None
     return final_results
 ```
+
+### CLI task
+
+重い処理は `cli_task_*.py` としてスタンドアロン CLI スクリプトに切り出し、`XtermDialog`（`common/xterm_dialog.py`）でサブプロセスとして実行する。Worker / Generator パターンの代替。
+
+**CLI スクリプトの規約**
+
+- ファイル名: `cli_task_<処理名>.py`（例: `music/cli_task_musicanalyze.py`）
+- 入力: stdin から JSON を受け取る（`sys.stdin.read()` → `json.loads()`）
+- 出力: 通常のテキストはそのまま print（xterm に表示される）
+- 件数通知・部分結果はマーカーで囲んで stdout に出力する
+
+```
+[[[initial_result_start]]]
+{"count": 10}
+[[[initial_result_end]]]
+```
+
+```
+[[[part_result_start]]]
+{"type": "result", "data": {...}}
+[[[part_result_end]]]
+```
+
+**XtermDialog の呼び出し**
+
+```python
+from common.xterm_dialog import XtermDialog
+
+dlg = XtermDialog(
+    args=[sys.executable, "module/cli_task_foo.py"],
+    title="処理タイトル",
+    input_json=data,                  # stdin に渡す Python オブジェクト（json.dumps される）
+    initial_callback=lambda n: ...,   # [[[initial_result]]] の count を受け取る（省略可）
+    part_callback=lambda d: ...,      # [[[part_result]]] が来るたびに呼ばれる（省略可）
+    finish_callback=lambda ok: ...,   # 完了時に bool（True=正常終了）を受け取る（省略可）
+)
+dlg.open()
+```
+
+`XtermDialog` は内部で `_total_count`（initial の count）と `_part_count`（part の受信数）を保持し、`ui.circular_progress` で進捗を自動表示する。
 
 ### File データクラス
 

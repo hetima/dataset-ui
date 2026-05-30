@@ -13,7 +13,7 @@ def tab_main(ctx: TestCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
 
     def open_xterm():
-        script = str(Path(__file__).parent / "xtermtest.py")
+        script = str(Path(__file__).parent / "cli_task_xtermtest.py")
         dlg = XtermDialog(
             args=[sys.executable, script],
             title="XtermDialog テスト",

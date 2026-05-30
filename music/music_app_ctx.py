@@ -48,7 +48,6 @@ class MusicCtx:
             musicfile = MusicFile.from_audio_file(file)
             self.files.append(musicfile)
 
-
         self.table.rows = self.files
         self.table.selected = []
         self.table.update()
@@ -69,8 +68,7 @@ class MusicCtx:
             return None
         return next((d for d in self.files if d["path"] == path), None)
 
-    def analyzed(self, result: dict) -> None:
-        result_files = result.get("result", [])
+    def analyzed(self, result_files: list) -> None:
         for music_file in self.files:
             info = next((d for d in result_files if d["path"] == music_file.path), None)
             if info is None:

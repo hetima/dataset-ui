@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from pathlib import Path
 from typing import cast
 from functools import partial
@@ -7,7 +8,7 @@ from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
 from common.setting import cnfg
-from music.musicanalyze import analyze_main
+from common.xterm_dialog import XtermDialog
 from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
 from music.music_app_ctx import MusicCtx
 
@@ -28,19 +29,24 @@ def tab_main(ctx: MusicCtx):
             download_repo_main, data, acestep_transcriber_download_finished
         )
 
-    def analyze_finished(result) -> None:
-        ctx.analyzed(result)
+    def progress_analyzed(part: dict) -> None:
+        ctx.analyzed([part["data"]])
 
-    async def analyze() -> None:
+    def analyze() -> None:
         files = ctx.target_files()
-        data = []
-        for music_file in files: # type: ignore
-            data.append(music_file["path"])
-        if len(data) == 0:
+        paths = [music_file["path"] for music_file in files]  # type: ignore
+        if len(paths) == 0:
             ui.notify("処理対象がありません")
             return
         cnfg.save()
-        await ctx.worker.run(analyze_main, data, analyze_finished)
+        cli = str(Path(__file__).parent / "cli_task_musicanalyze.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="曲を解析する",
+            input_json=paths,
+            part_callback=progress_analyzed,
+        )
+        dlg.open()
 
     def transcript_finished(result) -> None:
         ctx.transcripted(result)
@@ -122,7 +128,7 @@ def tab_main(ctx: MusicCtx):
 
     with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを librosa で解析し、BPM、キー、拍子、時間を取得します")
-        ui.button("曲を解析する", on_click=analyze).bind_enabled_from(ctx.worker, "can_run")
+        ui.button("曲を解析する", on_click=analyze)
 
     with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")

@@ -97,7 +97,7 @@ def main():
         print(f"解析中 ({i}/{total}): {path}", flush=True)
         try:
             data = analyze_audio(path)
-            result = {"type": "result", "current": i, "total": total, "data": data}
+            result = {"data": data}
             print("[[[part_result_start]]]", flush=True)
             print(json.dumps(result), flush=True)
             print("[[[part_result_end]]]", flush=True)
