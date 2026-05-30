@@ -44,7 +44,7 @@ common/                   # 共通モジュール
 │   worker.py             # マルチプロセスバックグラウンドタスク実行
 │   setting.py            # config.json の読み書き
 │   file_util.py          # 音声ファイル検出・ソート
-│   folder_picker.py, local_file_picker.py, message_dialog.py
+│   folder_picker.py, file_picker.py, message_dialog.py
 │   download_repo.py
 │   xterm_dialog.py
 qwen_asr/                 # Qwen3-ASR 実装（同梱、--no-deps でインストール）
