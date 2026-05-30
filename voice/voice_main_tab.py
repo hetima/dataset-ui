@@ -1,11 +1,9 @@
-import asyncio
 from pathlib import Path
 from typing import cast
 from functools import partial
 
 from nicegui import ui
 from common.folder_picker import FolderPicker
-from common.download_repo import download_repo_main
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
 from common.message_dialog import show_confirm_dialog
@@ -14,12 +12,21 @@ from voice.voice_app_ctx import VoiceCtx
 
 def tab_main(ctx: VoiceCtx):
 
-    def asr_download_finished(result) -> None:
+    def asr_download_finished(success: bool) -> None:
         reload_asr_model()
 
-    async def asr_download(repo_id: str) -> None:
-        data = {"repo_id": repo_id, "output_dir": cnfg.models_dir / "qwen_asr"}
-        await ctx.worker.run(download_repo_main, data, asr_download_finished)
+    def asr_download(repo_id: str) -> None:
+        cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="ダウンロード",
+            input_json={
+                "repo_id": repo_id,
+                "output_dir": str(cnfg.models_dir / "qwen_asr"),
+            },
+            finish_callback=asr_download_finished,
+        )
+        dlg.open()
 
     def progress_transcript(part: dict) -> None:
         ctx.transcripted([part["data"]])
@@ -223,9 +230,7 @@ def tab_main(ctx: VoiceCtx):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     qwen_models_menu = ui.menu()
 
-            ui.button("解析する", on_click=transcript_qwen_asr).bind_enabled_from(
-                ctx.worker, "can_run"
-            )
+            ui.button("解析する", on_click=transcript_qwen_asr)
 
     with ui.expansion("音声分割", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
@@ -245,7 +250,7 @@ def tab_main(ctx: VoiceCtx):
                         options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
                         value="wav",
                     ).props("outlined style='width: 120px;'")
-                    ui.button("分割する").bind_enabled_from(ctx.worker, "can_run").on_click(
+                    ui.button("分割する").on_click(
                         lambda: segment_silence(
                             min_sec=input_min_sec.value,  # type: ignore
                             max_sec=input_max_sec.value,  # type: ignore
@@ -270,9 +275,7 @@ def tab_main(ctx: VoiceCtx):
                         options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
                         value="wav",
                     ).props("outlined style='width: 120px;'")
-                    ui.button("分割する").bind_enabled_from(
-                        ctx.worker, "can_run"
-                    ).on_click(
+                    ui.button("分割する").on_click(
                         lambda: segment_equally(
                             frame_count=input_parts.value,  # type: ignore
                             fps=input_fps.value,  # type: ignore
@@ -293,10 +296,7 @@ def tab_main(ctx: VoiceCtx):
                     ui.item_section(repo_id)
                     ui.button(
                         "ダウンロード",
-                        on_click=lambda: [
-                            qwen_models_menu.close(),
-                            asyncio.ensure_future(asr_download(repo_id)),
-                        ],
+                        on_click=lambda: asr_download(repo_id),
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"
                     )

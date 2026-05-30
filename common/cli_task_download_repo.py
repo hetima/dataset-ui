@@ -1,11 +1,8 @@
 import os
-import shutil
+import json
 import sys
 from pathlib import Path
-from collections.abc import Generator
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-from common.message_dialog import show_error_dialog
 
 
 def try_url_to_hf_repo(url: str) -> tuple[str | None, str | None]:
@@ -50,24 +47,31 @@ def hf_download(
     snapshot_download(repo_id=repo_id, local_dir=str(output_dir))
 
 
-def download_repo_main(
-    data: dict, stop_event
-) -> Generator[tuple[float, str, dict | None], None, dict]:
-    print("download task started...")
-    yield 0, "処理開始", None
+def main():
+    data = json.loads(sys.stdin.read())
+    print("[[[initial_result_start]]]", flush=True)
+    print(json.dumps({"count": 1}), flush=True)
+    print("[[[initial_result_end]]]", flush=True)
+
+    print("download task started...", flush=True)
+    print("処理開始", flush=True)
+    import time
     repo_id = data["repo_id"]
-    output_dir = data["output_dir"]
+    output_dir = Path(data["output_dir"])
     ok, err, resolved_repo = check_download_params(repo_id, output_dir)
     if not ok:
-        yield 1, "エラー", None
-        return {"err": err}
+        print(f"エラー: {err}")
+        return
     try:
-        yield 0, f"{repo_id} のダウンロードを開始しました。進捗はターミナルを参照してください", None
+        print(f"{repo_id} のダウンロードを開始しました", flush=True)
         output_path = output_dir.resolve()
         output_path.mkdir(parents=True, exist_ok=True)
         local_dir = output_path / repo_id.split("/")[-1]
 
         hf_download(repo_id, local_dir)
-        return {"result": []}
     finally:
-        print("...download task finished")
+        print("...download task finished", flush=True)
+
+
+if __name__ == "__main__":
+    main()

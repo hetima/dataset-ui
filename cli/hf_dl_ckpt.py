@@ -59,20 +59,18 @@ def post_processing(path: Path, convert: bool = False):
         return
     try:
         from picklescan import scanner
+        print("picklescan start.")
+        scan_result = scanner.scan_file_path(str(path))
+        if scan_result.scan_err:
+            print(f"Error: picklescan failed. file: {str(path)}")
+            return
+        if scan_result.issues_count != 0:
+            print(f"Warning: picklescan reported issue. file: {str(path)}")
+            return
+        print("picklescan finished with no issues.")
     except ImportError:
-        raise ImportError(
-            "picklescan is required."
-            "Install with:  pip install picklescan"
-        )
-    print("picklescan start.")
-    scan_result = scanner.scan_file_path(str(path))
-    if scan_result.scan_err:
-        print(f"Error: picklescan failed. file: {str(path)}")
-        return
-    if scan_result.issues_count != 0:
-        print(f"Warning: picklescan reported issue. file: {str(path)}")
-        return
-    print("picklescan finished with no issues.")
+        print("picklescan is not installed and skipped. " "Install with:  pip install picklescan")
+
     safetensors_path = path.with_suffix(".safetensors")
     if safetensors_path.exists():
         return

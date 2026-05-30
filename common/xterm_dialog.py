@@ -53,7 +53,7 @@ class XtermDialog(ui.dialog):
         part_callback: Callable[[dict], None] | None = None,
         finish_callback: Callable[[bool], None] | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__().props("persistent")
         self.args = args
         self.title = title
         self._is_running = False
@@ -76,6 +76,7 @@ class XtermDialog(ui.dialog):
 
     def _show_panel(self):
         self._process: subprocess.Popen | None = None
+        self._is_running = True
 
         self.style("max-width: none")
         with self, ui.card().style("width: fit-content; max-width: 95vw"):

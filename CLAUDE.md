@@ -45,7 +45,7 @@ common/                   # 共通モジュール
 │   setting.py            # config.json の読み書き
 │   file_util.py          # 音声ファイル検出・ソート
 │   folder_picker.py, local_file_picker.py, message_dialog.py
-│   download_repo.py, download_ckpt.py
+│   download_repo.py
 │   xterm_dialog.py
 qwen_asr/                 # Qwen3-ASR 実装（同梱、--no-deps でインストール）
 roformer/                 # MelBandRoFormer 音源分離モデル（同梱）

@@ -1,4 +1,3 @@
-import asyncio
 import sys
 from pathlib import Path
 from typing import cast
@@ -6,7 +5,6 @@ from functools import partial
 
 from nicegui import ui
 from common.folder_picker import FolderPicker
-from common.download_repo import download_repo_main
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
@@ -17,17 +15,21 @@ LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
 def tab_main(ctx: MusicCtx):
 
-    def acestep_transcriber_download_finished(result) -> None:
+    def acestep_transcriber_download_finished(success: bool) -> None:
         reload_acestep_transcriber_model()
 
-    async def acestep_transcriber_download(repo_id: str) -> None:
-        data = {
-            "repo_id": repo_id,
-            "output_dir": cnfg.models_dir / "acestep_transcriber",
-        }
-        await ctx.worker.run(
-            download_repo_main, data, acestep_transcriber_download_finished
+    def acestep_transcriber_download(repo_id: str) -> None:
+        cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="ダウンロード",
+            input_json={
+                "repo_id": repo_id,
+                "output_dir": str(cnfg.models_dir / "acestep_transcriber"),
+            },
+            finish_callback=acestep_transcriber_download_finished,
         )
+        dlg.open()
 
     def progress_analyzed(part: dict) -> None:
         ctx.analyzed([part["data"]])
@@ -186,12 +188,7 @@ def tab_main(ctx: MusicCtx):
                     ui.item_section(repo_id)
                     ui.button(
                         "ダウンロード",
-                        on_click=lambda: [
-                            ace_models_menu.close(),
-                            asyncio.ensure_future(
-                                acestep_transcriber_download(repo_id)
-                            ),
-                        ],
+                        on_click=lambda: acestep_transcriber_download(repo_id),
                     ).props("flat dense color=primary").style("margin-left: 8px").on(
                         "click", js_handler="(e) => e.stopPropagation()"
                     )
