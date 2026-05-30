@@ -103,6 +103,10 @@ class VoiceCtx:
                 func()
         self.notify("モデルパスを保存しました")
 
+    def set_outputs_dir(self, path: str | None):
+        if path and cnfg.set_outputs_dir(path):
+            self.notify("書き出しパスを保存しました")
+
     def add_dataset_dir(self, path: str) -> bool:
         if not path or path in cnfg.voice.dataset_dirs:
             return False

@@ -204,5 +204,17 @@ class Setting:
             return True
         return False
 
+    def set_outputs_dir(self, path: str | Path) -> bool:
+        if isinstance(path, str):
+            path = path.strip()
+            if path.startswith('"') and path.endswith('"'):
+                path = path.strip('"')
+            path = Path(path)
+        if self.outputs_dir != path:
+            self.outputs_dir = path
+            self.save()
+            return True
+        return False
+
 
 cnfg = Setting()
