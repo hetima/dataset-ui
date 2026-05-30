@@ -151,6 +151,18 @@ def tab_main(ctx: VoiceCtx):
             path_input.value = result[0]
             ctx.load_files(path_input.value)
 
+    def asr_models() -> list[str]:
+        models_dir = cnfg.models_dir / "qwen_asr"
+        if not models_dir.exists():
+            return []
+        return [
+            p.name
+            for p in models_dir.iterdir()
+            if p.is_dir()
+            # and "asr" in p.name.lower()
+            # and "qwen" in p.name.lower()
+        ]
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -182,27 +194,27 @@ def tab_main(ctx: VoiceCtx):
     ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)
 
     # ═══════════════════════════════════════════════════════════════════════════════
+    # Save files
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("保存", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        with ui.row().classes("items-center gap-4"):
+            ui.label("処理対象:")
+            ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
+
+        ui.label("保存を押すと処理結果を書き出します。自動保存はされません")
+        with ui.row().classes("items-center gap-4"):
+            ui.label("保存対象:")
+            # ui.checkbox(".json").bind_value(ctx, "save_json")
+            ui.checkbox("歌詞.txt").bind_value(ctx, "save_txt")
+            ui.button("保存", on_click=lambda: ctx.save_metadata())
+
+    # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    def asr_models() -> list[str]:
-        models_dir = cnfg.models_dir / "qwen_asr"
-        if not models_dir.exists():
-            return []
-        return [
-            p.name
-            for p in models_dir.iterdir()
-            if p.is_dir()
-            # and "asr" in p.name.lower()
-            # and "qwen" in p.name.lower()
-        ]
-
-    with ui.row().classes("items-center gap-4"):
-        ui.label("処理対象:")
-        ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
-        ui.space()
-
-    with ui.expansion("音声認識", value=True).classes(
+    with ui.expansion("音声認識", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")
@@ -232,7 +244,7 @@ def tab_main(ctx: VoiceCtx):
 
             ui.button("解析する", on_click=transcript_qwen_asr)
 
-    with ui.expansion("音声分割", value=True).classes(
+    with ui.expansion("音声分割", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         with ui.splitter().classes("q-splitter--no-margin").props('separator-class="q-mx-md"') as segment_splitter:
@@ -375,15 +387,3 @@ def tab_main(ctx: VoiceCtx):
                 js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
                 handler=lambda e: print(e.args),
             )
-
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Save files
-    # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion('保存', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("メタデータをファイルに書き出します")
-        with ui.row().classes("items-center gap-4"):
-            ui.label("保存対象:")
-            # ui.checkbox(".json").bind_value(ctx, "save_json")
-            ui.checkbox(".txt").bind_value(ctx, "save_txt")
-            ui.space()
-            ui.button("保存", on_click=lambda: ctx.save_metadata())

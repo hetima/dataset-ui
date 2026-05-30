@@ -131,23 +131,20 @@ def tab_main(ctx: MusicCtx):
     with ui.expansion("保存", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        with ui.splitter().classes("q-splitter--no-margin").props('separator-class="q-mx-md"') as segment_splitter:
-            with segment_splitter.before:
-                with ui.row().classes("items-center gap-4"):
-                    ui.label("処理対象:")
-                    ui.toggle(
-                        {"all": "すべてのファイル", "selected": "チェックした項目のみ"}
-                    ).bind_value(ctx, "target")
-                    ui.space()
-            with segment_splitter.after:
-                ui.label("メタデータをファイルに書き出します")
-                with ui.row().classes("items-center gap-4"):
-                    ui.label("保存対象:")
-                    ui.checkbox(".json").bind_value(ctx, "save_json")
-                    ui.checkbox(".lyrics.txt").bind_value(ctx, "save_lyrics")
-                    ui.checkbox(".txt (for AI Toolkit)").bind_value(ctx, "save_aitk")
-                    ui.space()
-                    ui.button("保存", on_click=lambda: ctx.save_metadata())
+
+        with ui.row().classes("items-center gap-4"):
+            ui.label("処理対象:")
+            ui.toggle(
+                {"all": "すべてのファイル", "selected": "チェックした項目のみ"}
+            ).bind_value(ctx, "target")
+
+        ui.label("保存を押すと処理結果を書き出します。自動保存はされません")
+        with ui.row().classes("items-center gap-4"):
+            ui.label("保存対象:")
+            ui.checkbox(".json").bind_value(ctx, "save_json")
+            ui.checkbox(".lyrics.txt").bind_value(ctx, "save_lyrics")
+            ui.checkbox(".txt (for AI Toolkit)").bind_value(ctx, "save_aitk")
+            ui.button("保存", on_click=lambda: ctx.save_metadata())
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
@@ -165,11 +162,13 @@ def tab_main(ctx: MusicCtx):
             # and "transcriber" in p.name.lower()
         ]
 
-    with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
+    with ui.expansion('解析', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを librosa で解析し、BPM、キー、拍子、時間を取得します")
         ui.button("曲を解析する", on_click=analyze)
 
-    with ui.expansion('歌詞', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
+    with ui.expansion("歌詞", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを ACE-Step Transcriber で解析し、歌詞を取得します。かなり時間がかかります。")
         ui.label(
             "モデルフォルダの中にある acestep_transcriber のフォルダ名を入力してください。"
