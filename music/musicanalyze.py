@@ -1,6 +1,8 @@
 from pathlib import Path
 from collections.abc import Generator
 
+# このファイルは削除可
+
 def analyze_main(data: list[str], stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     print("analyzing task started...")
     yield 0, "処理開始", None

@@ -9,7 +9,7 @@ from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
-from music.acestep_transcriptor import transcript_main, acestep_transcriber_models
+from music.music_app_ctx import MusicCtx
 from music.music_app_ctx import MusicCtx
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -48,10 +48,10 @@ def tab_main(ctx: MusicCtx):
         )
         dlg.open()
 
-    def transcript_finished(result) -> None:
-        ctx.transcripted(result)
+    def progress_transcripted(part: dict) -> None:
+        ctx.transcripted([part["data"]])
 
-    async def transcript() -> None:
+    def transcript() -> None:
         if not cnfg.music.acestep_transcriber_model:
             ui.notify("モデルを選択してください")
             return
@@ -59,20 +59,26 @@ def tab_main(ctx: MusicCtx):
         if not model_path.exists():
             if cnfg.music.acestep_transcriber_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir / "acestep_transcriber")}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません。"
+                    f"モデルパス「  {str(cnfg.models_dir / 'acestep_transcriber')}」 に「{cnfg.music.acestep_transcriber_model}」フォルダが存在しません。"
                 )
                 return
             model_path_str = cnfg.music.acestep_transcriber_model
         else:
             model_path_str = str(model_path)
         files = ctx.target_files()
-        data = {"model_path": model_path_str, "files": []}
-        for music_file in files: # type: ignore
-            data["files"].append(music_file["path"])
-        if len(data["files"]) == 0:
+        paths = [f["path"] for f in files]  # type: ignore
+        if not paths:
             ui.notify("処理対象がありません")
             return
-        await ctx.worker.run(transcript_main, data, transcript_finished)
+        cnfg.save()
+        cli = str(Path(__file__).parent / "cli_task_acestep_transcriptor.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="歌詞を解析する",
+            input_json={"model_path": model_path_str, "files": paths},
+            part_callback=progress_transcripted,
+        )
+        dlg.open()
 
     # def handle_cell_value_change(e):
     #     new_row = e.args["data"]
@@ -121,6 +127,18 @@ def tab_main(ctx: MusicCtx):
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
 
+    def acestep_transcriber_models() -> list[str]:
+        models_dir = cnfg.models_dir / "acestep_transcriber"
+        if not models_dir.exists():
+            return []
+        return [
+            p.name
+            for p in models_dir.iterdir()
+            if p.is_dir()
+            # and "acestep" in p.name.lower()
+            # and "transcriber" in p.name.lower()
+        ]
+
     with ui.row().classes("items-center gap-4"):
         ui.label("処理対象:")
         ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
@@ -153,7 +171,7 @@ def tab_main(ctx: MusicCtx):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     ace_models_menu = ui.menu()
 
-            ui.button("歌詞を解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
+            ui.button("歌詞を解析する", on_click=transcript)
 
     def reload_acestep_transcriber_model():
         def hf_menu_item(models:list, repo_id:str):

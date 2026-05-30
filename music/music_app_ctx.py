@@ -82,8 +82,7 @@ class MusicCtx:
         # self.table.rows = self.files
         self.table.update()
 
-    def transcripted(self, result: dict) -> None:
-        result_files = result.get("result", [])
+    def transcripted(self, result_files: list) -> None:
         for music_file in self.files:
             info = next((d for d in result_files if d["path"] == music_file.path), None)
             if info is None:
