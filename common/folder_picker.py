@@ -1,282 +1,195 @@
 from pathlib import Path
-import time
 from nicegui import ui
-import platform
 
 
 class FolderPicker(ui.dialog):
+    """フォルダ選択ダイアログ。await して [path_str] または None を返す。"""
+
     def __init__(
         self,
         directory: str,
         *,
         caption: str = "フォルダを選択してください",
         show_hidden_files: bool = False,
-        read_all: bool = False,
+        show_files_count: list[str] | None = None,
     ) -> None:
         super().__init__()
 
-        if platform.system() == "Windows":
-            import ctypes
-
-            self.double_click_interval = ctypes.windll.user32.GetDoubleClickTime()
-        else:
-            self.double_click_interval = 500
-
-        client = ui.context.client
-        if not hasattr(client, "folder_picker_css_loaded"):
-            FolderPicker._add_css()
-            client.folder_picker_css_loaded = True  # type: ignore
-
         self.root_path = Path(directory).expanduser()
         self.show_hidden_files = show_hidden_files
-        self.read_all = read_all
+        # 拡張子は小文字・ドット付きに正規化（例: 'wav' → '.wav'）
+        self._count_exts: set[str] | None = (
+            {('.' + e.lstrip('.').lower()) for e in show_files_count}
+            if show_files_count else None
+        )
         self._selected_path: str | None = None
-        self._prev_selected_path: str | None = None
-        self._expanded_set: set[str] = set()
-        self._resolved_set: set[str] = set()
-        self._last_select_time: float = 0.0
 
-        with self, ui.card().classes("w-140 h-150"):
-            ui.label(caption)
-            search = (
-                ui.input(label="filter", placeholder="filter")
-                .classes("w-full")
-                .props("outlined clearable")
-            )
-            nodes = self._build_tree(self.root_path)
-            self.tree = (
-                ui.tree(
-                    nodes=nodes,
-                    node_key="id",
-                    label_key="label",
-                    on_select=self._handle_select,
-                    on_expand=self._handle_expand,
-                )
-                .bind_filter_from(search, "value")
-                .classes("h-full w-full brdr folder-picker-tree")
-                .props("dense no-transition no-connectors")
-            )
+        # nid -> 子コンテナ / 行要素 / 矢印アイコン
+        self._children_cols: dict[str, ui.element] = {}
+        self._row_elements: dict[str, ui.element] = {}
+        self._arrow_elements: dict[str, ui.icon] = {}
+        self._expanded: set[str] = set()
+        # 遅延ロード済みノード
+        self._resolved: set[str] = set()
+        # nid -> Path（遅延ロード用）
+        self._node_paths: dict[str, Path] = {}
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button("キャンセル", on_click=self.close).props("outline")
-                ui.button("選択", on_click=self._handle_ok)
-        js_code = """
-(e) => {
-    const targetKeys = ['ArrowUp', 'ArrowDown', 'Enter'];
-    if (targetKeys.includes(e.key)) {
-        e.preventDefault();
-        e.stopPropagation(); 
-        emit({key: e.key});
-    }
-}
-"""
-        self.tree.on("keydown", self._on_key_down, js_handler=js_code)
-        # self._setup_events()
-        # self.tree.props('tabindex="0"')
+        with self, ui.card().classes('h-150 flex flex-col gap-2'):
+            ui.label(caption).classes('text-base font-semibold')
 
-    # 上下キーで選択範囲移動 動かない
-    def _setup_events(self):
-        js_code = f"""
-        (e) => {{
-            const targetKeys = ['ArrowUp', 'ArrowDown'];
-            if (targetKeys.includes(e.key)) {{
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // 上流にあるツリーのルートコンテナ(.q-tree)を取得
-                const treeEl = e.target.closest('.q-tree');
-                if (!treeEl) return;
-                
-                // 現在画面に表示されているノード(.q-tree__node)を全件取得
-                const nodeElements = treeEl.querySelectorAll('.q-tree__node');
-                const visible_ids = [];
-                
-                
-                nodeElements.forEach(el => {{
-                    // ノードのテキスト部分かクラス名('label' 'class')しか取れない
-                    const labelEl = el.querySelector('.q-tree__node-header-content');
-                    if (labelEl) {{
-                        const labelText = labelEl.innerText.trim();
-                        visible_ids.push(labelText);
+            with ui.column().classes('w-96 flex-1 overflow-y-auto border rounded p-1 select-none gap-0'):
+                self._render_children(self.root_path, level=0)
 
-                    }}
-                }});
-                
-                // 現在選択されているIDを取得（DOMのaria属性などから）
-                let current_id = null;
-                const selectedEl = treeEl.querySelector('.q-tree__node--selected .q-tree__node-header-content');
-                if (selectedEl) {{
-                    current_id = selectedEl.innerText.trim();
-                }}
-                
-                emit({{
-                    key: e.key,
-                    current_id: current_id,
-                    visible_ids: visible_ids
-                }});
-            }}
-        }}
-        """
-        self.tree.on("keydown", self._on_key_down, js_handler=js_code)
+            with ui.row().classes('w-full justify-end gap-2'):
+                ui.button('キャンセル', on_click=self.close).props('outline')
+                ui.button('選択', on_click=self._handle_ok)
 
-    def _move_selection(self, current_id: str, visible_ids: list, step: int):
-        """現在の選択位置から、指定ステップ数だけ移動する"""
-        if not visible_ids:
-            return
+    # ──────────────────────────────────────────────
+    # ツリー描画
+    # ──────────────────────────────────────────────
 
-        # 現在選択されているノードの、可視リスト内でのインデックスを探す
+    def _scan(self, path: Path) -> list[Path]:
         try:
-            current_index = visible_ids.index(current_id)
-        except ValueError:
-            current_index = 0
-
-        # 安全にインデックスを循環させる
-        next_index = (current_index + step) % len(visible_ids)
-        target_id = visible_ids[next_index]
-
-        # 選択を更新
-        self.tree.select(target_id)
-
-    def _on_key_down(self, e) -> None:
-        key = e.args.get("key")
-        current_id = e.args.get("current_id")
-        visible_ids = e.args.get("visible_ids", [])
-        if key == "ArrowDown":
-            self._move_selection(current_id, visible_ids, 1)
-        elif key == "ArrowUp":
-            self._move_selection(current_id, visible_ids, -1)
-        elif key == "Enter":
-            ui.timer(0, self._handle_ok, once=True)
-
-    def _filter_path(self, p: Path) -> bool:
-        if not p.is_dir():
-            return False
-        if not self.show_hidden_files and p.name.startswith("."):
-            return False
-        return True
-
-    def _scan_subfolders(self, path: Path) -> list[Path]:
-        try:
-            paths = [p for p in path.iterdir() if self._filter_path(p)]
+            paths = [
+                p for p in path.iterdir()
+                if p.is_dir() and (self.show_hidden_files or not p.name.startswith('.'))
+            ]
         except PermissionError:
             return []
         paths.sort(key=lambda p: p.name.lower())
         return paths
 
-    def _has_subfolders(self, path: Path) -> bool:
+    def _count_files(self, path: Path) -> int | None:
+        """対象拡張子ファイルの直下件数を返す。show_files_count 未設定時は None。"""
+        if self._count_exts is None:
+            return None
         try:
-            return any(self._filter_path(p) for p in path.iterdir())
+            return sum(
+                1 for p in path.iterdir()
+                if p.is_file() and p.suffix.lower() in self._count_exts
+            )
+        except PermissionError:
+            return None
+
+    def _has_children(self, path: Path) -> bool:
+        try:
+            return any(
+                p.is_dir() and (self.show_hidden_files or not p.name.startswith('.'))
+                for p in path.iterdir()
+            )
         except PermissionError:
             return False
 
-    def _build_node(self, path: Path) -> dict:
-        node: dict = {
-            "id": str(path),
-            "label": f"📁 {path.name}" if path != self.root_path else f"📁 {path}",
-        }
-        if self.read_all:
-            subs = self._scan_subfolders(path)
-            if subs:
-                node["children"] = [self._build_node(p) for p in subs]
-        elif self._has_subfolders(path):
-            node["children"] = [{"id": f"__placeholder__:{path}", "label": ""}]
-        return node
+    def _render_children(self, path: Path, level: int):
+        """path 直下のサブフォルダを描画する"""
+        for sub in self._scan(path):
+            self._render_node(sub, level)
 
-    def _build_tree(self, root: Path) -> list[dict]:
-        subs = self._scan_subfolders(root)
-        children = [self._build_node(p) for p in subs]
-        if self.read_all:
-            self._collect_resolved(children)
-        return children
+    def _render_node(self, path: Path, level: int):
+        nid = str(path)
+        self._node_paths[nid] = path
+        has_ch = self._has_children(path)
+        indent = level * 20
+        label = path.name or str(path)  # ルート直下はフルパス
 
-    def _collect_resolved(self, nodes: list[dict]) -> None:
-        for node in nodes:
-            nid = node.get("id", "")
-            self._resolved_set.add(nid)
-            ch = node.get("children")
-            if ch:
-                self._collect_resolved(ch)
+        with ui.row().classes(
+            'items-center w-full cursor-pointer rounded px-1 py-0.5 '
+            'hover:bg-gray-100 dark:hover:bg-gray-800 gap-1'
+        ).style(f'padding-left: {8 + indent}px') as row:
+            self._row_elements[nid] = row
 
-    def _is_placeholder(self, children: list[dict]) -> bool:
-        return len(children) == 1 and str(children[0].get("id", "")).startswith(
-            "__placeholder__"
-        )
+            # 展開矢印
+            if has_ch:
+                arrow = ui.icon('chevron_right', size='xs').classes(
+                    'transition-transform duration-150 text-gray-500 flex-shrink-0'
+                )
+                self._arrow_elements[nid] = arrow
+                arrow.on('click.stop', lambda _, n=nid: self._toggle_expand(n))
+            else:
+                ui.element('div').style('width: 16px; height: 16px; flex-shrink: 0')
 
-    def _resolve_node(self, node_id: str) -> None:
-        if node_id in self._resolved_set:
+            ui.icon('folder', size='xs').classes('text-yellow-600 flex-shrink-0')
+            ui.label(label).classes('text-sm truncate flex-1')
+            count = self._count_files(path)
+            if count is not None:
+                ui.label(f'({count})').classes('text-xs text-gray-400 flex-shrink-0')
+
+            # フォルダ選択モード: 行クリック=選択トグル
+            row.on('click', lambda _, n=nid: self._toggle_select(n))
+            row.on('dblclick', lambda _, n=nid: self._on_dblclick(n))
+
+        # 子コンテナ（遅延ロード、初期非表示）
+        if has_ch:
+            with ui.column().classes('w-full gap-0') as col:
+                col.set_visibility(False)
+                self._children_cols[nid] = col
+
+    # ──────────────────────────────────────────────
+    # 展開 / 折りたたみ
+    # ──────────────────────────────────────────────
+
+    def _toggle_expand(self, nid: str):
+        if nid in self._expanded:
+            self._expanded.discard(nid)
+            self._children_cols[nid].set_visibility(False)
+            if nid in self._arrow_elements:
+                self._arrow_elements[nid].classes(remove='rotate-90')
+        else:
+            self._expanded.add(nid)
+            self._lazy_load(nid)
+            self._children_cols[nid].set_visibility(True)
+            if nid in self._arrow_elements:
+                self._arrow_elements[nid].classes(add='rotate-90')
+
+    def _lazy_load(self, nid: str):
+        """初回展開時に子ノードを描画する"""
+        if nid in self._resolved:
             return
-        self._resolved_set.add(node_id)
+        self._resolved.add(nid)
+        path = self._node_paths[nid]
+        col = self._children_cols[nid]
+        level = len(Path(nid).relative_to(self.root_path).parts)
+        with col:
+            self._render_children(path, level)
 
-        path = Path(node_id)
+    # ──────────────────────────────────────────────
+    # 選択
+    # ──────────────────────────────────────────────
 
-        def _find_and_fill(nodes: list[dict]) -> bool:
-            for node in nodes:
-                if node.get("id") == node_id:
-                    subs = self._scan_subfolders(path)
-                    node["children"] = [self._build_node(p) for p in subs]
-                    return True
-                children = node.get("children")
-                if children and _find_and_fill(children):
-                    return True
-            return False
+    def _toggle_select(self, nid: str):
+        prev = self._selected_path
+        if prev == nid:
+            self._selected_path = None
+            self._set_highlight(nid, False)
+        else:
+            if prev and prev in self._row_elements:
+                self._set_highlight(prev, False)
+            self._selected_path = nid
+            self._set_highlight(nid, True)
 
-        _find_and_fill(self.tree._props["nodes"])
-        self.tree.update()
-
-    def _handle_select(self, e) -> None:
-        now = time.monotonic() * 1000
-        elapsed = now - self._last_select_time
-        if 100 < elapsed < self.double_click_interval:
-            # ガバガバダブルクリック判定 たまにミスる
-            selection = e.value or self._selected_path
-            prev = self._selected_path or self._prev_selected_path
-            x = prev and selection != prev
-            if not x and selection:
-                self.submit([selection])
+    def _set_highlight(self, nid: str, active: bool):
+        row = self._row_elements.get(nid)
+        if not row:
             return
-        if e.value:
-            self._prev_selected_path = self._selected_path
-        self._selected_path = e.value
-        self._last_select_time = now
+        if active:
+            row.classes(
+                add='bg-blue-100 dark:bg-blue-900',
+                remove='hover:bg-gray-100 dark:hover:bg-gray-800',
+            )
+        else:
+            row.classes(
+                remove='bg-blue-100 dark:bg-blue-900',
+                add='hover:bg-gray-100 dark:hover:bg-gray-800',
+            )
 
-    def _handle_expand(self, e) -> None:
-        if e.value is None:
-            return
-        current = set(e.value)
-        newly_expanded = current - self._expanded_set
-        self._expanded_set = current
-        for node_id in newly_expanded:
-            self._resolve_node(node_id)
+    def _on_dblclick(self, nid: str):
+        # 選択してすぐ確定
+        self._toggle_select(nid)
+        if self._selected_path:
+            self.submit([self._selected_path])
 
-    async def _handle_ok(self) -> None:
+    async def _handle_ok(self):
         if self._selected_path:
             self.submit([self._selected_path])
         else:
             self.close()
-
-    @classmethod
-    def _add_css(cls) -> None:
-        ui.add_css(
-            """
-.folder-picker-tree {
-    user-select: none;
-    overflow-y: auto;
-    outline: none;
-}
-
-.folder-picker-tree .q-tree__node-header-content {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.folder-picker-tree .q-tree__node--selected {
-    background-color: var(--q-primary) !important;
-    border-radius: 3px;
-}
-
-.folder-picker-tree .q-tree__node--selected .q-tree__node-header-content {
-    color: #f4f4f4 !important;
-}
-"""
-        )

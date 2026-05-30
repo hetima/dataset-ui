@@ -146,7 +146,7 @@ def tab_main(ctx: VoiceCtx):
         dlg.open()
 
     async def pick_folder(path: str) -> None:
-        result = await FolderPicker(path, read_all=False)
+        result = await FolderPicker(path, show_files_count=[".flac", ".ogg", ".mp3", ".wav", ".m4a"])
         if isinstance(result, list) and len(result) > 0:
             path_input.value = result[0]
             ctx.load_files(path_input.value)
