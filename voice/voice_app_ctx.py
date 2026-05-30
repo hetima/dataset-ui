@@ -147,8 +147,7 @@ class VoiceCtx:
         # self.table.rows = self.files
         self.table.update()
 
-    def segment_finished(self, result: dict) -> None:
-        results = result.get("result", [])
+    def segment_finished(self, results: list) -> None:
         for result in results:
             src = result.get("src", "")
             dst_list = result.get("dst", [])

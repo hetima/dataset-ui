@@ -12,22 +12,40 @@ https://github.com/yesiampapa/rvc_split_audio
 
 ### 3. pydub の `fade_out`/`fade_in` で `ValueError`
 短いセグメント（数ms）に対するフェード呼び出しで、内部のミリ秒→バイト変換の丸め誤差により `ValueError: invalid start_byte/end_byte range` が発生。`_safe_fade` ヘルパーで `try/except` + リトライを実装
+
+---
+無音検出分割 CLI タスク。
+stdin から JSON を受け取り、音声ファイルを無音区間で分割する。
+
+入力例:
+    {
+        "files": ["path/to/a.wav", ...],
+        "output_dir": null,
+        "overwrite": true,
+        "format": "wav",
+        "min_sec": 2,
+        "max_sec": 5,
+        "silence_thresh": -60
+    }
+
+出力:
+    マーカー形式で結果を stdout に出力
 """
 
+import json
 import os
 import shutil
+import sys
+from pathlib import Path
+
 from pydub import AudioSegment, silence
 
-from pathlib import Path
-from collections.abc import Generator
 
 ########################################
 # 1) 初期無音分割
 ########################################
 def split_into_phrases(audio: AudioSegment, min_silence_len=300, silence_thresh=-40) -> list:
-    """
-    無音区間(min_silence_len ms & < silence_thresh dB)を境に分割。
-    """
+    """無音区間(min_silence_len ms & < silence_thresh dB)を境に分割。"""
     return silence.split_on_silence(
         audio,
         min_silence_len=min_silence_len,
@@ -46,28 +64,27 @@ def find_lowest_volume_split(ch: AudioSegment, search_range_ms=1000, min_split_m
     戻り値は min_split_ms <= pos <= len(ch) - min_split_ms を保証。
     """
     length = len(ch)
-    # 最小分割サイズを確保できない場合は等分フォールバック
     if length < min_split_ms * 2:
         return length // 2
 
     if length <= search_range_ms:
-        return length // 2  # 中央で切る
+        return length // 2
 
     mid = length // 2
     start_search = max(min_split_ms, mid - search_range_ms // 2)
     end_search = min(length - min_split_ms, mid + search_range_ms // 2)
 
     if start_search >= end_search:
-        return mid  # 探索範囲が取れないなら中央
+        return mid
 
     min_rms = float("inf")
     best_pos = mid
-    step = 50  # 50ms刻み
+    step = 50
     i = start_search
     while i < end_search:
-        seg = ch[i : i + step]
-        if seg.rms < min_rms: # type: ignore
-            min_rms = seg.rms # type: ignore
+        seg = ch[i: i + step]
+        if seg.rms < min_rms:  # type: ignore
+            min_rms = seg.rms  # type: ignore
             best_pos = i + step // 2
         i += step
 
@@ -75,10 +92,7 @@ def find_lowest_volume_split(ch: AudioSegment, search_range_ms=1000, min_split_m
 
 
 def _split_chunk_evenly(ch: AudioSegment, max_ms: int):
-    """
-    チャンクを max_ms 以下の等間隔に分割するフォールバック。
-    「音量の低い箇所」が見つからない場合に使用。
-    """
+    """チャンクを max_ms 以下の等間隔に分割するフォールバック。"""
     length = len(ch)
     n = max(2, (length + max_ms - 1) // max_ms)
     chunk_size = length // n
@@ -100,24 +114,22 @@ def split_by_low_volume(ch: AudioSegment, max_sec=5, fade_ms=10, search_ms=1000)
     if len(ch) <= max_len:
         return [ch]
 
-    min_split_ms = 500  # 分割位置の両端の最低確保(ms)
+    min_split_ms = 500
     result = []
     remaining = ch
-    max_iterations = 10000  # 安全ガード
+    max_iterations = 10000
     iteration = 0
 
     while len(remaining) > max_len and iteration < max_iterations:
         iteration += 1
         split_pos = find_lowest_volume_split(remaining, search_ms, min_split_ms)
 
-        # split_pos が短すぎる/長すぎる場合は等間隔フォールバック
         if split_pos <= min_split_ms or split_pos >= len(remaining) - min_split_ms:
             result.extend(_split_chunk_evenly(remaining, max_len))
             return result
 
         left = remaining[:split_pos]
         right = remaining[split_pos:]
-        # 安全なフェード
         fade_l = min(fade_ms, len(left) // 2) if len(left) > 0 else 0
         fade_r = min(fade_ms, len(right) // 2) if len(right) > 0 else 0
         left = _safe_fade(left, fade_l, "out")
@@ -126,7 +138,6 @@ def split_by_low_volume(ch: AudioSegment, max_sec=5, fade_ms=10, search_ms=1000)
         result.append(left)
         remaining = right
 
-    # 最後の残り
     if len(remaining) > 0:
         result.append(remaining)
     return result
@@ -150,24 +161,20 @@ def merge_chunks(chunks, min_sec=1, max_sec=5, ideal_pad_sec=4, fade_ms=10, gap_
             buffer = ch
         else:
             if len(buffer) < min_sec * 1000:
-                # バッファが1秒未満
                 if len(buffer) + len(ch) + gap_ms <= max_sec * 1000:
                     buffer = fade_merge(buffer, ch, fade_ms, gap_ms)
                 else:
-                    # 合体すると 5秒超 → buffer確定
                     if len(buffer) < min_sec * 1000:
                         buffer = pad_to_length(buffer, ideal_pad_sec * 1000)
                     result.append(buffer)
                     buffer = ch
             else:
-                # バッファ >=1s
                 if len(buffer) + len(ch) + gap_ms <= max_sec * 1000:
                     buffer = fade_merge(buffer, ch, fade_ms, gap_ms)
                 else:
                     result.append(buffer)
                     buffer = ch
 
-    # 最後の残り
     if len(buffer) > 0:
         if len(buffer) < min_sec * 1000:
             buffer = pad_to_length(buffer, ideal_pad_sec * 1000)
@@ -177,12 +184,9 @@ def merge_chunks(chunks, min_sec=1, max_sec=5, ideal_pad_sec=4, fade_ms=10, gap_
 
 
 def _safe_fade(seg: AudioSegment, fade_ms: int, direction: str) -> AudioSegment:
-    """pydubの丸め誤差による ValueError を回避するフェードヘルパー。
-    direction: 'out' or 'in'
-    """
+    """pydubの丸め誤差による ValueError を回避するフェードヘルパー。"""
     if fade_ms <= 0 or len(seg) == 0:
         return seg
-    # fade_ms がセグメント長を超えないようにクランプ
     fade_ms = min(fade_ms, len(seg))
     try:
         if direction == "out":
@@ -190,7 +194,6 @@ def _safe_fade(seg: AudioSegment, fade_ms: int, direction: str) -> AudioSegment:
         else:
             return seg.fade_in(fade_ms)
     except (ValueError, Exception):
-        # さらに半分に縮めてリトライ
         try:
             fade_ms = max(1, fade_ms // 2)
             if direction == "out":
@@ -198,7 +201,7 @@ def _safe_fade(seg: AudioSegment, fade_ms: int, direction: str) -> AudioSegment:
             else:
                 return seg.fade_in(fade_ms)
         except (ValueError, Exception):
-            return seg  # フェード諦める
+            return seg
 
 
 def fade_merge(ch1: AudioSegment, ch2: AudioSegment, fade_ms=10, gap_ms=100):
@@ -221,7 +224,7 @@ def pad_to_length(ch: AudioSegment, target_ms: int):
 # メイン処理: 1ファイル単位
 ########################################
 def process_one_file(
-    path_str: str, output_dir_str:str|None = None, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100, output_format="wav"
+    path_str: str, output_dir_str: str | None = None, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100, output_format="wav"
 ) -> list[str]:
     path = Path(path_str)
     base = path.stem
@@ -232,10 +235,8 @@ def process_one_file(
     audio = AudioSegment.from_file(path)
     files = []
 
-    # 1) 無音区間で分割
     phrases = split_into_phrases(audio, min_silence_len, silence_thresh)
 
-    # 2) 5秒超チャンク → 音量の低い部分で再帰的に分割
     splitted = []
     for ph in phrases:
         if len(ph) > max_sec * 1000:
@@ -244,7 +245,6 @@ def process_one_file(
         else:
             splitted.append(ph)
 
-    # 3) 短いチャンク(<1s) を結合 or パディング
     final_chunks = merge_chunks(
         splitted,
         min_sec=min_sec,
@@ -254,7 +254,6 @@ def process_one_file(
         gap_ms=gap_ms,
     )
 
-    # 4) 出力
     output_dir.mkdir(parents=True, exist_ok=True)
     for i, ch in enumerate(final_chunks, start=1):
         out_name = f"{base}_part{i:03d}.{output_format}"
@@ -264,70 +263,56 @@ def process_one_file(
     return files
 
 
-def segment_silence_main(
-    data: dict, stop_event
-) -> Generator[tuple[float, str, dict | None], None, dict]:
-    """音声ファイルを無音で分割して保存するタスクのメイン処理
-    Args:
-        data: {
-            "files": [str],  # 分割する音声ファイルのパス
-            "output_dir": str|None,  # 分割後のファイルの出力先フォルダ (Noneなら元と同じ場所)
-            "min_sec": int|float,  # チャンクの最小長さ(秒)
-            "max_sec": int|float,  # チャンクの最大長さ(秒)
-            "silence_thresh": int|float,  # 無音とみなす音量の閾値 (dB)
-            "format": str,   # 出力フォーマット ("wav", "mp3", "flac" のいずれか)
-            "overwrite": bool, # 出力先に同名フォルダがある場合に上書きするかどうか
-        }
-        stop_event: タスクキャンセル用イベント
-    """
-
-    print("segment silence task started...")
-
-    files = data.get("files", [])
-    output_dir = data.get("output_dir", None)
-    overwrite = data.get("overwrite", False)
+def main():
+    data = json.loads(sys.stdin.read())
+    files: list[str] = data.get("files", [])
+    output_dir_root = data.get("output_dir", None)
+    overwrite: bool = data.get("overwrite", False)
     min_sec = data.get("min_sec", 2)
     max_sec = data.get("max_sec", 5)
-    output_format = data.get("format", "wav")
+    silence_thresh = data.get("silence_thresh", -60)
+    output_format: str = data.get("format", "wav")
     if output_format not in ["wav", "mp3", "flac"]:
         output_format = "wav"
 
-    yield 0, "処理開始", None
-    cnt = len(files)
-    if cnt == 0:
-        yield 1, "完了", None
-        return {"err": "処理するファイルがありませんでした"}
+    total = len(files)
+    if total == 0:
+        print("処理するファイルがありませんでした", flush=True)
+        return
 
-    try:
-        for i, path in enumerate(files, start=1):
-            print(f"processing: {path}")
-            if stop_event.is_set():
-                yield 1, "キャンセル", None
-                return {"result": {}}
-            if not output_dir:
-                parent = Path(path).parent
-                output_dir_str = str(parent / Path(path).stem)
+    print("[[[initial_result_start]]]", flush=True)
+    print(json.dumps({"count": total}), flush=True)
+    print("[[[initial_result_end]]]", flush=True)
+
+    for i, path in enumerate(files, start=1):
+        print(f"処理中 ({i}/{total}): {path}", flush=True)
+        try:
+            if not output_dir_root:
+                output_dir_str = str(Path(path).parent / Path(path).stem)
             else:
-                output_dir_str = output_dir
+                output_dir_str = str(Path(output_dir_root) / Path(path).stem)
 
             if os.path.exists(output_dir_str):
                 if overwrite and os.path.isdir(output_dir_str):
                     shutil.rmtree(output_dir_str)
                 else:
-                    yield 1, "エラー", None
-                    return {"err": f"出力先の「{output_dir_str}」はすでに存在しています"}
+                    print(f"エラー: 出力先「{output_dir_str}」はすでに存在しています", flush=True)
+                    continue
+
             result = process_one_file(
                 path_str=path,
                 output_dir_str=output_dir_str,
                 min_sec=min_sec,
                 max_sec=max_sec,
-                silence_thresh=data.get("silence_thresh", -60),
+                silence_thresh=silence_thresh,
                 output_format=output_format,
             )
-            yield i / cnt, f"処理 ({i}/{cnt})", {"result": [{"src": path, "dst": result}]}
-        return {"result": {}}
-    except Exception as e:
-        yield 1, "エラー", None
-        return {"err": str(e)}
-    finally:
-        print("...segment silence task finished")
+            print("[[[part_result_start]]]", flush=True)
+            print(json.dumps({"data": {"src": path, "dst": result}}), flush=True)
+            print("[[[part_result_end]]]", flush=True)
+        except Exception as e:
+            print(f"エラー: {path}: {e}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

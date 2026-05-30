@@ -72,8 +72,8 @@ def tab_main(ctx: VoiceCtx):
             return confirm
         return True
 
-    def segment_finished(result) -> None:
-        ctx.segment_finished(result)
+    def on_segment_part(part: dict) -> None:
+        ctx.segment_finished([part["data"]])
 
     async def segment_silence(
         min_sec=2, max_sec=5, silence_thresh: int = -60, output_format: str = "wav"
@@ -84,8 +84,6 @@ def tab_main(ctx: VoiceCtx):
               output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
               silence_thresh: 無音とみなす音量の閾値 (dB)
         """
-        from voice.segment_silence import segment_silence_main
-
         min_sec = float(min_sec)
         max_sec = float(max_sec)
 
@@ -95,16 +93,22 @@ def tab_main(ctx: VoiceCtx):
             return
         if not await confirm_dir_exists(files):
             return
-        data = {
-            "files": [f["path"] for f in files],
-            "output_dir": None,
-            "overwrite": True,
-            "format": output_format,
-            "min_sec": min_sec,
-            "max_sec": max_sec,
-            "silence_thresh": silence_thresh,
-        }
-        await ctx.worker.run(segment_silence_main, data, segment_finished)
+        cli = str(Path(__file__).parent / "cli_task_segment_silence.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="無音検出分割",
+            input_json={
+                "files": [f["path"] for f in files],
+                "output_dir": None,
+                "overwrite": True,
+                "format": output_format,
+                "min_sec": min_sec,
+                "max_sec": max_sec,
+                "silence_thresh": silence_thresh,
+            },
+            part_callback=on_segment_part,
+        )
+        dlg.open()
 
     async def segment_equally(frame_count=5, fps=1, output_format: str = "wav") -> None:
         """均等に分割して保存するタスクを実行
@@ -112,8 +116,6 @@ def tab_main(ctx: VoiceCtx):
               fps: フレームレート。1にするとフレーム数=秒数になるので、秒数で分割したい場合は1を指定してください。
               output_format: 出力フォーマット ("wav", "mp3", "flac" のいずれか)
         """
-        from voice.segment_equally import segment_equally_main
-
         segment_sec = float(frame_count) / float(fps)
         files = ctx.target_files()
         if len(files) == 0:
@@ -121,14 +123,20 @@ def tab_main(ctx: VoiceCtx):
             return
         if not await confirm_dir_exists(files):
             return
-        data = {
-            "files": [f["path"] for f in files],
-            "output_dir": None,
-            "overwrite": True,
-            "format": output_format,
-            "segment_sec": segment_sec,
-        }
-        await ctx.worker.run(segment_equally_main, data, segment_finished)
+        cli = str(Path(__file__).parent / "cli_task_segment_equally.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="均等分割",
+            input_json={
+                "files": [f["path"] for f in files],
+                "output_dir": None,
+                "overwrite": True,
+                "format": output_format,
+                "segment_sec": segment_sec,
+            },
+            part_callback=on_segment_part,
+        )
+        dlg.open()
 
     async def pick_folder(path: str) -> None:
         result = await FolderPicker(path, read_all=False)
