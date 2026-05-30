@@ -19,6 +19,14 @@ h2 {
     font-size: 2em;
     margin: 0.2em 0 0.2em 0;
 }
+h3 {
+    font-size: 1.6em;
+    margin: 0.2em 0 0.2em 0;
+}
+h4 {
+    font-size: 1.3em;
+    margin: 0.2em 0 0.2em 0;
+}
 .infotxt {
     color: #666;
 }
@@ -98,13 +106,30 @@ def footer():
 @ui.page("/", title="dataset-ui")
 def main_page():
     header()
-    ui.markdown("""## dataset-ui""")
-    ui.link("music", "/music").style('text-decoration: none; font-size: 3em;')
-    ui.label("ACE-Step 向けのメタデータを編集")
-    ui.link("voice", "/voice").style('text-decoration: none; font-size: 3em;')
-    ui.label("音声データを編集")
+    ui.markdown("""# dataset-ui
+音声データセットに様々な処理を施すWeb UIです。
 
-    ui.link("test", "/test").style("text-decoration: none; font-size: 3em;")
+### 説明書
+各ページの設定タブで書き出しフォルダとモデルフォルダは必ず確認することをお勧めします。初期設定ではレポジトリの中に作成されます。この2つの設定はすべてのページで共有されます。
+
+自動保存されない操作が多いので保存ボタンを押し忘れないように注意してください。
+
+モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
+        """).classes("items-start w-180")
+    with ui.column().classes("items-start gap-0"):
+        ui.link("music", "/music").style(
+            "text-decoration: none; font-size: 3em; margin-top:16px;"
+        )
+        ui.label("主に ACE-Step 向けのメタデータを編集")
+        ui.label("楽曲のBPM、キーなどを解析します。歌詞の解析、編集などもできます")
+        ui.link("voice", "/voice").style(
+            'text-decoration: none; font-size: 3em; margin-top:16px;'
+        )
+        ui.label("音声データを編集")
+        ui.label("音声の分割や書き起こしなどができます")
+    if _auto_reload_flag:
+        ui.link("test", "/test").style("text-decoration: none; font-size: 1.8em;")
+
     footer()
 
 

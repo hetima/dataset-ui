@@ -3,7 +3,6 @@ librosa
 soundfile
 mutagen
 tenacity
-
 transformers>=5.4
 accelerate
 bitsandbytes
@@ -24,5 +23,3 @@ soynlp
 # sox
 # flask
 # pytz
-
-# pywinpty
