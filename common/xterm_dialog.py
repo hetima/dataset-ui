@@ -1,11 +1,9 @@
 import subprocess
-import traceback
 from typing import Any
 from nicegui import ui, background_tasks, helpers
 import asyncio
 
 xterm_option = {
-    # いい感じのテーマ定義
     "theme": {
         "background": "#20222f",
         "foreground": "#c7c9d0",
@@ -32,9 +30,10 @@ xterm_option = {
     "fontSize": 14,
     "fontFamily": '"Cascadia Code", Menlo, monospace',
     "cols": 80,
-    "rows": 24,
+    "rows": 26,
     "convertEol": True,
 }
+
 
 class XtermDialog(ui.dialog):
 
@@ -42,7 +41,7 @@ class XtermDialog(ui.dialog):
         self,
         args: list[str],
         title: str = "",
-        cd: str = "."
+        cd: str = ".",
     ) -> None:
         super().__init__()
         self.args = args
@@ -50,21 +49,20 @@ class XtermDialog(ui.dialog):
         self._is_running = False
         self._cancelled = False
         self.cd = cd
-        self.show_panel()
+        self._show_panel()
 
     def _handle_value_change(self, value: Any) -> None:
         """実行中は ESC / 背景クリックによるダイアログ閉じを禁止"""
         if not value and self._is_running:
-            self.open()  # 閉じようとしても即座に reopen して阻止
+            self.open()
             return
         super()._handle_value_change(value)
 
-    def show_panel(self):
-        """xtermパネルを表示してコマンド実行開始"""
-        self._process = None
+    def _show_panel(self):
+        self._process: subprocess.Popen | None = None
 
         self.style("max-width: none")
-        with self, ui.card().classes("").style("max-width: 70vw"):
+        with self, ui.card().style("width: fit-content; max-width: 95vw"):
             ui.label(self.title).classes("text-sm")
             self._terminal = ui.xterm(xterm_option).classes("dialog-xterm")
             with ui.row().classes("w-full justify-end"):
@@ -74,8 +72,8 @@ class XtermDialog(ui.dialog):
                 self._close_btn.set_enabled(False)
 
         background_tasks.create(
-            helpers.await_with_context(self._run_command(), self.client),
-            name='xterm_download',
+            helpers.await_with_context(self._run_command(), self.client),  # type: ignore[arg-type]
+            name='xterm_run',
         )
 
     async def _run_command(self):
@@ -104,15 +102,16 @@ class XtermDialog(ui.dialog):
                 read_stream(self._process.stderr),
                 asyncio.to_thread(self._process.wait),
             )
+
             if self._cancelled:
-                self._terminal.write("\r\n[キャンセルされました]\r\n")
+                self._terminal.write("\r\n[キャンセルされました]\r\n".encode())
             else:
-                self._terminal.write("\r\n[完了]\r\n")
+                self._terminal.write("\r\n[完了]\r\n".encode())
+
         except asyncio.CancelledError:
-            self._terminal.write("\r\n[キャンセルされました(タスク)]\r\n")
+            self._terminal.write("\r\n[キャンセルされました(タスク)]\r\n".encode())
         except Exception as e:
-            tb = traceback.format_exc()
-            self._terminal.write(f"\r\n[エラー] {type(e).__name__}: {e}")
+            self._terminal.write(f"\r\n[エラー] {type(e).__name__}: {e}".encode())
         finally:
             self._is_running = False
             self._process = None

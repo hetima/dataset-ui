@@ -17,10 +17,12 @@ BS-RoFormer
 pyloudnorm
 picklescan
 
-# uv pip install qwen_asr --no-deps
+# qwen_asr
 nagisa
 soynlp
 # qwen-omni-utils
 # sox
 # flask
 # pytz
+
+# pywinpty
