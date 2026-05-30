@@ -103,6 +103,8 @@ def main_page():
     ui.label("ACE-Step 向けのメタデータを編集")
     ui.link("voice", "/voice").style('text-decoration: none; font-size: 3em;')
     ui.label("音声データを編集")
+
+    ui.link("test", "/test").style("text-decoration: none; font-size: 3em;")
     footer()
 
 

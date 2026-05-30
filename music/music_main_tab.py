@@ -8,7 +8,6 @@ from common.folder_picker import FolderPicker
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
-from music.music_app_ctx import MusicCtx
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
