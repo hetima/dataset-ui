@@ -1,7 +1,13 @@
+import json
 import subprocess
-from typing import Any
+from typing import Any, Callable
 from nicegui import ui, background_tasks, helpers
 import asyncio
+
+INITIAL_RESULT_START = "[[[initial_result_start]]]"
+INITIAL_RESULT_END = "[[[initial_result_end]]]"
+PART_RESULT_START = "[[[part_result_start]]]"
+PART_RESULT_END = "[[[part_result_end]]]"
 
 xterm_option = {
     "theme": {
@@ -42,6 +48,10 @@ class XtermDialog(ui.dialog):
         args: list[str],
         title: str = "",
         cd: str = ".",
+        input_json: Any = None,
+        initial_callback: Callable[[int], None] | None = None,
+        part_callback: Callable[[dict], None] | None = None,
+        finish_callback: Callable[[bool], None] | None = None,
     ) -> None:
         super().__init__()
         self.args = args
@@ -49,6 +59,12 @@ class XtermDialog(ui.dialog):
         self._is_running = False
         self._cancelled = False
         self.cd = cd
+        self._input_json = input_json
+        self._initial_callback = initial_callback
+        self._part_callback = part_callback
+        self._finish_callback = finish_callback
+        self._total_count: int = 0
+        self._part_count: int = 0
         self._show_panel()
 
     def _handle_value_change(self, value: Any) -> None:
@@ -65,7 +81,9 @@ class XtermDialog(ui.dialog):
         with self, ui.card().style("width: fit-content; max-width: 95vw"):
             ui.label(self.title).classes("text-sm")
             self._terminal = ui.xterm(xterm_option).classes("dialog-xterm")
-            with ui.row().classes("w-full justify-end"):
+            with ui.row().classes("w-full justify-end items-center"):
+                self._progress = ui.circular_progress(min=0, max=1, value=0, size="30px").props("instant-feedback")
+                self._progress.set_visibility(False)
                 self._stop_btn = ui.button("停止", on_click=self._stop_command)
                 self._stop_btn.set_enabled(False)
                 self._close_btn = ui.button("閉じる", on_click=self._safe_close)
@@ -81,25 +99,74 @@ class XtermDialog(ui.dialog):
         self._is_running = True
         self._cancelled = False
         self._stop_btn.set_enabled(True)
+        success = False
 
         try:
+            stdin_data = json.dumps(self._input_json).encode() if self._input_json is not None else None
             self._process = subprocess.Popen(
                 self.args,
                 cwd=self.cd,
+                stdin=subprocess.PIPE if stdin_data is not None else None,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
+            if stdin_data is not None:
+                await asyncio.to_thread(self._process.stdin.write, stdin_data)  # type: ignore[union-attr]
+                self._process.stdin.close()  # type: ignore[union-attr]
 
-            async def read_stream(stream) -> None:
+            async def read_stdout() -> None:
+                """stdout を行単位で読み、マーカー間の JSON をコールバックに渡す"""
+                json_buf: list[str] = []
+                block_type: str = ""  # "initial" | "part" | ""
                 while True:
-                    chunk = await asyncio.to_thread(stream.read, 128)
+                    line_bytes = await asyncio.to_thread(self._process.stdout.readline)  # type: ignore[union-attr]
+                    if not line_bytes:
+                        break
+                    line = line_bytes.decode(errors='replace').rstrip('\r\n')
+                    if line == INITIAL_RESULT_START:
+                        block_type = "initial"
+                        json_buf = []
+                        continue
+                    if line == PART_RESULT_START:
+                        block_type = "part"
+                        json_buf = []
+                        continue
+                    if line in (INITIAL_RESULT_END, PART_RESULT_END):
+                        try:
+                            data = json.loads('\n'.join(json_buf))
+                            if block_type == "initial":
+                                self._total_count = data.get("count", 0)
+                                if self._total_count > 0:
+                                    self._progress.props(f"max={self._total_count}")
+                                    self._progress.value = 0
+                                    self._progress.set_visibility(True)
+                                if self._initial_callback:
+                                    self._initial_callback(self._total_count)
+                            elif block_type == "part":
+                                self._part_count += 1
+                                self._progress.value = self._part_count
+                                if self._part_callback:
+                                    self._part_callback(data)
+                        except Exception:
+                            pass
+                        json_buf = []
+                        block_type = ""
+                        continue
+                    if block_type:
+                        json_buf.append(line)
+                    else:
+                        self._terminal.write((line + '\r\n').encode())
+
+            async def read_stderr() -> None:
+                while True:
+                    chunk = await asyncio.to_thread(self._process.stderr.read, 128)  # type: ignore[union-attr]
                     if not chunk:
                         break
                     self._terminal.write(chunk)
 
             await asyncio.gather(
-                read_stream(self._process.stdout),
-                read_stream(self._process.stderr),
+                read_stdout(),
+                read_stderr(),
                 asyncio.to_thread(self._process.wait),
             )
 
@@ -107,6 +174,7 @@ class XtermDialog(ui.dialog):
                 self._terminal.write("\r\n[キャンセルされました]\r\n".encode())
             else:
                 self._terminal.write("\r\n[完了]\r\n".encode())
+                success = True
 
         except asyncio.CancelledError:
             self._terminal.write("\r\n[キャンセルされました(タスク)]\r\n".encode())
@@ -115,15 +183,16 @@ class XtermDialog(ui.dialog):
         finally:
             self._is_running = False
             self._process = None
+            self._progress.set_visibility(False)
             self._stop_btn.set_enabled(False)
             self._close_btn.set_enabled(True)
+            if self._finish_callback:
+                self._finish_callback(success)
 
     def _safe_close(self):
-        """安全にダイアログを閉じる"""
         self.delete()
 
     def _stop_command(self):
-        """ダウンロードプロセスを停止"""
         if self._process and self._is_running:
             self._cancelled = True
             self._process.terminate()

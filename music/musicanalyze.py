@@ -1,10 +1,8 @@
 from pathlib import Path
 from collections.abc import Generator
-from common.setting import cnfg
 
 def analyze_main(data: list[str], stop_event) -> Generator[tuple[float, str, dict|None], None, dict]:
     print("analyzing task started...")
-    cnfg.load()
     yield 0, "処理開始", None
     cnt = len(data)
     if cnt == 0:
