@@ -5,10 +5,12 @@ from common.worker import Worker
 from music.music_app_ctx import MusicCtx
 from music.music_main_tab import tab_main
 from music.music_setting_tab import tab_setting
+from common.wavesurfer import setup_wavesurfer
 
 def main_page(worker: Worker):
+    setup_wavesurfer()
     ctx = MusicCtx(worker)
-    
+
     ui.markdown("""# dataset-ui-music
 ACE-Step 向けのメタデータを書き出す webui です""")
 

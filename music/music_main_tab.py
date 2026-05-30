@@ -8,6 +8,7 @@ from common.folder_picker import FolderPicker
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
+from common.wavesurfer import simple_player
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
@@ -248,13 +249,17 @@ def tab_main(ctx: MusicCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    with ui.row().classes("items-center gap-4"):
-        player = ui.audio("")
-        play_info = ui.label("")
+    # with ui.row().classes("items-center gap-4"):
+    #     player = ui.audio("")
+    #     play_info = ui.label("")
+    # def play_src(path: str):
+    #     player.set_source(path)
+    #     player.play()
+    #     play_info.set_text(Path(path).name)
+    ws = simple_player("ws_01", visible=False, autoplay=True)
     def play_src(path: str):
-        player.set_source(path)
-        player.play()
-        play_info.set_text(Path(path).name)
+        ws.container.set_visibility(True)
+        ws.ws.load(path)
 
     ctx.table = ui.table(
         columns=[

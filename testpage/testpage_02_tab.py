@@ -6,8 +6,7 @@ from testpage.testpage_ctx import TestCtx
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
 from common.setting import cnfg
-from common.wavesurfer import WaveSurferWidget
-
+from common.wavesurfer import WaveSurferWidget, simple_player
 
 def tab_02(tctx: TestCtx, ctx: MusicCtx):
 
@@ -36,18 +35,29 @@ def tab_02(tctx: TestCtx, ctx: MusicCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    ws = WaveSurferWidget("ws_02")
-    with ui.column().classes("items-start gap-0"):
-        ws.build()
-        with ui.row().classes("items-center gap-0"):
-            ui.button(icon="play_arrow").props("flat").on(
-                "click", js_handler=ws.play_pause_js()
-            ).style("padding: 2px 4px;")
-            play_info = ui.label("")
+    # ws = WaveSurferWidget("ws_02")
+    # with ui.column().classes("items-start gap-0"):
+    #     ws.build()
+    #     with ui.row().classes("items-center gap-0"):
+    #         ui.button(icon="play_arrow").props("flat").on(
+    #             "click", js_handler=ws.play_js()
+    #         ).style("padding: 2px 4px;")
+    #         ui.button(icon="pause").props("flat").on(
+    #             "click", js_handler=ws.pause_js()
+    #         ).style("padding: 2px 4px;")
+    #         play_info = ui.label("")
+    #         ws.duration_label().style("margin:0 0 0 10px")
+    #         ui.slider(min=0, max=1, step=0.05, value=1).style(
+    #             "width: 120px; margin:0 0 0 20px"
+    #         ).on(
+    #             "update:model-value",
+    #             js_handler=f"(v) => window['{ws._name}'] && window['{ws._name}'].setVolume(v)",
+    #         )
 
+    ws = simple_player("ws_03", visible=False)
     def play_src(path: str):
-        play_info.set_text(Path(path).name)
-        ws.load(path)
+        ws.container.set_visibility(True)
+        ws.ws.load(path)
 
     ctx.table = ui.table(
         columns=[
