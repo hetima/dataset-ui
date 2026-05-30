@@ -3,6 +3,7 @@ from nicegui import ui, app
 from common.worker import Worker
 from music.index import main_page as page_music
 from voice.index import main_page as page_voice
+from testpage.index import main_page as page_testpage
 
 _worker: Worker = Worker()
 _auto_reload_flag = False
@@ -118,7 +119,7 @@ def main_page_voice():
 @ui.page("/test", title="dataset-ui")
 def test_page():
     header()
-    ui.label("test")
+    page_testpage(_worker)
     footer()
 
 
