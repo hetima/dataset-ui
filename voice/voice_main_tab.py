@@ -7,8 +7,9 @@ from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.download_repo import download_repo_main
 from common.setting import cnfg
+from common.xterm_dialog import XtermDialog
 from common.message_dialog import show_confirm_dialog
-from voice.qwen3_asr_transcriptor import transcript_main, asr_models
+import sys
 from voice.voice_app_ctx import VoiceCtx
 
 def tab_main(ctx: VoiceCtx):
@@ -20,10 +21,10 @@ def tab_main(ctx: VoiceCtx):
         data = {"repo_id": repo_id, "output_dir": cnfg.models_dir / "qwen_asr"}
         await ctx.worker.run(download_repo_main, data, asr_download_finished)
 
-    def transcript_finished(result) -> None:
-        ctx.transcripted(result)
+    def progress_transcript(part: dict) -> None:
+        ctx.transcripted([part["data"]])
 
-    async def transcript() -> None:
+    def transcript_qwen_asr() -> None:
         """処理対象のファイルを Qwen3-ASR で音声認識するタスクを実行"""
         if not cnfg.voice.asr_model:
             ui.notify("モデルを選択してください")
@@ -32,20 +33,26 @@ def tab_main(ctx: VoiceCtx):
         if not model_path.exists():
             if cnfg.voice.asr_model.find("/") < 1:
                 ui.notify(
-                    f"モデルパス「  {str(cnfg.models_dir / "qwen_asr")}」 に「{cnfg.voice.asr_model}」フォルダが存在しません。"
+                    f"モデルパス「  {str(cnfg.models_dir / 'qwen_asr')}」 に「{cnfg.voice.asr_model}」フォルダが存在しません。"
                 )
                 return
-            model_path_str = cnfg.music.acestep_transcriber_model
+            model_path_str = cnfg.voice.asr_model
         else:
             model_path_str = str(model_path)
         files = ctx.target_files()
-        if len(files) == 0:
+        if not files:
             ui.notify("処理対象がありません")
             return
-        data = {"model_path": model_path_str, "files": []}
-        for music_file in files: # type: ignore
-            data["files"].append(music_file["path"])
-        await ctx.worker.run(transcript_main, data, transcript_finished)
+        paths = [f["path"] for f in files]  # type: ignore
+        cnfg.save()
+        cli = str(Path(__file__).parent / "cli_task_qwen3_asr.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="音声認識",
+            input_json={"model_path": model_path_str, "files": paths},
+            part_callback=progress_transcript,
+        )
+        dlg.open()
 
     async def confirm_dir_exists(files: list) -> bool:
         exists_dirs = []
@@ -163,6 +170,18 @@ def tab_main(ctx: VoiceCtx):
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
 
+    def asr_models() -> list[str]:
+        models_dir = cnfg.models_dir / "qwen_asr"
+        if not models_dir.exists():
+            return []
+        return [
+            p.name
+            for p in models_dir.iterdir()
+            if p.is_dir()
+            # and "asr" in p.name.lower()
+            # and "qwen" in p.name.lower()
+        ]
+
     with ui.row().classes("items-center gap-4"):
         ui.label("処理対象:")
         ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
@@ -196,7 +215,9 @@ def tab_main(ctx: VoiceCtx):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     qwen_models_menu = ui.menu()
 
-            ui.button("解析する", on_click=transcript).bind_enabled_from(ctx.worker, "can_run")
+            ui.button("解析する", on_click=transcript_qwen_asr).bind_enabled_from(
+                ctx.worker, "can_run"
+            )
 
     with ui.expansion("音声分割", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"

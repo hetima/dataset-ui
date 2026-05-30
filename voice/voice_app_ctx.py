@@ -138,8 +138,7 @@ class VoiceCtx:
             return True
         return False
 
-    def transcripted(self, result: dict) -> None:
-        result_files = result.get("result", [])
+    def transcripted(self, result_files: list) -> None:
         for voice_file in self.files:
             info = next((d for d in result_files if d["path"] == voice_file.path), None)
             if info is None:
@@ -159,4 +158,3 @@ class VoiceCtx:
                     voicefile = VoiceFile.from_audio_file(dst)
                     parent_file.add_child(voicefile)
         self.table.update()
-
