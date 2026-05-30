@@ -53,7 +53,8 @@ class XtermDialog(ui.dialog):
         part_callback: Callable[[dict], None] | None = None,
         finish_callback: Callable[[bool], None] | None = None,
     ) -> None:
-        super().__init__().props("persistent")
+        super().__init__()
+        self.props("persistent")
         self.args = args
         self.title = title
         self._is_running = False
@@ -65,6 +66,7 @@ class XtermDialog(ui.dialog):
         self._finish_callback = finish_callback
         self._total_count: int = 0
         self._part_count: int = 0
+        self._success: bool = False
         self._show_panel()
 
     def _handle_value_change(self, value: Any) -> None:
@@ -184,13 +186,14 @@ class XtermDialog(ui.dialog):
         finally:
             self._is_running = False
             self._process = None
+            self._success = success
             self._progress.set_visibility(False)
             self._stop_btn.set_enabled(False)
             self._close_btn.set_enabled(True)
-            if self._finish_callback:
-                self._finish_callback(success)
 
     def _safe_close(self):
+        if self._finish_callback:
+            self._finish_callback(self._success)
         self.delete()
 
     def _stop_command(self):

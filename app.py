@@ -51,6 +51,9 @@ h2 {
 
 """)
     ui.colors(secondary='#747474')
+    ui.html(
+        '<a href="/">dataset-ui</a> / <a href="/music">music</a> | <a href="/voice">voice</a>'
+    ).style("color: #646464")
     if _auto_reload_flag:
         ui.label(
             "※ --auto-reload フラグが有効になっています。ソースコードを編集すると自動でリロードされます。"

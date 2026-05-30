@@ -98,7 +98,6 @@ def tab_main(ctx: MusicCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
-
     with ui.row().classes("items-center gap-2"):
         dataset_dropdown = (
             ui.dropdown_button(icon="folder", auto_close=True)
@@ -107,12 +106,13 @@ def tab_main(ctx: MusicCtx):
         )
         path_input = (
             ui.input(
-                value = cnfg.music.last_dataset_path,
+                value=cnfg.music.last_dataset_path,
                 label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
             )
-            .props('style="min-width: 500px" outlined clearable').classes("w-140")
+            .props('style="min-width: 500px" outlined clearable')
+            .classes("w-140")
         )
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value))
 
@@ -124,6 +124,30 @@ def tab_main(ctx: MusicCtx):
 
     update_dataset_dropdown()
     ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Save files
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("保存", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        with ui.splitter().classes("q-splitter--no-margin").props('separator-class="q-mx-md"') as segment_splitter:
+            with segment_splitter.before:
+                with ui.row().classes("items-center gap-4"):
+                    ui.label("処理対象:")
+                    ui.toggle(
+                        {"all": "すべてのファイル", "selected": "チェックした項目のみ"}
+                    ).bind_value(ctx, "target")
+                    ui.space()
+            with segment_splitter.after:
+                ui.label("メタデータをファイルに書き出します")
+                with ui.row().classes("items-center gap-4"):
+                    ui.label("保存対象:")
+                    ui.checkbox(".json").bind_value(ctx, "save_json")
+                    ui.checkbox(".lyrics.txt").bind_value(ctx, "save_lyrics")
+                    ui.checkbox(".txt (for AI Toolkit)").bind_value(ctx, "save_aitk")
+                    ui.space()
+                    ui.button("保存", on_click=lambda: ctx.save_metadata())
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
@@ -140,11 +164,6 @@ def tab_main(ctx: MusicCtx):
             # and "acestep" in p.name.lower()
             # and "transcriber" in p.name.lower()
         ]
-
-    with ui.row().classes("items-center gap-4"):
-        ui.label("処理対象:")
-        ui.toggle({"all": 'すべてのファイル', "selected": 'チェックした項目のみ'}).bind_value(ctx, 'target')
-        ui.space()
 
     with ui.expansion('解析', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを librosa で解析し、BPM、キー、拍子、時間を取得します")
@@ -324,16 +343,3 @@ def tab_main(ctx: MusicCtx):
                 js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
                 handler=lambda e: print(e.args),
             )
-
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Save files
-    # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion('保存', value=True).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
-        ui.label("メタデータをファイルに書き出します")
-        with ui.row().classes("items-center gap-4"):
-            ui.label("保存対象:")
-            ui.checkbox(".json").bind_value(ctx, "save_json")
-            ui.checkbox(".lyrics.txt").bind_value(ctx, "save_lyrics")
-            ui.checkbox(".txt (for AI Toolkit)").bind_value(ctx, "save_aitk")
-            ui.space()
-            ui.button("保存", on_click=lambda: ctx.save_metadata())
