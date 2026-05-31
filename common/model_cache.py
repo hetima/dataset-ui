@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 
@@ -25,6 +25,17 @@ class ModelCache:
 
     def __init__(self):
         self._entries: list[CacheEntry] = []
+        self._on_change: list[Callable] = []
+
+    def add_change_listener(self, fn: Callable) -> None:
+        self._on_change.append(fn)
+
+    def remove_change_listener(self, fn: Callable) -> None:
+        self._on_change.remove(fn)
+
+    def _notify(self) -> None:
+        for fn in self._on_change:
+            fn()
 
     def model_loaded(self, name: str, value: Any, get_func: Callable, dispose_func: Callable) -> CacheEntry:
         """モデルをキャッシュ済みとして登録する。既存エントリがあれば先に破棄する。"""
@@ -35,6 +46,7 @@ class ModelCache:
 
         entry = CacheEntry(name=name, value=value, _get_func=get_func, _dispose_func=dispose_func)
         self._entries.append(entry)
+        self._notify()
         return entry
 
     def dispose(self, name: str):
@@ -43,12 +55,14 @@ class ModelCache:
         if entry:
             entry.dispose()
             self._entries.remove(entry)
+            self._notify()
 
     def dispose_all(self):
         """全モデルを破棄する。"""
         for entry in list(self._entries):
             entry.dispose()
         self._entries.clear()
+        self._notify()
 
     def get_entry(self, name: str) -> CacheEntry | None:
         return self._find(name)

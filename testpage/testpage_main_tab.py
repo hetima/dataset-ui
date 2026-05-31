@@ -3,6 +3,7 @@ from nicegui import ui
 
 from testpage.testpage_ctx import TestCtx
 from common.cpu_task_dialog import CpuTaskDialog
+from common.model_cache import model_cache
 
 
 def _dummy_task(_, queue, stop_event):
@@ -34,6 +35,25 @@ def tab_main(ctx: TestCtx):
         dlg.open()
 
     ui.button("CpuTaskDialog テスト", on_click=open_task)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # ModelCache テスト
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    _counter = {"n": 0}
+
+    def add_dummy_cache():
+        _counter["n"] += 1
+        name = f"DummyModel-{_counter['n']}"
+        model_cache.model_loaded(
+            name=name,
+            value=object(),
+            get_func=lambda: None,
+            dispose_func=lambda _: None,
+        )
+        ui.notify(f"キャッシュ登録: {name}", type="positive")
+
+    ui.button("ダミーキャッシュ追加", icon="add", on_click=add_dummy_cache)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧

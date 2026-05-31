@@ -1,13 +1,12 @@
 from nicegui import ui
 
 
-from common.worker import Worker
 from voice.voice_app_ctx import VoiceCtx
 from voice.voice_main_tab import tab_main
 from voice.voice_setting_tab import tab_setting
 
-def main_page(worker: Worker):
-    ctx = VoiceCtx(worker)
+def main_page():
+    ctx = VoiceCtx()
 
     ui.markdown("""# dataset-ui-voice
 音声ファイルのメタデータを書き出す webui です""")

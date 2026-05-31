@@ -1,15 +1,12 @@
 from nicegui import binding, ui
 from nicegui.elements.table import Table
 
-from common.worker import Worker
-
 
 @binding.bindable_dataclass
 class TestCtx:
-    def __init__(self, worker: Worker):
+    def __init__(self):
         self.files = []
         self.table: Table
-        self.worker: Worker = worker
         self.client = ui.context.client
 
     def notify(self, text: str, type=None):

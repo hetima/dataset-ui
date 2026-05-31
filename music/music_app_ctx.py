@@ -7,19 +7,16 @@ from nicegui.elements.table import Table
 from common.file_util import audio_files_in_folder
 from common.setting import cnfg
 from music.musicfile import MusicFile
-from common.worker import Worker
-
 
 @binding.bindable_dataclass
 class MusicCtx:
-    def __init__(self, worker: Worker):
+    def __init__(self):
         self.name = "dataset-ui-music"
         self.files = []
         self.table: Table
         self.save_json: bool = True
         self.save_lyrics: bool = True
         self.save_aitk: bool = False
-        self.worker: Worker = worker
         self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []

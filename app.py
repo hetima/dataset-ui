@@ -1,11 +1,10 @@
 import argparse
 from nicegui import ui, app
-from common.worker import Worker
+from common.model_cache import model_cache
 from music.index import main_page as page_music
 from voice.index import main_page as page_voice
 from testpage.index import main_page as page_testpage
 
-_worker: Worker = Worker()
 _auto_reload_flag = False
 
 def header():
@@ -73,34 +72,36 @@ def footer():
         '<a href="/">dataset-ui</a> ・ <a href="https://github.com/hetima/dataset-ui">GitHub</a>'
     ).classes("text-center w-full").style("color:#999999; font-size: 1em;")
 
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # 処理中UI
-    # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.footer(bordered=True).bind_visibility_from(_worker, "is_running").style(
-        "background-color: #f2f2f2"
-    ):
-        with ui.row().classes("items-center gap-4"):
-            ui.spinner(size='lg')
-            with ui.column():
-                with ui.row().classes("items-center gap-4"):
-                    ui.label("バックグラウンド処理を実行しています").style('color: #010101')
-                    ui.label("").style("color: #010101").bind_text_from(
-                        _worker, "elapsed_time"
-                    )
-                with ui.row().classes("items-center gap-4"):
-                    ui.button(
-                        "処理を強制終了する",
-                        icon="warning",
-                        on_click=_worker.terminate_now,
-                    ).bind_visibility_from(_worker, "is_running").props(
-                        'color="red"'
-                    ).tooltip(
-                        "強制的に子プロセスを終了"
-                    )
-                    ui.label().style("color: #010101").bind_text_from(_worker, "status")
-        ui.linear_progress(show_value=False).props("instant-feedback").bind_value_from(
-            _worker, "progress"
-        ).bind_visibility_from(_worker, "is_running")
+
+def model_cache_sticky():
+    """右上にモデルキャッシュ状態ボタンを表示する。"""
+
+    @ui.refreshable
+    def cache_card():
+        entries = model_cache.entries
+        if not entries:
+            return
+        with ui.page_sticky(position="top-right", x_offset=16, y_offset=16):
+            with ui.card().classes("gap-0 q-pa-none").style("min-width: 200px; padding:0;"):
+                with ui.expansion("モデルキャッシュ", value=True).classes("w-full").style("margin:0; padding:0;"):
+                    for e in entries:
+                        with ui.row().classes("items-center gap-1 q-px-sm"):
+                            ui.icon("check_circle").style("color: teal; font-size: 1em")
+                            ui.label(e.name).classes("text-sm")
+                    ui.button("キャッシュをクリア", icon="delete", on_click=on_clear).props('color=red flat dense').classes("q-mt-xs")
+
+    def on_clear():
+        model_cache.dispose_all()
+
+    client = ui.context.client
+    def on_change():
+        with client:
+            cache_card.refresh()
+
+    model_cache.add_change_listener(on_change)
+    client.on_disconnect(lambda: model_cache.remove_change_listener(on_change))
+
+    cache_card()
 
 
 @ui.page("/", title="dataset-ui")
@@ -136,21 +137,24 @@ def main_page():
 @ui.page("/music", title="dataset-ui-music")
 def main_page_music():
     header()
-    page_music(_worker)
+    page_music()
     footer()
+    model_cache_sticky()
 
 @ui.page("/voice", title="dataset-ui-voice")
 def main_page_voice():
     header()
-    page_voice(_worker)
+    page_voice()
     footer()
+    model_cache_sticky()
 
 
 @ui.page("/test", title="dataset-ui")
 def test_page():
     header()
-    page_testpage(_worker)
+    page_testpage()
     footer()
+    model_cache_sticky()
 
 
 def make_startup_message(host: str, port: int):
