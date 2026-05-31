@@ -95,8 +95,8 @@ class CpuTaskDialog(ui.dialog):
 
         # Manager は spawn コンテキストで Queue/Event を共有するために必要
         self._manager = multiprocessing.Manager()
-        self._queue = self._manager.Queue()
-        self._stop_event = self._manager.Event()
+        self._queue = self._manager.Queue() # type: ignore
+        self._stop_event = self._manager.Event() # type: ignore
 
         self._executor = ProcessPoolExecutor(max_workers=1)
         loop = asyncio.get_event_loop()

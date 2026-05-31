@@ -1,26 +1,39 @@
-import sys
-from pathlib import Path
+import time
 from nicegui import ui
 
 from testpage.testpage_ctx import TestCtx
-from common.xterm_dialog import XtermDialog
+from common.cpu_task_dialog import CpuTaskDialog
+
+
+def _dummy_task(_, queue, stop_event):
+    """10秒かかるダミータスク"""
+    total = 10
+    queue.put({"type": "progress", "value": 0, "max": total})
+    for i in range(total):
+        if stop_event.is_set():
+            return None
+        time.sleep(1)
+        queue.put({"type": "log", "text": f"ステップ {i + 1}/{total} 完了"})
+        queue.put({"type": "progress", "value": i + 1})
+    return {"done": True}
 
 
 def tab_main(ctx: TestCtx):
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # XtermDialog テスト
+    # CpuTaskDialog テスト
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    def open_xterm():
-        script = str(Path(__file__).parent / "cli_task_xtermtest.py")
-        dlg = XtermDialog(
-            args=[sys.executable, script],
-            title="XtermDialog テスト",
+    def open_task():
+        dlg = CpuTaskDialog(
+            fn=_dummy_task,
+            data=None,
+            title="CpuTaskDialog テスト（10秒処理）",
+            finish_callback=lambda ok, result: ui.notify(f"完了: {result}" if ok else "キャンセル"),
         )
         dlg.open()
 
-    ui.button("XtermDialog テスト", on_click=open_xterm)
+    ui.button("CpuTaskDialog テスト", on_click=open_task)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧
