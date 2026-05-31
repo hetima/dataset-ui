@@ -7,7 +7,7 @@ from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
-from common.cpu_task_dialog import CpuTaskDialog
+from common.thread_task_dialog import ThreadTaskDialog
 from music.music_app_ctx import MusicCtx
 from roformer.roformer import list_roformer_models
 from roformer.task_infer import infer_roformer
@@ -327,7 +327,7 @@ def tab_main(ctx: MusicCtx):
                 "files": paths,
                 "output_dir": str(cnfg.outputs_dir) if dest == "output_dir" else "",
             }
-            CpuTaskDialog(
+            ThreadTaskDialog(
                 fn=infer_roformer,
                 data=data,
                 title=f"分離: {model.get('name', '')}",
