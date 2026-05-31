@@ -22,6 +22,7 @@ class MusicFile:
     ttml: Optional[str] = None
     default: Optional["MusicFile"] = None
     is_expandable: bool = False
+    children: Optional[list["MusicFile"]] = None
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -79,6 +80,13 @@ class MusicFile:
             album_artist=data.get("ttml", ""),
             ttml=data.get("ttml", ""),
         )
+
+    def add_child(self, child: "MusicFile") -> None:
+        """子要素を追加する"""
+        if self.children is None:
+            self.children = []
+        self.children.append(child)
+        self.is_expandable = True
 
     def save_to_json(self) -> None:
         """音声ファイルと同名の .json にメタデータを書き出す（存在すれば上書き）"""

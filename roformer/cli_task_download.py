@@ -1,21 +1,38 @@
 import json
 import os
 import sys
+import time
 from pathlib import Path
-os.environ["PYTHONUNBUFFERED"] = "1"
-sys.stderr.isatty = lambda: True
-sys.stdout.isatty = lambda: True
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+# os.environ["PYTHONUNBUFFERED"] = "1"
+# sys.stderr.isatty = lambda: True
+# sys.stdout.isatty = lambda: True
+# os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
+
+try:
+    from huggingface_hub import hf_hub_download
+except ImportError:
+    raise ImportError(
+        "huggingface_hub is required for download. "
+        "Install with:  pip install huggingface_hub"
+    )
+
+
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
+def do_download(repo_id, filename, local_dir):
+    hf_hub_download(
+        repo_id=repo_id, filename=filename, local_dir=local_dir
+    )
+
 
 def download_hf_model(repo_id: str, filename: str, yamlname: str, output_dir: str):
     """Download a model from HuggingFace into ComfyUI's diffusion_models folder."""
-    try:
-        from huggingface_hub import hf_hub_download
-    except ImportError:
-        raise ImportError(
-            "huggingface_hub is required for download. "
-            "Install with:  pip install huggingface_hub"
-        )
+
     if filename.startswith("resolve/main/"):
         filename = filename[len("resolve/main/"):]
     if filename.startswith("blob/main/"):
@@ -33,14 +50,18 @@ def download_hf_model(repo_id: str, filename: str, yamlname: str, output_dir: st
         )
     else:
         print(f"Downloading {filename} from {repo_id} ...", flush=True)
-        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
+        do_download(
+            repo_id=repo_id, filename=filename, local_dir=repo_dir
+        )
         print(f"{Path(filename).name} ダウンロード完了", flush=True)
         if yamlname:
             print(f"Downloading {yamlname} ...", flush=True)
-            hf_hub_download(repo_id=repo_id, filename=yamlname, local_dir=repo_dir)
+            do_download(
+                repo_id=repo_id, filename=yamlname, local_dir=repo_dir
+            )
             print(f"{Path(yamlname).name} ダウンロード完了", flush=True)
             # yaml をモデルファイルと同名にリネーム
-            yaml_src = Path(repo_dir) / Path(yamlname).name
+            yaml_src = Path(repo_dir) / yamlname
             yaml_dst = Path(save_path).with_suffix(".yaml")
             if yaml_src.exists() and yaml_src != yaml_dst:
                 yaml_src.rename(yaml_dst)

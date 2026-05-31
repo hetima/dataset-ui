@@ -117,6 +117,8 @@ def tab_setting(ctx: MusicCtx):
         .classes("rounded-borders brdr overflow-hidden w-full")
         .props('header-class="bg-grey-2 text-black"')
     ):
+        ui.label("手動でモデルを追加する場合は、「モデルフォルダ/roformer」フォルダに入れてください。サブフォルダにも対応してます。config.yaml がある場合はモデルと同じ名前にしてください。")
+        ui.label("ダウンロードがどうしても途中で止まる場合はwebブラウザとかで直接ダウンロードしてください。ごめんなさい。")
         with ui.row().classes("w-full gap-4 items-start"):
             # 左：インストール済みモデル
             with ui.column().classes("flex-1 gap-1"):

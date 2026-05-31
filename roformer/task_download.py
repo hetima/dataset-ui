@@ -56,7 +56,7 @@ def download_roformer_model(data: dict, queue: multiprocessing.queues.Queue, sto
             _log(queue, f"ダウンロード: {yamlname}")
             hf_hub_download(repo_id=repo_id, filename=yamlname, local_dir=repo_dir)
             _log(queue, f"{Path(yamlname).name} ダウンロード完了")
-            yaml_src = Path(repo_dir) / Path(yamlname).name
+            yaml_src = Path(repo_dir) / yamlname
             yaml_dst = Path(save_path).with_suffix(".yaml")
             if yaml_src.exists() and yaml_src != yaml_dst:
                 yaml_src.rename(yaml_dst)

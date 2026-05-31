@@ -30,6 +30,7 @@ class ThreadTaskDialog(ui.dialog):
         fn: Callable,
         data: Any = None,
         title: str = "",
+        part_callback: Callable[[Any], None] | None = None,
         finish_callback: Callable[[bool, Any], None] | None = None,
     ) -> None:
         super().__init__()
@@ -38,6 +39,7 @@ class ThreadTaskDialog(ui.dialog):
         self._data = data
         self.title = title
         self._finish_callback = finish_callback
+        self._part_callback = part_callback
 
         self._is_running = False
         self._cancel_requested = False
@@ -132,6 +134,8 @@ class ThreadTaskDialog(ui.dialog):
                     self._progress.props(f"max={msg['max']}")
                     self._progress.set_visibility(True)
                 self._progress.value = msg.get("value", 0)
+            elif t == "part" and self._part_callback:
+                self._part_callback(msg.get("data"))
 
     def _cleanup(self):
         self._is_running = False

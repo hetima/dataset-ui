@@ -60,10 +60,10 @@ class MusicCtx:
         rows = self.table.selected
         return rows
 
-    def music_file_for_path(self, path: str) -> dict | None:
+    def music_file_for_path(self, path: str) -> MusicFile | None:
         if not path:
             return None
-        return next((d for d in self.files if d["path"] == path), None)
+        return next((d for d in self.files if d.path == path), None)
 
     def analyzed(self, result_files: list) -> None:
         for music_file in self.files:
@@ -167,3 +167,16 @@ class MusicCtx:
             self.notify("データセットフォルダの登録を解除しました")
             return True
         return False
+
+    def add_dst_to_src(self, results: list|dict) -> None:
+        if isinstance(results, dict):
+            results = [results]
+        for result in results:
+            src = result.get("src", "")
+            dst_list = result.get("dst", [])
+            parent_file = self.music_file_for_path(src)
+            if parent_file:
+                for dst in dst_list:
+                    musicfile = MusicFile.from_audio_file(Path(dst))
+                    parent_file.add_child(musicfile)
+        self.table.update()

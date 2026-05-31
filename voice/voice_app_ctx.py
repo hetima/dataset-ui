@@ -155,6 +155,6 @@ class VoiceCtx:
             parent_file = self.voice_file_for_path(src)
             if parent_file:
                 for dst in dst_list:
-                    voicefile = VoiceFile.from_audio_file(dst)
+                    voicefile = VoiceFile.from_audio_file(Path(dst))
                     parent_file.add_child(voicefile)
         self.table.update()

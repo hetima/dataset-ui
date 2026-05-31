@@ -265,12 +265,43 @@ def tab_main(ctx: MusicCtx):
             with roformer_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     roformer_menu = ui.menu()
-                    
+
+            roformer_cache = ui.checkbox("モデルをキャッシュ", value=True).tooltip(
+                "効いてるのかどうかよく分かりません"
+            )
+            roformer_target_only = ui.checkbox("Vocalのみ出力", value=False).tooltip(
+                "ほとんどのモデルでVocalのみを書き出します。例外があるかもしれません"
+            )
+
+            ui.label("オーバーラップ: ")
+            roformer_overlap = (
+                ui.number(
+                    label="overlap",
+                    value=2,
+                    min=1,
+                    max=16,
+                    step=1,
+                )
+                .props('style="min-width: 80px" outlined')
+                .tooltip(
+                    "増やすと品質が上がりますが時間がかかります。チャンクを何分割ずつずらすかの分割数"
+                )
+            )
+
+            ui.label("チャンクサイズ(秒): ")
+            roformer_chunk_size = ui.number(
+                label="chunk size",
+                value=8,
+                min=2,
+                max=30,
+                step=1,
+            ).props('style="min-width: 80px" outlined').tooltip("一度に処理する秒数。大きいほど品質が上がりますがVRAMを多く使います")
+
             ui.label("ファイル名サフィックス: ")
             roformer_suffix_input = ui.input(
                 label="suffix",
-                value="_separated",
-            ).props('style="min-width: 150px" outlined')
+                value="",
+            ).props('style="min-width: 150px" outlined').tooltip("「ファイル名suffix_Vocals.flac」となります")
 
             ui.label("フォーマット: ")
             roformer_format = ui.toggle(
@@ -283,8 +314,9 @@ def tab_main(ctx: MusicCtx):
                 {"output_dir": "出力フォルダ", "same": "同じ場所"},
                 value="output_dir",
             )
-
-            roformer_cache = ui.checkbox("モデルをキャッシュ", value=True)
+            roformer_subfolder = ui.checkbox(
+                "サブフォルダに書き出し", value=False
+            ).tooltip("ファイル名のサブフォルダを作りその中に書き出します")
 
             ui.button("開始", on_click=lambda: roformer_start(
                 selected_roformer_model,
@@ -292,6 +324,10 @@ def tab_main(ctx: MusicCtx):
                 roformer_format.value,
                 roformer_dest.value,
                 roformer_cache.value or False,
+                int(roformer_overlap.value or 2),
+                roformer_target_only.value or False,
+                roformer_subfolder.value or False,
+                float(roformer_chunk_size.value or 8),
             ))
 
         def select_roformer_model(m: dict):
@@ -309,7 +345,7 @@ def tab_main(ctx: MusicCtx):
                 ui.separator()
                 ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
 
-        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool) -> None:
+        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0) -> None:
             if not model:
                 ui.notify("モデルを選択してください")
                 return
@@ -324,6 +360,10 @@ def tab_main(ctx: MusicCtx):
                 "fmt": fmt,
                 "dest": dest,
                 "cache": cache,
+                "overlap": overlap,
+                "chunk_size": chunk_size,
+                "target_only": target_only,
+                "subfolder": subfolder,
                 "files": paths,
                 "output_dir": str(cnfg.outputs_dir) if dest == "output_dir" else "",
             }
@@ -331,6 +371,7 @@ def tab_main(ctx: MusicCtx):
                 fn=infer_roformer,
                 data=data,
                 title=f"分離: {model.get('name', '')}",
+                part_callback=lambda d: ctx.add_dst_to_src(d),
             ).open()
 
         reload_roformer_models()
