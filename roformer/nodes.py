@@ -186,12 +186,7 @@ def _save_ckpt_ack():
         f.write("acknowledged")
 
 
-# Basenames of every file managed by the registry.
-# Used to suppress local duplicates: if a model was downloaded via [HF],
-# its bare filename is hidden from the local list so it only appears once.
-_REGISTRY_FILENAMES = frozenset(
-    os.path.basename(filename) for _, filename in MODEL_REGISTRY.values()
-)
+
 
 
 _MODEL_EXTENSIONS = {".ckpt", ".safetensors", ".pt", ".pth"}
@@ -211,8 +206,6 @@ def _manual_local_choices():
         if base.startswith("."):
             continue
         if os.path.splitext(base)[1].lower() not in _MODEL_EXTENSIONS:
-            continue
-        if base in _REGISTRY_FILENAMES:
             continue
         result.append(f)
     return result

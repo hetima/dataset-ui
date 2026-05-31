@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from nicegui import binding, ui
 from common.setting import cnfg
@@ -165,14 +164,9 @@ def tab_setting(ctx: MusicCtx):
             installed_col.clear()
             with installed_col:
                 for m in list_roformer_models():
-                    meta_path = Path(m["path"]).with_suffix(".meta.json")
-                    if meta_path.exists():
-                        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                        label = meta.get("display_name", m["name"])
-                    else:
-                        label = m["name"]
                     with ui.row().classes("items-center gap-2 q-px-sm padd4 w-full"):
-                        ui.label(label).classes("flex-1 text-sm")
+                        ui.label(m["name"]).classes("flex-1 text-sm")
+                        ui.label(m.get("size", "")).classes("text-xs infotxt")
                         ui.button("削除", on_click=lambda _, m=m: delete_model(m)).props(
                             "flat dense color=negative size=sm"
                         )

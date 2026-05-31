@@ -7,7 +7,10 @@ from nicegui import ui
 from common.folder_picker import FolderPicker
 from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
+from common.cpu_task_dialog import CpuTaskDialog
 from music.music_app_ctx import MusicCtx
+from roformer.roformer import list_roformer_models
+from roformer.task_infer import infer_roformer
 from common.wavesurfer import simple_player
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -244,6 +247,94 @@ def tab_main(ctx: MusicCtx):
             ui.space()
             capt = ui.input(placeholder="captionを入力", label="caption").classes('w-100').props("outlined")
             ui.button("captionを設定", on_click=lambda e: ctx.set_caption(cast(str, capt.value)))
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Roformer
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("分離", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label("処理対象ファイルを Roformer で分離処理します")
+        selected_roformer_model: dict = {}
+
+        with ui.row().classes("items-center gap-4"):
+            roformer_model_input = ui.input(
+                label="roformer model",
+                placeholder="モデルを選択",
+            ).props('style="min-width: 380px" outlined')
+            with roformer_model_input.add_slot('append'):
+                with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
+                    roformer_menu = ui.menu()
+                    
+            ui.label("ファイル名サフィックス: ")
+            roformer_suffix_input = ui.input(
+                label="suffix",
+                value="_separated",
+            ).props('style="min-width: 150px" outlined')
+
+            ui.label("フォーマット: ")
+            roformer_format = ui.toggle(
+                {".wav": ".wav", ".flac": ".flac"},
+                value=".wav",
+            )
+
+            ui.label("出力先: ")
+            roformer_dest = ui.toggle(
+                {"output_dir": "出力フォルダ", "same": "同じ場所"},
+                value="output_dir",
+            )
+
+            roformer_cache = ui.checkbox("モデルをキャッシュ", value=True)
+
+            ui.button("開始", on_click=lambda: roformer_start(
+                selected_roformer_model,
+                roformer_suffix_input.value or "",
+                roformer_format.value,
+                roformer_dest.value,
+                roformer_cache.value or False,
+            ))
+
+        def select_roformer_model(m: dict):
+            selected_roformer_model.clear()
+            selected_roformer_model.update(m)
+            roformer_model_input.value = m["name"]
+
+        def reload_roformer_models():
+            models = list_roformer_models()
+            roformer_menu.clear()
+            with roformer_menu:
+                for m in models:
+                    label = m["name"] + (f"  {m['size']}" if m.get("size") else "")
+                    ui.menu_item(label, lambda _, m=m: select_roformer_model(m)).classes("padd8")
+                ui.separator()
+                ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
+
+        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool) -> None:
+            if not model:
+                ui.notify("モデルを選択してください")
+                return
+            files = ctx.target_files()
+            paths = [f["path"] for f in files]  # type: ignore
+            if not paths:
+                ui.notify("処理対象がありません")
+                return
+            data = {
+                "model": model,
+                "suffix": suffix,
+                "fmt": fmt,
+                "dest": dest,
+                "cache": cache,
+                "files": paths,
+                "output_dir": str(cnfg.outputs_dir) if dest == "output_dir" else "",
+            }
+            CpuTaskDialog(
+                fn=infer_roformer,
+                data=data,
+                title=f"分離: {model.get('name', '')}",
+            ).open()
+
+        reload_roformer_models()
+        ctx.model_refresh_func.append(reload_roformer_models)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧

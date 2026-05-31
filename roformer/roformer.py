@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 from common.setting import cnfg
 from roformer.constant import KNOWN_MODELS
@@ -15,9 +16,20 @@ def list_roformer_models() -> list[dict]:
         if path.suffix not in (".ckpt", ".safetensors"):
             continue
         config = path.with_suffix(".yaml")
+        name = path.stem
+        size = ""
+        meta_path = path.with_suffix(".meta.json")
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                name = meta.get("display_name", name)
+                size = meta.get("size", size)
+            except Exception:
+                pass
         models.append({
-            "name": path.stem,
+            "name": name,
             "path": str(path),
+            "size": size,
             "relative_path": str(path.relative_to(roformer_dir)),
             "config": str(config) if config.exists() else None,
         })
