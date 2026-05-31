@@ -1,4 +1,4 @@
-"""ThreadTaskDialog 用 Roformer 推論タスク。"""
+"""ThreadTaskDialog 用 Roformer 推論タスク。q=None のときはスタンドアロン CLI モードで動作する。"""
 import queue
 import threading
 from pathlib import Path
@@ -345,11 +345,14 @@ def _unique_output_path(out_dir: str, stem_base: str, fmt: str) -> Path:
 # ---------------------------------------------------------------------------
 # Worker
 # ---------------------------------------------------------------------------
-def _log(q: queue.Queue, text: str) -> None:  # type: ignore[type-arg]
-    q.put({"type": "log", "text": text})
+def _log(q: queue.Queue | None, text: str) -> None:  # type: ignore[type-arg]
+    if q is None:
+        print(text)
+    else:
+        q.put({"type": "log", "text": text})
 
 
-def infer_roformer(data: dict, q: queue.Queue, stop_event: threading.Event) -> dict | None:  # type: ignore[type-arg]
+def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threading.Event | None = None) -> dict | None:  # type: ignore[type-arg]
     """
     data keys:
       model     : dict  (list_roformer_models の1エントリ)
@@ -404,10 +407,16 @@ def infer_roformer(data: dict, q: queue.Queue, stop_event: threading.Event) -> d
             )
 
     sr_target = 44100
-    q.put({"type": "progress", "value": 0, "max": len(files)})
+    if q is not None:
+        q.put({"type": "progress", "value": 0, "max": len(files)})
 
-    for i, file_path in enumerate(files):
-        if stop_event.is_set():
+    file_iter = files
+    if q is None:
+        from tqdm import tqdm
+        file_iter = tqdm(files, desc="ファイル処理", unit="file")
+
+    for i, file_path in enumerate(file_iter):
+        if stop_event is not None and stop_event.is_set():
             return None
 
         _log(q, f"処理中 [{i+1}/{len(files)}]: {Path(file_path).name}")
@@ -430,8 +439,21 @@ def infer_roformer(data: dict, q: queue.Queue, stop_event: threading.Event) -> d
             audio_tensor = TAF.resample(audio_tensor, orig_freq=sr, new_freq=sr_target) # type: ignore
 
         # 推論
-        def on_progress(step: int, total: int) -> None:
-            _log(q, f"  チャンク {step}/{total}")
+        if q is not None:
+            def on_progress(step: int, total: int) -> None:
+                _log(q, f"  チャンク {step}/{total}")
+        else:
+            from tqdm import tqdm as _tqdm
+            _chunk_bar: Any = None
+            def on_progress(step: int, total: int) -> None:
+                nonlocal _chunk_bar
+                if _chunk_bar is None:
+                    _chunk_bar = _tqdm(total=total, desc="  チャンク", unit="chunk", leave=False)
+                _chunk_bar.n = step
+                _chunk_bar.refresh()
+                if step >= total and _chunk_bar is not None:
+                    _chunk_bar.close()
+                    _chunk_bar = None
 
         try:
             stems = _run_inference(model, audio_tensor, chunk_size=float(data.get("chunk_size", 8.0)), overlap=data.get("overlap", 2), progress_callback=on_progress, stop_event=stop_event)
@@ -457,7 +479,7 @@ def infer_roformer(data: dict, q: queue.Queue, stop_event: threading.Event) -> d
         for stem_idx, stem in enumerate(stems):
             if target_only and stem_idx > 0:
                 continue
-            if stop_event.is_set():
+            if stop_event is not None and stop_event.is_set():
                 return None
             stem_label = stem_labels[stem_idx] if stem_idx < len(stem_labels) else f"_stem{stem_idx + 1}"
             out_path = _unique_output_path(out_dir, stem_base + stem_label, fmt)
@@ -466,8 +488,9 @@ def infer_roformer(data: dict, q: queue.Queue, stop_event: threading.Event) -> d
             dst_paths.append(str(out_path))
             _log(q, f"  → {out_path.name}")
 
-        q.put({"type": "part", "data": {"src": file_path, "dst": dst_paths}})
-        q.put({"type": "progress", "value": i + 1})
+        if q is not None:
+            q.put({"type": "part", "data": {"src": file_path, "dst": dst_paths}})
+            q.put({"type": "progress", "value": i + 1})
 
     return {"processed": len(files)}
 
