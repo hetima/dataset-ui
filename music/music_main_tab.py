@@ -251,7 +251,7 @@ def tab_main(ctx: MusicCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # Roformer
     # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion("分離", value=False).classes(
+    with ui.expansion("オーディオ分離", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを Roformer で分離処理します")

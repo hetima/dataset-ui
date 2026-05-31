@@ -4,22 +4,38 @@ import multiprocessing
 import multiprocessing.queues
 import os
 from pathlib import Path
-
-
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+)
 def _log(queue: multiprocessing.queues.Queue, text: str):  # type: ignore[type-arg]
     queue.put({"type": "log", "text": text})
 
+try:
+    from huggingface_hub import hf_hub_download, download_bucket_files
+except ImportError:
+    print("[エラー] huggingface_hub が見つかりません。pip install huggingface_hub")
+
+
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
+def do_download(repo_id, filename, local_dir):
+    # もしrepo_idがbuckets/で始まっていたらbuckets/を取り除きdownload_bucket_filesを実行
+    # そうでないならhf_hub_downloadを実行
+    if repo_id.startswith("buckets/"):
+        bucket_name = repo_id[len("buckets/"):]
+        local_file_path = str(Path(local_dir) / filename)
+        download_bucket_files(bucket_name, files=[(filename, local_file_path)])
+    else:
+        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=local_dir)
+    # or
+    download_bucket_files("username/my-bucket", files=[],)
 
 def download_roformer_model(data: dict, queue: multiprocessing.queues.Queue, stop_event) -> dict | None:  # type: ignore[type-arg]
     """
     data keys: repo_id, filename, yamlname, output_dir, convert, metadata
     親プロセスのターミナルに tqdm が直接出力される。
     """
-    try:
-        from huggingface_hub import hf_hub_download
-    except ImportError:
-        _log(queue, "[エラー] huggingface_hub が見つかりません。pip install huggingface_hub")
-        return None
     _log(queue, "ダウンロード進捗は本物のターミナルの方に表示されます")
 
     repo_id: str = data["repo_id"]
@@ -46,7 +62,7 @@ def download_roformer_model(data: dict, queue: multiprocessing.queues.Queue, sto
         _log(queue, f"既に存在します: {safetensors_path}")
     else:
         _log(queue, f"ダウンロード: {filename} from {repo_id}")
-        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
+        do_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
         _log(queue, f"{Path(filename).name} ダウンロード完了")
 
         if stop_event.is_set():
@@ -54,7 +70,7 @@ def download_roformer_model(data: dict, queue: multiprocessing.queues.Queue, sto
 
         if yamlname:
             _log(queue, f"ダウンロード: {yamlname}")
-            hf_hub_download(repo_id=repo_id, filename=yamlname, local_dir=repo_dir)
+            do_download(repo_id=repo_id, filename=yamlname, local_dir=repo_dir)
             _log(queue, f"{Path(yamlname).name} ダウンロード完了")
             yaml_src = Path(repo_dir) / yamlname
             yaml_dst = Path(save_path).with_suffix(".yaml")

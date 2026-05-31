@@ -8,7 +8,7 @@
 KNOWN_MODELS = [
     # ── Vocals ──────────────────────────────────────────────────────���───────
     {
-        "display_name": "Vocals · Kim fp16 ⭐ [Kijai]",
+        "display_name": "Vocals - Kim fp16 ⭐ [Kijai]",
         "repo_id": "Kijai/MelBandRoFormer_comfy",
         "filename": "MelBandRoformer_fp16.safetensors",
         "type": "vocals",
@@ -16,7 +16,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals · Kim fp32 [Kijai]",
+        "display_name": "Vocals - Kim fp32 [Kijai]",
         "repo_id": "Kijai/MelBandRoFormer_comfy",
         "filename": "MelBandRoformer_fp32.safetensors",
         "type": "vocals",
@@ -24,7 +24,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "Vocals · Kim original [KimberleyJSN]",
+        "display_name": "Vocals - Kim original [KimberleyJSN]",
         "repo_id": "KimberleyJSN/melbandroformer",
         "filename": "MelBandRoformer.ckpt",
         "type": "vocals",
@@ -32,7 +32,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "Vocals · Kim FT v2 ⭐ [pcunwa]",
+        "display_name": "Vocals - Kim FT v2 ⭐ [pcunwa]",
         "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
         "filename": "kimmel_unwa_ft2.ckpt",
         "config": "config_kimmel_unwa_ft.yaml",
@@ -41,7 +41,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals · Kim FT v2 bleedless [pcunwa]",
+        "display_name": "Vocals - Kim FT v2 bleedless [pcunwa]",
         "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
         "filename": "kimmel_unwa_ft2_bleedless.ckpt",
         "config": "config_kimmel_unwa_ft.yaml",
@@ -50,7 +50,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals · Kim FT v1 [pcunwa]",
+        "display_name": "Vocals - Kim FT v1 [pcunwa]",
         "repo_id": "pcunwa/Kim-Mel-Band-Roformer-FT",
         "filename": "kimmel_unwa_ft.ckpt",
         "config": "config_kimmel_unwa_ft.yaml",
@@ -59,7 +59,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "Vocals · becruily",
+        "display_name": "Vocals - becruily",
         "repo_id": "becruily/mel-band-roformer-vocals",
         "filename": "mel_band_roformer_vocals_becruily.ckpt",
         "config": "config_vocals_becruily.yaml",
@@ -68,7 +68,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals · GaboxR67 fv7",
+        "display_name": "Vocals - GaboxR67 fv7",
         "repo_id": "GaboxR67/MelBandRoformers",
         "filename": "melbandroformers/vocals/voc_fv7.ckpt",
         "config": "melbandroformers/vocals/v7.yaml",
@@ -77,7 +77,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals small · pcunwa",
+        "display_name": "Vocals small - pcunwa",
         "repo_id": "pcunwa/Mel-Band-Roformer-small",
         "filename": "melband_roformer_small_v1.ckpt",
         "config": "config_melbandroformer_small.yaml",
@@ -87,7 +87,7 @@ KNOWN_MODELS = [
     },
     # ── Instrumental ────────────────────────────────────────────────────────
     {
-        "display_name": "Instrumental · becruily",
+        "display_name": "Instrumental - becruily",
         "repo_id": "becruily/mel-band-roformer-instrumental",
         "filename": "mel_band_roformer_instrumental_becruily.ckpt",
         "config": "config_instrumental_becruily.yaml",
@@ -96,7 +96,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Instrumental v2 (depth-12) · pcunwa ⭐",
+        "display_name": "Instrumental v2 (depth-12) - pcunwa ⭐",
         "repo_id": "pcunwa/Mel-Band-Roformer-Inst",
         "filename": "melband_roformer_inst_v2.ckpt",
         "config": "config_melbandroformer_inst_v2.yaml",
@@ -105,7 +105,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Instrumental v1 · pcunwa",
+        "display_name": "Instrumental v1 - pcunwa",
         "repo_id": "pcunwa/Mel-Band-Roformer-Inst",
         "filename": "melband_roformer_inst_v1.ckpt",
         "config": "config_melbandroformer_inst.yaml",
@@ -114,7 +114,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "Instrumental · GaboxR67 Fv9",
+        "display_name": "Instrumental - GaboxR67 Fv9",
         "repo_id": "GaboxR67/MelBandRoformers",
         "filename": "melbandroformers/instrumental/Inst_GaboxFv9.ckpt",
         "config": "melbandroformers/instrumental/inst_gabox.yaml",
@@ -124,7 +124,7 @@ KNOWN_MODELS = [
     },
     # ── Big models (dim=512) ─────────────────────────────────────────────────
     {
-        "display_name": "Vocals big beta6 (dim=512) · pcunwa ⭐",
+        "display_name": "Vocals big beta6 (dim=512) - pcunwa ⭐",
         "repo_id": "pcunwa/Mel-Band-Roformer-big",
         "filename": "big_beta6.ckpt",
         "config": "big_beta6.yaml",
@@ -133,7 +133,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Vocals big beta6x (dim=512) · pcunwa",
+        "display_name": "Vocals big beta6x (dim=512) - pcunwa",
         "repo_id": "pcunwa/Mel-Band-Roformer-big",
         "filename": "big_beta6x.ckpt",
         "config": "big_beta6x.yaml",
@@ -142,7 +142,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "Vocals big beta7 · pcunwa",
+        "display_name": "Vocals big beta7 - pcunwa",
         "repo_id": "pcunwa/Mel-Band-Roformer-big",
         "filename": "big_beta7.ckpt",
         "config": "big_beta7.yaml",
@@ -152,7 +152,7 @@ KNOWN_MODELS = [
     },
     # ── Karaoke ────────────────────────────────────────
     {
-        "display_name": "Karaoke · aufr33/viperx ⭐",
+        "display_name": "Karaoke - aufr33/viperx ⭐",
         "repo_id": "jarredou/aufr33-viperx-karaoke-melroformer-model",
         "filename": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
         "config": "config_mel_band_roformer_karaoke.yaml",
@@ -161,7 +161,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Karaoke · becruily (2-stem)",
+        "display_name": "Karaoke - becruily (2-stem)",
         "repo_id": "becruily/mel-band-roformer-karaoke",
         "filename": "mel_band_roformer_karaoke_becruily.ckpt",
         "config": "config_karaoke_becruily.yaml",
@@ -170,7 +170,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Karaoke · GaboxR67 V1",
+        "display_name": "Karaoke - GaboxR67 V1",
         "repo_id": "GaboxR67/MelBandRoformers",
         "filename": "melbandroformers/karaoke/Karaoke_GaboxV1.ckpt",
         "config": "melbandroformers/karaoke/karaokegabox_1750911344.yaml",
@@ -179,7 +179,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Karaoke · GaboxR67 V1 Small",
+        "display_name": "Karaoke - GaboxR67 V1 Small",
         "repo_id": "GaboxR67/MelBandRoformers",
         "filename": "melbandroformers/karaoke/small_karaoke_gaboxaufr.ckpt",
         "config": "melbandroformers/karaoke/config_karaoke_small.yaml",
@@ -189,7 +189,7 @@ KNOWN_MODELS = [
     },
     # ── Vocals + Inst 2-stem ────────────────────────────────────────
     {
-        "display_name": "Vocals+Instrumental 2-stem · becruily",
+        "display_name": "Vocals+Instrumental 2-stem - becruily",
         "repo_id": "becruily/mel-band-roformer-deux",
         "filename": "becruily_deux.ckpt",
         "config": "config_deux_becruily.yaml",
@@ -197,19 +197,9 @@ KNOWN_MODELS = [
         "type": "vocals_inst",
         "recommend": True,
     },
-    # ── 4-stem ─────────────────────────────────
-    {
-        "display_name": "4-stem large · Aname-Tommy [stem_1=vox only]",
-        "repo_id": "Aname-Tommy/melbandroformer4stems",
-        "filename": "mel_band_roformer_4stems_large_ver1.ckpt",
-        "config": "config_large.yaml",
-        "size": "3.76GB",
-        "type": "multi_stem",
-        "recommend": True,
-    },
     # ── Dereverb ─────────────────────────────────────────────
     {
-        "display_name": "Dereverb · anvuew ⭐ (SDR 19.17)",
+        "display_name": "Dereverb - anvuew ⭐ (SDR 19.17)",
         "repo_id": "anvuew/dereverb_mel_band_roformer",
         "filename": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
         "config": "dereverb_mel_band_roformer_anvuew.yaml",
@@ -218,7 +208,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Dereverb less-aggressive · anvuew (SDR 18.80)",
+        "display_name": "Dereverb less-aggressive - anvuew (SDR 18.80)",
         "repo_id": "anvuew/dereverb_mel_band_roformer",
         "filename": "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt",
         "config": "dereverb_mel_band_roformer_anvuew.yaml",
@@ -227,7 +217,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Dereverb mono-optimized · anvuew (SDR 20.40)",
+        "display_name": "Dereverb mono-optimized - anvuew (SDR 20.40)",
         "repo_id": "anvuew/dereverb_mel_band_roformer",
         "filename": "dereverb_mel_band_roformer_mono_anvuew_sdr_20.4029.ckpt",
         "config": "dereverb_mel_band_roformer_anvuew.yaml",
@@ -237,7 +227,7 @@ KNOWN_MODELS = [
     },
     # ── Denoise ─────────────────────────────────────────────────────────────
     {
-        "display_name": "Denoise · aufr33 ⭐",
+        "display_name": "Denoise - aufr33 ⭐",
         "repo_id": "poiqazwsx/melband-roformer-denoise",
         "filename": "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
         "config": "model_mel_band_roformer_denoise.yaml",
@@ -246,7 +236,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Denoise aggressive · aufr33",
+        "display_name": "Denoise aggressive - aufr33",
         "repo_id": "poiqazwsx/melband-roformer-denoise",
         "filename": "denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768.ckpt",
         "config": "model_mel_band_roformer_denoise.yaml",
@@ -256,7 +246,7 @@ KNOWN_MODELS = [
     },
     # ── Aspiration (breath/mouth sounds) ────────────────────────────────────
     {
-        "display_name": "Aspiration · Sucial ⭐",
+        "display_name": "Aspiration - Sucial ⭐",
         "repo_id": "Sucial/Aspiration_Mel_Band_Roformer",
         "filename": "aspiration_mel_band_roformer_sdr_18.9845.ckpt",
         "config": "config_aspiration_mel_band_roformer.yaml",
@@ -265,7 +255,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "Aspiration less-aggressive · Sucial",
+        "display_name": "Aspiration less-aggressive - Sucial",
         "repo_id": "Sucial/Aspiration_Mel_Band_Roformer",
         "filename": "aspiration_mel_band_roformer_less_aggr_sdr_18.1201.ckpt",
         "config": "config_aspiration_mel_band_roformer.yaml",
@@ -275,7 +265,7 @@ KNOWN_MODELS = [
     },
     # ── BS-RoFormer: Vocals ─────────────────────────────────────────────────
     {
-        "display_name": "[BS] Vocals revive v3e ⭐ · pcunwa",
+        "display_name": "[BS] Vocals revive v3e ⭐ - pcunwa",
         "repo_id": "pcunwa/BS-Roformer-Revive",
         "filename": "bs_roformer_revive3e.ckpt",
         "config": "config.yaml",
@@ -284,7 +274,7 @@ KNOWN_MODELS = [
         "recommend": True,
     },
     {
-        "display_name": "[BS] Vocals revive v2 · pcunwa",
+        "display_name": "[BS] Vocals revive v2 - pcunwa",
         "repo_id": "pcunwa/BS-Roformer-Revive",
         "filename": "bs_roformer_revive2.ckpt",
         "config": "config.yaml",
@@ -292,14 +282,41 @@ KNOWN_MODELS = [
         "type": "vocals",
         "recommend": False,
     },
+    {
+        "display_name": "[BS] Vocals - Gabox",
+        "repo_id": "buckets/hrktxz/MelBand_BS_Roformers-bucket",
+        "filename": "BS_Vocals_by_Gabox.ckpt",
+        "config": "BS_Vocals_by_Gabox.yaml",
+        "size": "639MB",
+        "type": "vocals",
+        "recommend": False,
+    },
     # ── BS-RoFormer: Dereverb ────────────────────────────────────────────────
     {
-        "display_name": "[BS] Dereverb · anvuew ⭐ (SDR 22.51)",
+        "display_name": "[BS] Dereverb - anvuew ⭐ (SDR 22.51)",
         "repo_id": "anvuew/deverb_bs_roformer",
         "filename": "dereverb_bs_roformer_anvuew_sdr_22.5050.ckpt",
         "config": "config.yaml",
         "size": "204MB",
         "type": "dereverb",
         "recommend": True,
+    },
+    {
+        "display_name": "[BS] SW 6-stem - jarredou⭐",
+        "repo_id": "jarredou/BS-ROFO-SW-Fixed",
+        "filename": "BS-Rofo-SW-Fixed.ckpt",
+        "config": "BS-Rofo-SW-Fixed.yaml",
+        "size": "699MB",
+        "type": "multi_stem",
+        "recommend": False,
+    },
+    {
+        "display_name": "[BS] Chorus Male-Female - Sucial",
+        "repo_id": "buckets/hrktxz/MelBand_BS_Roformers-bucket",
+        "filename": "BS_Chorus_Male-Female_Sucial.ckpt",
+        "config": "BS_Chorus_Male-Female_Sucial.yaml",
+        "size": "527MB",
+        "type": "",
+        "recommend": False,
     },
 ]

@@ -33,7 +33,7 @@ def list_roformer_models() -> list[dict]:
             "relative_path": str(path.relative_to(roformer_dir)),
             "config": str(config) if config.exists() else None,
         })
-    return models
+    return sorted(models, key=lambda m: m["name"].lower())
 
 
 def list_known_models() -> list[dict]:
