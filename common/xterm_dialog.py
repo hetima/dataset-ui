@@ -194,7 +194,10 @@ class XtermDialog(ui.dialog):
     def _safe_close(self):
         if self._finish_callback:
             self._finish_callback(self._success)
-        self.delete()
+        try:
+            self.delete()
+        except ValueError:
+            pass
 
     def _stop_command(self):
         if self._process and self._is_running:

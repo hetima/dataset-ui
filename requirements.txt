@@ -6,6 +6,7 @@ tenacity
 transformers>=5.4
 accelerate
 bitsandbytes
+send2trash
 # torchcodec #==0.10.0
 
 # roforner

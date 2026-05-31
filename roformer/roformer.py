@@ -32,6 +32,7 @@ def list_known_models() -> list[dict]:
         folder = entry["repo_id"].replace("/", "--")
         model_path = roformer_dir / folder / Path(entry["filename"])
         item = copy.copy(entry)
-        item["exists"] = model_path.exists()
+        alt_path = model_path.with_suffix(".safetensors")
+        item["exists"] = model_path.exists() or alt_path.exists()
         result.append(item)
     return result

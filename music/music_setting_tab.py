@@ -1,7 +1,12 @@
+import json
 from pathlib import Path
 from nicegui import binding, ui
 from common.setting import cnfg
+from common.cpu_task_dialog import CpuTaskDialog
+from common.message_dialog import show_confirm_dialog
 from music.music_app_ctx import MusicCtx
+from roformer.roformer import list_roformer_models, list_known_models
+from roformer.task_download import download_roformer_model
 
 def tab_setting(ctx: MusicCtx):
 
@@ -104,3 +109,82 @@ def tab_setting(ctx: MusicCtx):
 
         update_dataset_dirs()
         ctx.dataset_dirs_refresh_func.append(update_dataset_dirs)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # roformer モデル管理
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with (
+        ui.expansion("roformer モデル管理", value=True)
+        .classes("rounded-borders brdr overflow-hidden w-full")
+        .props('header-class="bg-grey-2 text-black"')
+    ):
+        with ui.row().classes("w-full gap-4 items-start"):
+            # 左：インストール済みモデル
+            with ui.column().classes("flex-1 gap-1"):
+                ui.label("インストール済みモデル").classes("font-bold")
+                with ui.scroll_area().classes("brdr").style("height: 300px; width: 100%"):
+                    installed_col = ui.column().classes("w-full gap-0")
+
+            # 右：既知モデル一覧
+            with ui.column().classes("flex-1 gap-1"):
+                ui.label("既知モデル一覧").classes("font-bold")
+                with ui.scroll_area().classes("brdr").style("height: 300px; width: 100%"):
+                    known_col = ui.column().classes("w-full gap-0")
+
+        def download_model(m: dict):
+            data = {
+                "repo_id": m["repo_id"],
+                "filename": m["filename"],
+                "yamlname": m.get("config", ""),
+                "output_dir": str(Path(cnfg.models_dir) / "roformer"),
+                "convert": False,
+                "metadata": m,
+            }
+            CpuTaskDialog(
+                fn=download_roformer_model,
+                data=data,
+                title=f"ダウンロード: {m['display_name']}",
+                finish_callback=lambda ok, _: refresh_roformer() if ok else None,
+            ).open()
+
+        async def delete_model(m: dict):
+            path = Path(m["path"])
+            if not await show_confirm_dialog(f"削除しますか？（ゴミ箱に移動します）\n\n{path.name}"):
+                return
+            try:
+                from send2trash import send2trash
+            except ImportError:
+                ui.notify("send2trash pipライブラリが見つかりません", type="negative")
+                return
+            for p in [path, path.with_suffix(".yaml"), path.with_suffix(".meta.json")]:
+                if p.exists():
+                    send2trash(str(p))
+            refresh_roformer()
+
+        def refresh_roformer():
+            installed_col.clear()
+            with installed_col:
+                for m in list_roformer_models():
+                    meta_path = Path(m["path"]).with_suffix(".meta.json")
+                    if meta_path.exists():
+                        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                        label = meta.get("display_name", m["name"])
+                    else:
+                        label = m["name"]
+                    with ui.row().classes("items-center gap-2 q-px-sm padd4 w-full"):
+                        ui.label(label).classes("flex-1 text-sm")
+                        ui.button("削除", on_click=lambda _, m=m: delete_model(m)).props(
+                            "flat dense color=negative size=sm"
+                        )
+
+            known_col.clear()
+            with known_col:
+                for m in list_known_models():
+                    with ui.row().classes("items-center gap-2 q-px-sm padd4 w-full"):
+                        ui.label(m["display_name"]).classes("flex-1 text-sm")
+                        ui.label(m.get("size", "")).classes("text-xs infotxt")
+                        if not m["exists"]:
+                            ui.button(icon="download", on_click=lambda m=m: download_model(m)).props("flat dense color=primary size=sm") # type: ignore
+
+        refresh_roformer()
+        ctx.model_refresh_func.append(refresh_roformer)

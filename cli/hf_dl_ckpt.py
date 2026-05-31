@@ -12,13 +12,14 @@ def try_url_to_hf_repo(url: str):
             return repo_id, filename
     return None, None
 
-def download_hf_model(repo_id: str, filename: str, output_dir: str):
+
+def download_hf_model(repo_id: str, filename: str, yamlname: str, output_dir: str):
     """Download a model from HuggingFace into ComfyUI's diffusion_models folder."""
     try:
-        from huggingface_hub import hf_hub_download, snapshot_download
+        from huggingface_hub import hf_hub_download
     except ImportError:
         raise ImportError(
-            "huggingface_hub is required for auto-download. "
+            "huggingface_hub is required for download. "
             "Install with:  pip install huggingface_hub"
         )
     if filename.startswith("resolve/main/"):
@@ -29,23 +30,16 @@ def download_hf_model(repo_id: str, filename: str, output_dir: str):
     repo_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
     os.makedirs(repo_dir, exist_ok=True)
     save_path = os.path.join(repo_dir, filename)
-    # filenameがサブフォルダを含む場合、allow_patternsもそのパスに合わせる
-    file_parent = str(Path(filename).parent)
-    if file_parent and file_parent != ".":
-        yaml_pattern = f"{file_parent}/*.yaml"
-    else:
-        yaml_pattern = "*.yaml"
 
-    # safetensors_path = Path(save_path).with_suffix(".safetensors")
-    # if safetensors_path.exists():
-    #     print(f"safetensors file already exists at {str(safetensors_path)}, skipping download.")
-    print(f"Downloading {filename} from {repo_id} ...")
-    hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
-    snapshot_download(
-        repo_id=repo_id,
-        local_dir=repo_dir,
-        allow_patterns=yaml_pattern,
-    )
+    safetensors_path = Path(save_path).with_suffix(".safetensors")
+    if safetensors_path.exists():
+        print(f"safetensors file already exists at {str(safetensors_path)}, skipping download.")
+    else:
+        print(f"Downloading {filename} from {repo_id} ...")
+        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=repo_dir)
+        if yamlname:
+            hf_hub_download(repo_id=repo_id, filename=yamlname, local_dir=repo_dir)
+
     # tqdmの出力が別スレッドで書き込まれるため、フラッシュして出力を同期する
     sys.stdout.flush()
     sys.stderr.flush()
@@ -53,6 +47,7 @@ def download_hf_model(repo_id: str, filename: str, output_dir: str):
     print(f"Saved to {save_path}")
 
     return save_path
+
 
 def post_processing(path: Path, convert: bool = False):
     if not path.exists():
@@ -69,7 +64,7 @@ def post_processing(path: Path, convert: bool = False):
             return
         print("picklescan finished with no issues.")
     except ImportError:
-        print("picklescan is not installed and skipped. " "Install with:  pip install picklescan")
+        print("picklescan is not installed and skipped.")
 
     safetensors_path = path.with_suffix(".safetensors")
     if safetensors_path.exists():
@@ -89,14 +84,17 @@ def post_processing(path: Path, convert: bool = False):
         print("convert to safetensors finished.")
 
 
-def start_operation(repo_id: str, filename: str, output_dir: str, convert: bool = False):
-    save_path = Path(download_hf_model(repo_id, filename, output_dir))
+def start_operation(
+    repo_id: str, filename: str, yamlname: str, output_dir: str, convert: bool = False
+):
+    save_path = Path(download_hf_model(repo_id, filename, yamlname, output_dir))
     if save_path.suffix == ".safetensors":
         return
     if save_path.suffix in [".ckpt", ".pth", ".pt", "bin"]:
         post_processing(save_path, convert)
 
     # if tpath.exists():
+
 
 if __name__ == "__main__":
     import argparse
@@ -106,6 +104,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--repo-id", help="HuggingFace repo ID (e.g., 'user/model')")
     parser.add_argument("--filename", help="Filename to download from the repo")
+    parser.add_argument("--yamlname", help="Filename to download from the repo")
     parser.add_argument(
         "--output-dir",
         help="Directory to save the downloaded file (e.g., 'diffusion_models')",
@@ -131,8 +130,9 @@ if __name__ == "__main__":
         repo_id = args.repo_id
         filename = args.filename
 
+    yamlname = args.yamlname
     try:
-        start_operation(repo_id, filename, args.output_dir, args.convert)
+        start_operation(repo_id, filename, yamlname, args.output_dir, args.convert)
     except KeyboardInterrupt:
         print("Process interrupted by user. Exiting.")
         exit(1)
