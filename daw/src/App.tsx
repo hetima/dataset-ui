@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   LoaderCircle,
@@ -192,6 +192,7 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
 
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
+  const viewportRef = useRef<HTMLDivElement | null>(null)
 
   return (
     <WaveformPlaylistProvider
@@ -205,7 +206,8 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
       <KeyboardShortcuts playback clipSplitting undo />
       <PlaylistToolbar />
       <ClipInteractionProvider>
-        <div className="playlist-view">
+        <div ref={viewportRef} className="playlist-view">
+          <RulerClickOverlay viewportRef={viewportRef} />
           <Waveform
             showClipHeaders
             showFades
@@ -214,6 +216,141 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
         </div>
       </ClipInteractionProvider>
     </WaveformPlaylistProvider>
+  )
+}
+
+function RulerClickOverlay({
+  viewportRef,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const controls = usePlaylistControls()
+  const data = usePlaylistData()
+  const dragStateRef = useRef<{
+    dragging: boolean
+    startY: number
+    lastStep: number
+    rulerLeft: number
+    zooming: boolean
+  } | null>(null)
+  const zoomAnchorRef = useRef<{
+    time: number
+    x: number
+  } | null>(null)
+
+  const controlsWidth = data.controls.show ? data.controls.width : 0
+
+  const pixelToTime = (clientX: number, rulerLeft: number, viewport: HTMLDivElement) => {
+    const waveformPixel = clientX - rulerLeft + viewport.scrollLeft
+    const clampedPixel = Math.max(0, waveformPixel)
+    const seconds = (clampedPixel * data.samplesPerPixel) / data.sampleRate
+    return Math.max(0, Math.min(seconds, data.duration || seconds))
+  }
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    const anchor = zoomAnchorRef.current
+    if (!viewport || !anchor) {
+      return
+    }
+
+    // ズーム変化後、アンカー時刻が画面上の同じピクセル位置に来るようスクロールを補正
+    // anchor.x はスクロールを含むwaveformピクセル座標
+    const nextScrollLeft = anchor.time * data.sampleRate / data.samplesPerPixel - anchor.x
+    viewport.scrollLeft = Math.max(0, nextScrollLeft)
+  }, [data.sampleRate, data.samplesPerPixel, viewportRef])
+
+  const applyZoomStep = (stepDelta: number) => {
+    if (stepDelta > 0) {
+      for (let i = 0; i < stepDelta; i += 1) {
+        controls.zoomIn()
+      }
+      return
+    }
+    for (let i = 0; i < Math.abs(stepDelta); i += 1) {
+      controls.zoomOut()
+    }
+  }
+
+  const updateZoomFromPointer = (state: { startY: number; lastStep: number }, clientY: number) => {
+    const deltaY = clientY - state.startY
+    const step = Math.trunc(deltaY / 24)
+    if (step === state.lastStep) {
+      return
+    }
+
+    applyZoomStep(step - state.lastStep)
+    state.lastStep = step
+  }
+
+  const updateSeekFromPointer = (clientX: number, rulerLeft: number) => {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+
+    const time = pixelToTime(clientX, rulerLeft, viewport)
+    // x はスクロールを含むwaveformピクセル座標（ズームアンカー補正に使う）
+    const x = Math.max(0, clientX - rulerLeft + viewport.scrollLeft)
+    zoomAnchorRef.current = { time, x }
+    controls.setCurrentTime(time)
+    controls.setSelection(time, time)
+  }
+
+  const stopWindowDrag = () => {
+    window.removeEventListener('mousemove', onWindowMouseMove)
+    window.removeEventListener('mouseup', onWindowMouseUp)
+    dragStateRef.current = null
+  }
+
+  const onWindowMouseMove = (event: MouseEvent) => {
+    const state = dragStateRef.current
+    if (!state?.dragging) {
+      return
+    }
+
+    event.preventDefault()
+    // 縦方向に8px以上動いたらズームモード（シーク更新を止める）
+    const absY = Math.abs(event.clientY - state.startY)
+    if (absY >= 8) {
+      state.zooming = true
+    }
+    if (state.zooming) {
+      updateZoomFromPointer(state, event.clientY)
+    } else {
+      updateSeekFromPointer(event.clientX, state.rulerLeft)
+    }
+  }
+
+  const onWindowMouseUp = (event: MouseEvent) => {
+    const state = dragStateRef.current
+    if (state?.dragging && !state.zooming) {
+      updateSeekFromPointer(event.clientX, state.rulerLeft)
+    }
+    stopWindowDrag()
+  }
+
+  const onMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    dragStateRef.current = {
+      dragging: true,
+      startY: event.clientY,
+      lastStep: 0,
+      rulerLeft: rect.left,
+      zooming: false,
+    }
+    updateSeekFromPointer(event.clientX, rect.left)
+    window.addEventListener('mousemove', onWindowMouseMove)
+    window.addEventListener('mouseup', onWindowMouseUp)
+  }
+
+  return (
+    <div
+      className="ruler-click-overlay"
+      style={{ left: controlsWidth }}
+      onMouseDown={onMouseDown}
+    />
   )
 }
 

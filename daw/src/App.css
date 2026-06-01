@@ -179,12 +179,24 @@ dd {
 }
 
 .playlist-view {
+  position: relative;
   overflow-x: auto;
   background: #0f172a;
 }
 
 .playlist-view * {
   box-sizing: content-box;
+}
+
+.ruler-click-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 30px;
+  z-index: 20;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
 }
 
 .playlist-view [aria-roledescription="draggable"] {
