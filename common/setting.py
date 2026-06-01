@@ -1,6 +1,7 @@
 import dataclasses
 import json
 from pathlib import Path
+from nicegui import binding
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 定数
@@ -100,7 +101,7 @@ class VoiceSubSetting:
 # ─────────────────────────────────────────────────────────────────────────────
 # ルート設定クラス
 # ─────────────────────────────────────────────────────────────────────────────
-@dataclasses.dataclass
+@binding.bindable_dataclass
 class Setting:
     _EXCLUDED_SETTINGS: frozenset[str] = frozenset({
         "base_dir",
@@ -114,6 +115,7 @@ class Setting:
     models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
     output_prefix: str = ""
+    edit_file_paths: list[str] = dataclasses.field(default_factory=list)
 
     music: MusicSubSetting = dataclasses.field(default_factory=MusicSubSetting)
     voice: VoiceSubSetting = dataclasses.field(default_factory=VoiceSubSetting)
@@ -215,6 +217,24 @@ class Setting:
             self.save()
             return True
         return False
+
+    @property
+    def has_edit_files(self) -> bool:
+        return bool(self.edit_file_paths)
+
+    def add_edit_file_path(self, path: str) -> bool:
+        if not path or path in self.edit_file_paths:
+            return False
+        self.edit_file_paths.append(path)
+        self.save()
+        return True
+
+    def remove_edit_file_path(self, path: str) -> bool:
+        if not path or path not in self.edit_file_paths:
+            return False
+        self.edit_file_paths = [p for p in self.edit_file_paths if p != path]
+        self.save()
+        return True
 
 
 cnfg = Setting()

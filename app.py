@@ -1,8 +1,10 @@
 import argparse
 from nicegui import ui, app
 from common.model_cache import model_cache
+from common.setting import cnfg
 from music.index import main_page as page_music
 from voice.index import main_page as page_voice
+from edit.index import main_page as page_edit
 from testpage.index import main_page as page_testpage
 
 _auto_reload_flag = False
@@ -104,6 +106,16 @@ def model_cache_sticky():
     cache_card()
 
 
+def efit_file_footer():
+    """エディットページへの遷移フッタ"""
+    with ui.footer(bordered=True).bind_visibility_from(cnfg, "has_edit_files").style(
+        "background-color: #f2f2f2"
+    ):
+        with ui.row().classes("items-center gap-4"):
+            ui.label().bind_text_from(cnfg, "edit_file_paths", lambda v: f"エディットプールに {len(v)} 件あります")
+            ui.html('<a href="/edit" target="_blank">エディットプールを開く</a>')
+
+
 @ui.page("/", title="dataset-ui")
 def main_page():
     header()
@@ -129,32 +141,45 @@ def main_page():
         ui.label("音声データを編集")
         ui.label("音声の分割や書き起こしなどができます")
     if _auto_reload_flag:
+        ui.link("edit", "/edit").style("text-decoration: none; font-size: 1.8em;")
         ui.link("test", "/test").style("text-decoration: none; font-size: 1.8em;")
 
     footer()
 
 
-@ui.page("/music", title="dataset-ui-music")
+@ui.page("/music", title="music - dataset-ui")
 def main_page_music():
     header()
     page_music()
     footer()
     model_cache_sticky()
+    efit_file_footer()
 
-@ui.page("/voice", title="dataset-ui-voice")
+
+@ui.page("/voice", title="voice - dataset-ui")
 def main_page_voice():
     header()
     page_voice()
     footer()
     model_cache_sticky()
+    efit_file_footer()
 
 
-@ui.page("/test", title="dataset-ui")
+@ui.page("/edit", title="edit - dataset-ui")
+def main_page_edit():
+    header()
+    page_edit()
+    footer()
+    model_cache_sticky()
+
+
+@ui.page("/test", title="test - dataset-ui")
 def test_page():
     header()
     page_testpage()
     footer()
     model_cache_sticky()
+    efit_file_footer()
 
 
 def make_startup_message(host: str, port: int):
