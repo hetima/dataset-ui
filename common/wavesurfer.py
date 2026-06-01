@@ -4,7 +4,8 @@ from nicegui import ui, app
 
 
 _WAVESURFER_CDN = "https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.esm.js"
-_MULTITRACK_CDN = "https://unpkg.com/wavesurfer-multitrack/dist/multitrack.min.js"
+_REGIONS_CDN = "https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.esm.js"
+_MULTITRACK_CDN = "/static/multitrack.min.js"
 
 
 def setup_wavesurfer():
@@ -102,8 +103,14 @@ class WaveSurferWidget:
 
 
 def setup_multitrack():
-    """Multitrackをwindow.Multitrackとして事前ロード。main_page先頭で一度だけ呼ぶ。"""
+    """Multitrack と RegionsPlugin を事前ロード。main_page 先頭で一度だけ呼ぶ。"""
+    app.add_static_files("/static", str(Path(__file__).parent.parent / "static"))
     ui.add_head_html(f'<script src="{_MULTITRACK_CDN}"></script>')
+    ui.add_head_html(f'''
+<script type="module">
+    import("{_REGIONS_CDN}").then(m => {{ window.WaveSurferRegions = m.default; }});
+</script>
+''')
 
 
 class MultitrackWidget:
@@ -114,6 +121,8 @@ class MultitrackWidget:
         self._min_px_per_sec = min_px_per_sec
         self._el: ui.element | None = None
         self._tracks: list[dict] = []
+        self._region_callback: str = ""
+        self._locked = False
 
     def build(self) -> "MultitrackWidget":
         """コンテナDIVを配置し、接続時に初期化をスケジュールする。"""
@@ -144,21 +153,31 @@ class MultitrackWidget:
             tryCreate();
         ''')
 
-    def load_tracks(self, tracks: list[dict]):
-        """トラックリストをセットして再描画する。各要素は {id, url, startPosition, ...} の dict。"""
+    def load_tracks(self, tracks: list[dict], region_callback: str = "") -> None:
+        """トラックリストをセットして再描画する。
+        region_callback: region 変化時に呼ぶ JS 関数名（省略可）。
+            関数シグネチャ: (trackIndex, regions: [{start, end}][]) を受け取る。
+        """
         self._tracks = tracks
+        if region_callback:
+            self._region_callback = region_callback
+        cb = self._region_callback
         name = self._name
         import json
         tracks_json = json.dumps(tracks)
+        el_id = f"c{self._el.id}" if self._el else ""
+        locked_js = "true" if self._locked else "false"
+        # region変化をPythonに通知するJS（region_callbackが空なら何もしない）
+        notify_cb = f"{cb}(trackIdx, rp.getRegions().map(r => ({{start: r.start, end: r.end}})));" if cb else ""
         ui.run_javascript(f'''
-            (async () => {{
+            (() => {{
                 const tryLoad = () => {{
                     if (!window["{name}"]) {{ setTimeout(tryLoad, 100); return; }}
                     window["{name}"].destroy();
                     window["{name}"] = null;
-                    const el = document.getElementById("c{self._el.id if self._el else ''}");
+                    const el = document.getElementById("{el_id}");
                     if (!el) return;
-                    window["{name}"] = Multitrack.create({tracks_json}, {{
+                    const mt = Multitrack.create({tracks_json}, {{
                         container: el,
                         minPxPerSec: {self._min_px_per_sec},
                         cursorWidth: 2,
@@ -166,6 +185,85 @@ class MultitrackWidget:
                         trackBackground: "#2D2D2D",
                         trackBorderColor: "#7C7C7C",
                         dragBounds: false,
+                    }});
+                    window["{name}"] = mt;
+                    mt.setLocked({locked_js});
+
+                    // canplay後に各トラックへ RegionsPlugin を追加登録
+                    mt.once("canplay", () => {{
+                        const wsList = mt.wavesurfers;
+                        if (!wsList || !window.WaveSurferRegions) return;
+
+                        // 全トラックの RegionsPlugin を配列で保持（排他制御に使う）
+                        const allRp = [];
+                        // enableDragSelection の解除関数（ロック切り替え用）
+                        const dragDisposers = [];
+
+                        wsList.forEach((ws, trackIdx) => {{
+                            if (!ws) {{ allRp.push(null); dragDisposers.push(null); return; }}
+                            const rp = ws.registerPlugin(window.WaveSurferRegions.create());
+                            allRp.push(rp);
+
+                            // ドラッグ選択を有効化し、解除関数を保持
+                            const disposeDrag = rp.enableDragSelection({{ color: "rgba(100, 200, 255, 0.25)" }});
+                            dragDisposers.push(disposeDrag || null);
+
+                            // 他トラックの重複 Region を境界に合わせて縮小・削除する
+                            const onRegionChange = (changedRegion) => {{
+                                allRp.forEach((otherRp, otherIdx) => {{
+                                    if (otherIdx === trackIdx || !otherRp) return;
+                                    otherRp.getRegions().forEach(r => {{
+                                        const overlaps = r.start < changedRegion.end && r.end > changedRegion.start;
+                                        if (!overlaps) return;
+                                        const fullyContained = r.start >= changedRegion.start && r.end <= changedRegion.end;
+                                        if (fullyContained) {{
+                                            r.remove();
+                                        }} else if (r.start < changedRegion.start && r.end <= changedRegion.end) {{
+                                            // 右側が重なる → end を縮める
+                                            r.setOptions({{ end: changedRegion.start }});
+                                        }} else if (r.start >= changedRegion.start && r.end > changedRegion.end) {{
+                                            // 左側が重なる → start を縮める
+                                            r.setOptions({{ start: changedRegion.end }});
+                                        }} else {{
+                                            // 既存 Region が新 Region を完全包含 → 新 Region の右側を残して分割は難しいので削除
+                                            r.remove();
+                                        }}
+                                    }});
+                                }});
+                                {notify_cb}
+                            }};
+
+                            rp.on("region-created", onRegionChange);
+                            rp.on("region-updated", onRegionChange);
+
+                            // 下半分クリックで Region を分割。上半分クリックは移動・リサイズ操作用に残す。
+                            rp.on("region-clicked", (r, e) => {{
+                                e.stopPropagation();
+                                const regionRect = r.element.getBoundingClientRect();
+                                const isLowerHalf = e.clientY - regionRect.top >= regionRect.height / 2;
+                                if (!isLowerHalf || mt.locked) return;
+
+                                const wrapper = ws.getWrapper();
+                                const rect = wrapper.getBoundingClientRect();
+                                const duration = ws.getDuration();
+                                const splitAt = ((e.clientX - rect.left) / rect.width) * duration;
+                                const minLength = 0.01;
+                                if (splitAt > r.start + minLength && splitAt < r.end - minLength) {{
+                                    const color = r.color || "rgba(100, 200, 255, 0.25)";
+                                    const left = {{ start: r.start, end: splitAt, color }};
+                                    const right = {{ start: splitAt, end: r.end, color }};
+                                    r.remove();
+                                    rp.addRegion(left);
+                                    rp.addRegion(right);
+                                    {notify_cb}
+                                }}
+                            }});
+                        }});
+
+                        // グローバルに保持（ロック切り替え用）
+                        window["{name}__rp"] = allRp;
+                        window["{name}__dragDisposers"] = dragDisposers;
+                        mt.setLocked({locked_js});
                     }});
                 }};
                 tryLoad();
@@ -189,19 +287,24 @@ class MultitrackWidget:
         return f"(v) => window['{self._name}'] && window['{self._name}'].zoom(v)"
 
     def set_locked(self, locked: bool):
-        """ドラッグロックを切り替えて再構築する。load_tracks が一度も呼ばれていない場合は何もしない。"""
-        if not self._tracks:
-            return
-        for t in self._tracks:
-            t["draggable"] = not locked
-        self.load_tracks(self._tracks)
+        """イベントロックを切り替える。Region 作成は許可し、トラック移動だけを禁止する。"""
+        self._locked = locked
+        name = self._name
+        locked_js = "true" if locked else "false"
+        ui.run_javascript(f'''
+            (() => {{
+                const mt = window["{name}"];
+                if (!mt) return;
+                mt.setLocked({locked_js});
+            }})();
+        ''')
 
     def volume_js(self) -> str:
-        """マスターボリュームスライダーの update:model-value ハンドラ。全トラックに一括適用する。"""
+        """マスターボリュームスライダーの update:model-value ハンドラ。トラック別音量は変更しない。"""
         name = self._name
         return (
             f"(v) => {{ const m = window['{name}']; if (!m) return;"
-            f" const ws = m.wavesurfers; if (ws) ws.forEach(w => w && w.setVolume(v)); }}"
+            f" if (typeof m.setMasterVolume === 'function') m.setMasterVolume(v); }}"
         )
 
 
