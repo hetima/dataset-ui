@@ -1,5 +1,6 @@
 nicegui>=3.12.0
-librosa
+huggingface_hub
+librosa<1.0.0
 soundfile
 mutagen
 tenacity
@@ -10,18 +11,15 @@ send2trash
 tqdm
 # torchcodec #==0.10.0
 
-# roforner
-rotary_embedding_torch
-einops
-huggingface_hub
-# BS-RoFormer
-# pyloudnorm
-picklescan
-
 # qwen_asr
 nagisa
 soynlp
-# qwen-omni-utils
-# sox
-# flask
-# pytz
+
+# roforner
+rotary_embedding_torch
+einops
+beartype
+
+# ckpt ダウンロードしたときの安全性スキャン
+# picklescan 
+
