@@ -23,7 +23,7 @@ def tab_main(ctx: EditCtx):
         ctx.tabs.set_value("compi")
         # open compi tab
 
-    with ui.expansion("コンピング", value=False).classes(
+    with ui.expansion("コンピング", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(

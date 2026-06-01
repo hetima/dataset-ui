@@ -4,6 +4,7 @@ from nicegui import ui, app
 
 
 _WAVESURFER_CDN = "https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.esm.js"
+_MULTITRACK_CDN = "https://unpkg.com/wavesurfer-multitrack/dist/multitrack.min.js"
 
 
 def setup_wavesurfer():
@@ -98,6 +99,102 @@ class WaveSurferWidget:
         app.add_media_files(mount, str(p.parent))
         url = f"{mount}/{p.name}"
         ui.run_javascript(f"window['{self._name}'] && window['{self._name}'].load({url!r})")
+
+
+def setup_multitrack():
+    """Multitrackをwindow.Multitrackとして事前ロード。main_page先頭で一度だけ呼ぶ。"""
+    ui.add_head_html(f'<script src="{_MULTITRACK_CDN}"></script>')
+
+
+class MultitrackWidget:
+    """wavesurfer-multitrack のラッパー。複数ファイルをタイムライン上に並べて再生・編集できる。"""
+
+    def __init__(self, instance_name: str, min_px_per_sec: int = 10):
+        self._name = instance_name
+        self._min_px_per_sec = min_px_per_sec
+        self._el: ui.element | None = None
+        self._tracks: list[dict] = []
+
+    def build(self) -> "MultitrackWidget":
+        """コンテナDIVを配置し、接続時に初期化をスケジュールする。"""
+        self._el = ui.element("div").style("width: 100%; background: #2d2d2d;")
+        ui.context.client.on_connect(self._init)
+        return self
+
+    async def _init(self):
+        el_id = f"c{self._el.id}"  # type: ignore
+        name = self._name
+        min_px = self._min_px_per_sec
+        await ui.run_javascript(f'''
+            const tryCreate = () => {{
+                if (typeof Multitrack === "undefined") {{ setTimeout(tryCreate, 100); return; }}
+                const el = document.getElementById("{el_id}");
+                if (!el) {{ setTimeout(tryCreate, 100); return; }}
+                if (window["{name}"]) return;
+                window["{name}"] = Multitrack.create([], {{
+                    container: el,
+                    minPxPerSec: {min_px},
+                    cursorWidth: 2,
+                    cursorColor: "#D72F21",
+                    trackBackground: "#2D2D2D",
+                    trackBorderColor: "#7C7C7C",
+                    dragBounds: false,
+                }});
+            }};
+            tryCreate();
+        ''')
+
+    def load_tracks(self, tracks: list[dict]):
+        """トラックリストをセットして再描画する。各要素は {id, url, startPosition, ...} の dict。"""
+        self._tracks = tracks
+        name = self._name
+        import json
+        tracks_json = json.dumps(tracks)
+        ui.run_javascript(f'''
+            (async () => {{
+                const tryLoad = () => {{
+                    if (!window["{name}"]) {{ setTimeout(tryLoad, 100); return; }}
+                    window["{name}"].destroy();
+                    window["{name}"] = null;
+                    const el = document.getElementById("c{self._el.id if self._el else ''}");
+                    if (!el) return;
+                    window["{name}"] = Multitrack.create({tracks_json}, {{
+                        container: el,
+                        minPxPerSec: {self._min_px_per_sec},
+                        cursorWidth: 2,
+                        cursorColor: "#D72F21",
+                        trackBackground: "#2D2D2D",
+                        trackBorderColor: "#7C7C7C",
+                        dragBounds: false,
+                    }});
+                }};
+                tryLoad();
+            }})();
+        ''')
+
+    def play_js(self) -> str:
+        return f"() => window['{self._name}'] && window['{self._name}'].play()"
+
+    def pause_js(self) -> str:
+        return f"() => window['{self._name}'] && window['{self._name}'].pause()"
+
+    def play_pause_js(self) -> str:
+        return f"() => {{ const m = window['{self._name}']; if (m) {{ m.isPlaying() ? m.pause() : m.play(); }} }}"
+
+    def seek_js(self, seconds: float) -> str:
+        return f"() => {{ const m = window['{self._name}']; if (m) m.setTime(m.getCurrentTime() + {seconds}); }}"
+
+    def zoom_js(self) -> str:
+        """zoom スライダーの update:model-value ハンドラ文字列を返す。"""
+        return f"(v) => window['{self._name}'] && window['{self._name}'].zoom(v)"
+
+    def volume_js(self) -> str:
+        """マスターボリュームスライダーの update:model-value ハンドラ。全トラックに一括適用する。"""
+        name = self._name
+        return (
+            f"(v) => {{ const m = window['{name}']; if (!m) return;"
+            f" const ws = m.wavesurfers; if (ws) ws.forEach(w => w && w.setVolume(v)); }}"
+        )
 
 
 def simple_player(
