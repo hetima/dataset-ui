@@ -17,8 +17,10 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import {
+  ClipInteractionProvider,
+  type ClipTrack,
   KeyboardShortcuts,
-  PlaylistVisualization,
+  Waveform,
   WaveformPlaylistProvider,
   useAudioTracks,
   useClipSplitting,
@@ -207,38 +209,47 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
           {error}
         </div>
       )}
-      <WaveformPlaylistProvider
-        tracks={tracks}
-        deferEngineRebuild={loading}
-        timescale
-        waveHeight={76}
-        samplesPerPixel={2048}
-        controls={{ show: false, width: 0 }}
-      >
-        <KeyboardShortcuts playback clipSplitting undo />
-        <PlaylistToolbar loading={loading} loadedCount={loadedCount} totalCount={totalCount} />
+      {loading && (
+        <div className="playlist-loading">
+          <LoaderCircle size={18} className="spin" />
+          読み込み {loadedCount}/{totalCount}
+        </div>
+      )}
+      {!loading && tracks.length > 0 && (
+        <EditablePlaylist key={sourceTracks.map((track) => track.id).join(':')} initialTracks={tracks} />
+      )}
+    </div>
+  )
+}
+
+function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
+  const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
+
+  return (
+    <WaveformPlaylistProvider
+      tracks={playlistTracks}
+      onTracksChange={setPlaylistTracks}
+      timescale
+      waveHeight={76}
+      samplesPerPixel={2048}
+      controls={{ show: false, width: 0 }}
+    >
+      <KeyboardShortcuts playback clipSplitting undo />
+      <PlaylistToolbar />
+      <ClipInteractionProvider>
         <div className="playlist-view">
-          <PlaylistVisualization
-            interactiveClips
+          <Waveform
             showClipHeaders
             showFades
             renderTrackControls={(trackIndex) => <TrackControls trackIndex={trackIndex} />}
           />
         </div>
-      </WaveformPlaylistProvider>
-    </div>
+      </ClipInteractionProvider>
+    </WaveformPlaylistProvider>
   )
 }
 
-function PlaylistToolbar({
-  loading,
-  loadedCount,
-  totalCount,
-}: {
-  loading: boolean
-  loadedCount: number
-  totalCount: number
-}) {
+function PlaylistToolbar() {
   const controls = usePlaylistControls()
   const state = usePlaylistState()
   const data = usePlaylistData()
@@ -315,9 +326,7 @@ function PlaylistToolbar({
         />
       </label>
 
-      <span className="load-state">
-        {loading ? `読み込み ${loadedCount}/${totalCount}` : 'ready'}
-      </span>
+      <span className="load-state">ready</span>
     </div>
   )
 }

@@ -195,6 +195,15 @@ audio {
   background: #17202a;
 }
 
+.playlist-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
 .tool-group,
 .volume-control,
 .track-controls {
@@ -253,6 +262,19 @@ audio {
 
 .playlist-view * {
   box-sizing: content-box;
+}
+
+.playlist-view [aria-roledescription="draggable"] {
+  border-left: 2px solid #38bdf8;
+  border-right: 2px solid #38bdf8;
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.35),
+    0 0 0 1px rgba(15, 23, 42, 0.45);
+  cursor: grab;
+}
+
+.playlist-view [aria-roledescription="draggable"]:active {
+  cursor: grabbing;
 }
 
 .track-controls {
