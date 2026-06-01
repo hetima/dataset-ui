@@ -261,6 +261,40 @@ dd {
   color: #fff;
 }
 
+.track-mute-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.track-solo-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.track-solo-play:hover {
+  background: #263244;
+}
+
+.track-solo-play.active {
+  border-color: #38bdf8;
+  background: #0e7490;
+  color: #fff;
+}
+
 .track-volume {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);

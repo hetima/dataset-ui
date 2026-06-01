@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  type Dispatch,
+  type SetStateAction,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   AlertTriangle,
   LoaderCircle,
@@ -22,6 +31,7 @@ import {
   WaveformPlaylistProvider,
   useAudioTracks,
   useClipSplitting,
+  usePlaybackAnimation,
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
@@ -42,6 +52,27 @@ type DawTrack = {
 type DawSession = {
   id: string
   tracks: DawTrack[]
+}
+
+type SoloPlaybackState = {
+  trackIndex: number
+  startTime: number
+  soloedStates: boolean[]
+}
+
+type SoloPlaybackContextValue = {
+  soloPlayback: SoloPlaybackState | null
+  setSoloPlayback: Dispatch<SetStateAction<SoloPlaybackState | null>>
+}
+
+const SoloPlaybackContext = createContext<SoloPlaybackContextValue | null>(null)
+
+function useSoloPlayback() {
+  const context = useContext(SoloPlaybackContext)
+  if (!context) {
+    throw new Error('SoloPlaybackContext が見つかりません')
+  }
+  return context
 }
 
 async function fetchSession(id: string) {
@@ -192,6 +223,7 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
 
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
+  const [soloPlayback, setSoloPlayback] = useState<SoloPlaybackState | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
 
   return (
@@ -205,16 +237,18 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
     >
       <KeyboardShortcuts playback clipSplitting undo />
       <PlaylistToolbar />
-      <ClipInteractionProvider>
-        <div ref={viewportRef} className="playlist-view">
-          <RulerClickOverlay viewportRef={viewportRef} />
-          <Waveform
-            showClipHeaders
-            showFades
-            renderTrackControls={(trackIndex) => <TrackControls trackIndex={trackIndex} />}
-          />
-        </div>
-      </ClipInteractionProvider>
+      <SoloPlaybackContext.Provider value={{ soloPlayback, setSoloPlayback }}>
+        <ClipInteractionProvider>
+          <div ref={viewportRef} className="playlist-view">
+            <RulerClickOverlay viewportRef={viewportRef} />
+            <Waveform
+              showClipHeaders
+              showFades
+              renderTrackControls={(trackIndex) => <TrackControls trackIndex={trackIndex} />}
+            />
+          </div>
+        </ClipInteractionProvider>
+      </SoloPlaybackContext.Provider>
     </WaveformPlaylistProvider>
   )
 }
@@ -439,6 +473,8 @@ function PlaylistToolbar() {
 function TrackControls({ trackIndex }: { trackIndex: number }) {
   const controls = usePlaylistControls()
   const data = usePlaylistData()
+  const playback = usePlaybackAnimation()
+  const { soloPlayback, setSoloPlayback } = useSoloPlayback()
   const track = data.tracks[trackIndex]
   const trackState = data.trackStates[trackIndex]
 
@@ -446,11 +482,41 @@ function TrackControls({ trackIndex }: { trackIndex: number }) {
     return null
   }
 
+  const isSoloPlaybackActive = soloPlayback?.trackIndex === trackIndex
+  const restoreSoloStates = (soloedStates: boolean[]) => {
+    soloedStates.forEach((soloed, index) => {
+      controls.setTrackSolo(index, soloed)
+    })
+  }
+
+  const handleSoloPlayback = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+
+    if (soloPlayback?.trackIndex === trackIndex) {
+      controls.stop()
+      controls.setCurrentTime(soloPlayback.startTime)
+      restoreSoloStates(soloPlayback.soloedStates)
+      setSoloPlayback(null)
+      return
+    }
+
+    const startTime = soloPlayback ? soloPlayback.startTime : playback.currentTimeRef.current ?? 0
+    const soloedStates = soloPlayback?.soloedStates ?? data.trackStates.map((state) => state.soloed)
+    controls.stop()
+    controls.setCurrentTime(startTime)
+
+    data.trackStates.forEach((_, index) => {
+      controls.setTrackSolo(index, index === trackIndex)
+    })
+
+    setSoloPlayback({ trackIndex, startTime, soloedStates })
+    await controls.play(startTime)
+  }
+
   return (
     <div className="track-controls">
       <div className="track-header-row">
         <strong>{trackState.name || track.name}</strong>
-        <span>ID {trackIndex}</span>
       </div>
       <button
         type="button"
@@ -459,13 +525,24 @@ function TrackControls({ trackIndex }: { trackIndex: number }) {
       >
         S
       </button>
-      <button
-        type="button"
-        className={trackState.muted ? 'track-toggle active' : 'track-toggle'}
-        onClick={() => controls.setTrackMute(trackIndex, !trackState.muted)}
-      >
-        M
-      </button>
+      <div className="track-mute-row">
+        <button
+          type="button"
+          className={trackState.muted ? 'track-toggle active' : 'track-toggle'}
+          onClick={() => controls.setTrackMute(trackIndex, !trackState.muted)}
+        >
+          M
+        </button>
+        <button
+          type="button"
+          className={isSoloPlaybackActive ? 'track-solo-play active' : 'track-solo-play'}
+          onClick={(event) => void handleSoloPlayback(event)}
+          title="このトラックだけ再生"
+        >
+          <span>S</span>
+          <Play size={14} />
+        </button>
+      </div>
       <label className="track-volume">
         <span>VOL</span>
         <input
