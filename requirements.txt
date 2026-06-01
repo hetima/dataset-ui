@@ -14,8 +14,8 @@ tqdm
 rotary_embedding_torch
 einops
 huggingface_hub
-BS-RoFormer
-pyloudnorm
+# BS-RoFormer
+# pyloudnorm
 picklescan
 
 # qwen_asr

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from nicegui import binding, ui
 from common.setting import cnfg
@@ -123,13 +124,13 @@ def tab_setting(ctx: MusicCtx):
             # 左：インストール済みモデル
             with ui.column().classes("flex-1 gap-1"):
                 ui.label("インストール済みモデル").classes("font-bold")
-                with ui.scroll_area().classes("brdr").style("height: 300px; width: 100%"):
+                with ui.scroll_area().classes("brdr").style("height: 520px; width: 100%"):
                     installed_col = ui.column().classes("w-full gap-0")
 
             # 右：既知モデル一覧
             with ui.column().classes("flex-1 gap-1"):
                 ui.label("既知モデル一覧").classes("font-bold")
-                with ui.scroll_area().classes("brdr").style("height: 300px; width: 100%"):
+                with ui.scroll_area().classes("brdr").style("height: 520px; width: 100%"):
                     known_col = ui.column().classes("w-full gap-0")
 
         def download_model(m: dict):
@@ -162,6 +163,61 @@ def tab_setting(ctx: MusicCtx):
                     send2trash(str(p))
             refresh_roformer()
 
+        def _format_file_size(path: Path) -> str:
+            size_bytes = path.stat().st_size
+            if size_bytes >= 1024 ** 3:
+                return f"{size_bytes / 1024 ** 3:.1f}GB"
+            return f"{size_bytes // (1024 ** 2)}MB"
+
+        async def show_info_dialog(m: dict):
+            path = Path(m["path"])
+            meta_path = path.with_suffix(".meta.json")
+
+            result = {"ok": False}
+            with ui.dialog() as dlg, ui.card().classes("w-120"):
+                ui.label(f"モデル情報: {path.stem}").classes("font-bold text-base")
+                ui.label(str(path)).classes("text-xs infotxt")
+                display_name_input = ui.input(
+                    label="表示名 (display_name)",
+                    value=m["name"],
+                ).props('outlined style="min-width: 400px"').classes("w-full")
+                output_suffix_input = ui.input(
+                    label="出力サフィックス (output_suffix)",
+                    value=m.get("output_suffix", ""),
+                ).props("outlined").classes("w-full").tooltip(
+                    "suffixが空のとき自動で使われます。どのモデルで出力したか分かりやすくなります。例: _vocals"
+                )
+                with ui.row().classes("justify-end gap-2 w-full"):
+                    ui.button("キャンセル", on_click=dlg.close).props("flat")
+                    def on_ok():
+                        result["ok"] = True
+                        dlg.close()
+                    ui.button("OK", on_click=on_ok).props("color=primary")
+
+            dlg.open()
+            await dlg
+            if not result["ok"]:
+                return
+
+            new_name = (display_name_input.value or "").strip() or path.stem
+            new_suffix = output_suffix_input.value or ""
+
+            # meta.json を読み込み or 新規作成
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                except Exception:
+                    meta = {}
+            else:
+                meta = {"size": _format_file_size(path)}
+
+            meta["display_name"] = new_name
+            meta["output_suffix"] = new_suffix
+            meta_path.write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            refresh_roformer()
+
         def refresh_roformer():
             installed_col.clear()
             with installed_col:
@@ -169,6 +225,9 @@ def tab_setting(ctx: MusicCtx):
                     with ui.row().classes("items-center gap-2 q-px-sm padd4 w-full"):
                         ui.label(m["name"]).classes("flex-1 text-sm")
                         ui.label(m.get("size", "")).classes("text-xs infotxt")
+                        ui.button("情報", on_click=lambda _, m=m: show_info_dialog(m)).props(
+                            "flat dense size=sm"
+                        )
                         ui.button("削除", on_click=lambda _, m=m: delete_model(m)).props(
                             "flat dense color=negative size=sm"
                         )

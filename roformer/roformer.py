@@ -19,17 +19,20 @@ def list_roformer_models() -> list[dict]:
         name = path.stem
         size = ""
         meta_path = path.with_suffix(".meta.json")
+        output_suffix = ""
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 name = meta.get("display_name", name)
                 size = meta.get("size", size)
+                output_suffix = meta.get("output_suffix", "")
             except Exception:
                 pass
         models.append({
             "name": name,
             "path": str(path),
             "size": size,
+            "output_suffix": output_suffix,
             "relative_path": str(path.relative_to(roformer_dir)),
             "config": str(config) if config.exists() else None,
         })

@@ -254,7 +254,7 @@ def tab_main(ctx: MusicCtx):
     with ui.expansion("オーディオ分離", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを Roformer で分離処理します")
+        ui.label("処理対象ファイルを Roformer で分離処理します。各パラメータの詳細はマウスオーバーしてツールチップを参照してください。")
         selected_roformer_model: dict = {}
 
         with ui.row().classes("items-center gap-4"):
@@ -267,10 +267,10 @@ def tab_main(ctx: MusicCtx):
                     roformer_menu = ui.menu()
 
             roformer_cache = ui.checkbox("モデルをキャッシュ", value=True).tooltip(
-                "効いてるのかどうかよく分かりません"
+                "メモリに読み込んだままにしておき連続して生成するときの時間を節約します。効いてるのかどうかよく分かりません"
             )
             roformer_target_only = ui.checkbox("Vocalのみ出力", value=False).tooltip(
-                "ほとんどのモデルでVocalのみを書き出します。例外があるかもしれません"
+                "メインターゲットのみ書き出します。ほとんどのモデルでVocalです。例外があるかもしれません"
             )
 
             ui.label("オーバーラップ: ")
@@ -305,7 +305,7 @@ def tab_main(ctx: MusicCtx):
             roformer_suffix_input = ui.input(
                 label="suffix",
                 value="",
-            ).props('style="min-width: 150px" outlined').tooltip("「ファイル名suffix_Vocals.flac」となります")
+            ).props('style="min-width: 150px" outlined').tooltip("「ファイル名suffix_Vocals.flac」となります。モデル固有のサフィックス設定を上書きします")
 
             ui.label("フォーマット: ")
             roformer_format = ui.toggle(
@@ -359,9 +359,10 @@ def tab_main(ctx: MusicCtx):
             if not paths:
                 ui.notify("処理対象がありません")
                 return
+            effective_suffix = suffix or model.get("output_suffix", "")
             data = {
                 "model": model,
-                "suffix": suffix,
+                "suffix": effective_suffix,
                 "fmt": fmt,
                 "dest": dest,
                 "cache": cache,
