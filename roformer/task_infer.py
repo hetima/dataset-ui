@@ -342,6 +342,21 @@ def _unique_output_path(out_dir: str, stem_base: str, fmt: str) -> Path:
         n += 1
 
 
+def _next_prefix_num(out_dir: str) -> str:
+    """out_dir をスキャンして「数字_」プレフィクスの最大値+1を2桁ゼロ埋めで返す。"""
+    import re
+    max_n = 0
+    p = Path(out_dir)
+    if p.exists():
+        pattern = re.compile(r'^(\d+)_')
+        for f in p.iterdir():
+            m = pattern.match(f.name)
+            if m:
+                max_n = max(max_n, int(m.group(1)))
+    n = max_n + 1
+    return f"{n:02d}" if n < 10 else str(n)
+
+
 # ---------------------------------------------------------------------------
 # Worker
 # ---------------------------------------------------------------------------
@@ -474,7 +489,9 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
 
         # 書き出し
         target_only: bool = data.get("target_only", False)
+        use_prefix_num: bool = data.get("use_prefix_num", False)
         stem_labels = _get_stem_labels(model_path, len(stems))
+        prefix = (_next_prefix_num(out_dir) + "_") if use_prefix_num else ""
         dst_paths: list[str] = []
         for stem_idx, stem in enumerate(stems):
             if target_only and stem_idx > 0:
@@ -482,7 +499,7 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
             if stop_event is not None and stop_event.is_set():
                 return None
             stem_label = stem_labels[stem_idx] if stem_idx < len(stem_labels) else f"_stem{stem_idx + 1}"
-            out_path = _unique_output_path(out_dir, stem_base + stem_label, fmt)
+            out_path = _unique_output_path(out_dir, prefix + stem_base + stem_label, fmt)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             sf.write(str(out_path), stem.numpy().T, sr_target)
             dst_paths.append(str(out_path))

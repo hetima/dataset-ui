@@ -297,6 +297,10 @@ def tab_main(ctx: MusicCtx):
                 step=1,
             ).props('style="min-width: 80px" outlined').tooltip("一度に処理する秒数。大きいほど品質が上がりますがVRAMを多く使います")
 
+            roformer_prefix_num = ui.checkbox(
+                "連番プレフィクスを付加", value=False
+            ).tooltip("出力フォルダをスキャンして連番プレフィクス（例: 04_）をファイル名に付けます")
+
             ui.label("ファイル名サフィックス: ")
             roformer_suffix_input = ui.input(
                 label="suffix",
@@ -328,6 +332,7 @@ def tab_main(ctx: MusicCtx):
                 roformer_target_only.value or False,
                 roformer_subfolder.value or False,
                 float(roformer_chunk_size.value or 8),
+                roformer_prefix_num.value or False,
             ))
 
         def select_roformer_model(m: dict):
@@ -345,7 +350,7 @@ def tab_main(ctx: MusicCtx):
                 ui.separator()
                 ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
 
-        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0) -> None:
+        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0, use_prefix_num: bool = False) -> None:
             if not model:
                 ui.notify("モデルを選択してください")
                 return
@@ -364,6 +369,7 @@ def tab_main(ctx: MusicCtx):
                 "chunk_size": chunk_size,
                 "target_only": target_only,
                 "subfolder": subfolder,
+                "use_prefix_num": use_prefix_num,
                 "files": paths,
                 "output_dir": str(cnfg.outputs_dir) if dest == "output_dir" else "",
             }
