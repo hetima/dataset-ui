@@ -4,6 +4,11 @@ from dataclasses import dataclass, asdict
 from typing import Optional
 import re
 
+try:
+    from mutagen import File as MutagenFile
+except ImportError:
+    MutagenFile = None
+
 @dataclass
 class MusicFile:
     name: str
@@ -76,8 +81,9 @@ class MusicFile:
             timesignature=data.get("timesignature", ""),
             language=data.get("language", ""),
             duration=data.get("duration", ""),
-            artist=data.get("ttml", ""),
-            album_artist=data.get("ttml", ""),
+            title=data.get("title", ""),
+            artist=data.get("artist", ""),
+            album_artist=data.get("album_artist", ""),
             ttml=data.get("ttml", ""),
         )
 
@@ -176,6 +182,19 @@ class MusicFile:
             language = data.get("language", language)
             duration = data.get("duration", duration)
 
+        # mutagenで音声ファイルのタグを読み取る
+        title = ""
+        artist = ""
+        album_artist = ""
+        if MutagenFile is not None:
+            audio = MutagenFile(file, easy=True)
+            if audio is not None:
+                title = (audio.get("title") or [""])[0]
+                artist = (audio.get("artist") or [""])[0]
+                album_artist = (audio.get("albumartist") or [""])[0]
+        if album_artist and not artist:
+            artist = album_artist
+            
         default = cls(
             name=name,
             path=path,
@@ -187,6 +206,9 @@ class MusicFile:
             timesignature=timesignature,
             language=language,
             duration=duration,
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
         )
 
         return cls(
@@ -200,6 +222,9 @@ class MusicFile:
             timesignature=timesignature,
             language=language,
             duration=duration,
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
             is_expandable=False,
             default=default,
         )
