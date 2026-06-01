@@ -1,35 +1,36 @@
-from pathlib import Path
-from typing import cast
 from nicegui import ui
 from common.setting import cnfg
-import sys
 from edit.edit_app_ctx import EditCtx
+from edit.daw_bridge import create_daw_session, get_daw_url
 from common.wavesurfer import simple_player
 
 
 def tab_main(ctx: EditCtx):
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # compi
+    # DAW
     # ═══════════════════════════════════════════════════════════════════════════════
-    def comping() -> None:
+    def open_daw() -> None:
+        """選択中のファイルを DAW タブで開く。"""
+
         files = ctx.target_files()
-        paths = [music_file["path"] for music_file in files]  # type: ignore
-        if len(paths) == 0:
+        paths = [edit_file["path"] for edit_file in files]  # type: ignore
+        if not paths:
             ui.notify("処理対象がありません")
             return
         cnfg.save()
-        ctx.update_compi()
-        ctx.tabs.set_value("compi")
-        # open compi tab
+        session = create_daw_session(paths)
+        ctx.daw_url = get_daw_url(session.id)
+        ctx.tabs.set_value("daw")
+        ui.timer(0.1, lambda: [func() for func in ctx.daw_refresh_func], once=True)
 
-    with ui.expansion("コンピング", value=True).classes(
+    with ui.expansion("DAW", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
-            "選択したファイルをコンピングタブで編集します"
+            "選択したファイルを DAW タブで編集します"
         )
-        ui.button("コンピングタブを開く", on_click=comping)
+        ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧

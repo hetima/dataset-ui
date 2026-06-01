@@ -20,6 +20,8 @@ class EditCtx:
         self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
+        self.daw_refresh_func: list[Callable[[], None]] = []
+        self.daw_url = ""
         self.client = ui.context.client
         self.tabs: Tabs
 
