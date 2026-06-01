@@ -188,6 +188,14 @@ class MultitrackWidget:
         """zoom スライダーの update:model-value ハンドラ文字列を返す。"""
         return f"(v) => window['{self._name}'] && window['{self._name}'].zoom(v)"
 
+    def set_locked(self, locked: bool):
+        """ドラッグロックを切り替えて再構築する。load_tracks が一度も呼ばれていない場合は何もしない。"""
+        if not self._tracks:
+            return
+        for t in self._tracks:
+            t["draggable"] = not locked
+        self.load_tracks(self._tracks)
+
     def volume_js(self) -> str:
         """マスターボリュームスライダーの update:model-value ハンドラ。全トラックに一括適用する。"""
         name = self._name

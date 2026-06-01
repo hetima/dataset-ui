@@ -36,6 +36,11 @@ def tab_compi(ctx: EditCtx):
                 js_handler=mt.zoom_js(),
             )
             ui.separator().props("vertical")
+            ui.switch("イベントロック").on(
+                "update:model-value",
+                lambda e: mt.set_locked(e.args),
+            )
+            ui.separator().props("vertical")
             ui.button("読み込む", icon="refresh", on_click=lambda: _load(ctx, mt)).props("flat dense")
 
         # Multitrack コンテナ
