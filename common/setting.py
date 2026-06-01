@@ -222,10 +222,14 @@ class Setting:
     def has_edit_files(self) -> bool:
         return bool(self.edit_file_paths)
 
+    def clear_edit_file_paths(self) -> None:
+        self.edit_file_paths = []
+        self.save()
+
     def add_edit_file_path(self, path: str) -> bool:
         if not path or path in self.edit_file_paths:
             return False
-        self.edit_file_paths.append(path)
+        self.edit_file_paths = self.edit_file_paths + [path]
         self.save()
         return True
 

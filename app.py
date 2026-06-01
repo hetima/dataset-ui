@@ -109,11 +109,12 @@ def model_cache_sticky():
 def efit_file_footer():
     """エディットページへの遷移フッタ"""
     with ui.footer(bordered=True).bind_visibility_from(cnfg, "has_edit_files").style(
-        "background-color: #f2f2f2"
+        "background-color: #f5f5f5"
     ):
         with ui.row().classes("items-center gap-4"):
-            ui.label().bind_text_from(cnfg, "edit_file_paths", lambda v: f"エディットプールに {len(v)} 件あります")
-            ui.html('<a href="/edit" target="_blank">エディットプールを開く</a>')
+            ui.label().bind_text_from(cnfg, "edit_file_paths", lambda v: f"エディットプールに {len(v)} 件あります").style("color: #222")
+            ui.button("エディットプールを開く", on_click=lambda: ui.navigate.to("/edit", new_tab=True)).props('flat dense')
+            ui.button("クリアする", on_click=cnfg.clear_edit_file_paths).props('flat dense').style("color: #999")
 
 
 @ui.page("/", title="dataset-ui")
