@@ -96,6 +96,24 @@ function useIoRange() {
   return context
 }
 
+function loadIoRange(key: string): IoRangeState {
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) {
+      return { inPoint: null, outPoint: null, loop: false }
+    }
+
+    const value = JSON.parse(raw) as Partial<IoRangeState>
+    return {
+      inPoint: typeof value.inPoint === 'number' ? value.inPoint : null,
+      outPoint: typeof value.outPoint === 'number' ? value.outPoint : null,
+      loop: value.loop === true,
+    }
+  } catch {
+    return { inPoint: null, outPoint: null, loop: false }
+  }
+}
+
 async function fetchSession(id: string) {
   const response = await fetch(`/api/daw/session/${id}`)
   if (!response.ok) {
@@ -243,15 +261,19 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
 }
 
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
+  const ioRangeStorageKey = useMemo(() => {
+    const session = new URLSearchParams(window.location.search).get('session') ?? 'default'
+    return `dataset-ui:daw:io-range:${session}`
+  }, [])
   const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
   const [soloPlayback, setSoloPlayback] = useState<SoloPlaybackState | null>(null)
-  const [ioRange, setIoRange] = useState<IoRangeState>({
-    inPoint: null,
-    outPoint: null,
-    loop: false,
-  })
+  const [ioRange, setIoRange] = useState<IoRangeState>(() => loadIoRange(ioRangeStorageKey))
   const [scrollLeft, setScrollLeft] = useState(0)
   const viewportRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    window.sessionStorage.setItem(ioRangeStorageKey, JSON.stringify(ioRange))
+  }, [ioRange, ioRangeStorageKey])
 
   return (
     <WaveformPlaylistProvider
