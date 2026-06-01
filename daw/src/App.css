@@ -103,83 +103,6 @@ dd {
   font-size: 13px;
 }
 
-.track-list {
-  display: grid;
-  border-top: 1px solid #e2e8f0;
-}
-
-.track-row {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.track-row:last-child {
-  border-bottom: 0;
-}
-
-.track-icon {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 6px;
-  background: #e8f2ff;
-  color: #075985;
-}
-
-.track-body {
-  min-width: 0;
-}
-
-.track-title {
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.track-title strong,
-dd {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.track-title span {
-  flex: 0 0 auto;
-  color: #64748b;
-  font-size: 12px;
-}
-
-dl {
-  display: grid;
-  gap: 4px;
-  margin: 0 0 10px;
-}
-
-dl div {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 8px;
-  font-size: 12px;
-}
-
-dt {
-  color: #64748b;
-}
-
-dd {
-  margin: 0;
-  color: #334155;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-
-audio {
-  width: 100%;
-  height: 36px;
-}
-
 .playlist-shell {
   background: #111827;
   color: #e5e7eb;
@@ -278,11 +201,39 @@ audio {
 }
 
 .track-controls {
-  width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 240px;
   height: 100%;
-  padding: 0 8px;
+  padding: 8px 10px;
   box-sizing: border-box;
   background: #182233;
+  gap: 8px;
+}
+
+.track-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.track-header-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.track-header-row span {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .track-toggle {
@@ -298,8 +249,17 @@ audio {
   color: #fff;
 }
 
-.track-controls input {
-  width: 70px;
+.track-volume {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.track-volume input {
+  width: 100%;
 }
 
 .spin {

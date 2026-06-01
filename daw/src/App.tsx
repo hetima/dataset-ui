@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  FileAudio2,
-  Link,
   LoaderCircle,
   Pause,
   Play,
@@ -150,36 +148,6 @@ function App() {
           </div>
 
           <PlaylistArea sourceTracks={session.tracks} />
-
-          <div className="track-list">
-            {session.tracks.map((track) => (
-              <article className="track-row" key={track.id}>
-                <div className="track-icon">
-                  <FileAudio2 size={22} />
-                </div>
-                <div className="track-body">
-                  <div className="track-title">
-                    <strong>{track.name}</strong>
-                    <span>ID {track.id}</span>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>sourcePath</dt>
-                      <dd>{track.sourcePath}</dd>
-                    </div>
-                    <div>
-                      <dt>url</dt>
-                      <dd>
-                        <Link size={14} />
-                        {track.url}
-                      </dd>
-                    </div>
-                  </dl>
-                  <audio controls preload="metadata" src={track.url} />
-                </div>
-              </article>
-            ))}
-          </div>
         </section>
       )}
     </main>
@@ -232,7 +200,7 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
       timescale
       waveHeight={76}
       samplesPerPixel={2048}
-      controls={{ show: false, width: 0 }}
+      controls={{ show: true, width: 240 }}
     >
       <KeyboardShortcuts playback clipSplitting undo />
       <PlaylistToolbar />
@@ -334,14 +302,19 @@ function PlaylistToolbar() {
 function TrackControls({ trackIndex }: { trackIndex: number }) {
   const controls = usePlaylistControls()
   const data = usePlaylistData()
+  const track = data.tracks[trackIndex]
   const trackState = data.trackStates[trackIndex]
 
-  if (!trackState) {
+  if (!trackState || !track) {
     return null
   }
 
   return (
     <div className="track-controls">
+      <div className="track-header-row">
+        <strong>{trackState.name || track.name}</strong>
+        <span>ID {trackIndex}</span>
+      </div>
       <button
         type="button"
         className={trackState.soloed ? 'track-toggle active' : 'track-toggle'}
@@ -356,15 +329,20 @@ function TrackControls({ trackIndex }: { trackIndex: number }) {
       >
         M
       </button>
-      <input
-        aria-label={`${trackState.name} volume`}
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={trackState.volume}
-        onChange={(event) => controls.setTrackVolume(trackIndex, Number(event.currentTarget.value))}
-      />
+      <label className="track-volume">
+        <span>VOL</span>
+        <input
+          aria-label={`${trackState.name} volume`}
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={trackState.volume}
+          onChange={(event) =>
+            controls.setTrackVolume(trackIndex, Number(event.currentTarget.value))
+          }
+        />
+      </label>
     </div>
   )
 }
