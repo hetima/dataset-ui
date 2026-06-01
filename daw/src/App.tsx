@@ -74,7 +74,6 @@ type IoRangeState = {
 type IoRangeContextValue = {
   ioRange: IoRangeState
   setIoRange: Dispatch<SetStateAction<IoRangeState>>
-  scrollLeft: number
 }
 
 const SoloPlaybackContext = createContext<SoloPlaybackContextValue | null>(null)
@@ -268,12 +267,27 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
   const [soloPlayback, setSoloPlayback] = useState<SoloPlaybackState | null>(null)
   const [ioRange, setIoRange] = useState<IoRangeState>(() => loadIoRange(ioRangeStorageKey))
-  const [scrollLeft, setScrollLeft] = useState(0)
   const viewportRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     window.sessionStorage.setItem(ioRangeStorageKey, JSON.stringify(ioRange))
   }, [ioRange, ioRangeStorageKey])
+
+  const focusClipHandle = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+
+    const handle = target.closest('[aria-roledescription="draggable"]')
+    if (handle instanceof HTMLElement) {
+      viewportRef.current
+        ?.querySelectorAll('.clip-focus-visible')
+        .forEach((element) => element.classList.remove('clip-focus-visible'))
+      handle.classList.add('clip-focus-visible')
+      handle.focus()
+    }
+  }
 
   return (
     <WaveformPlaylistProvider
@@ -287,16 +301,16 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
       <KeyboardShortcuts playback clipSplitting undo />
       <PlaylistToolbar />
       <SoloPlaybackContext.Provider value={{ soloPlayback, setSoloPlayback }}>
-        <IoRangeContext.Provider value={{ ioRange, setIoRange, scrollLeft }}>
+        <IoRangeContext.Provider value={{ ioRange, setIoRange }}>
           <IoKeyboardShortcuts />
           <ClipInteractionProvider>
             <div
               ref={viewportRef}
               className="playlist-view"
-              onScroll={(event) => setScrollLeft(event.currentTarget.scrollLeft)}
+              onMouseDownCapture={focusClipHandle}
             >
               <IoHeaderControls />
-              <IoRulerMarkers />
+              <IoRulerMarkers viewportRef={viewportRef} />
               <RulerClickOverlay viewportRef={viewportRef} />
               <Waveform
                 showClipHeaders
@@ -458,41 +472,72 @@ function IoHeaderControls() {
   )
 }
 
-function IoRulerMarkers() {
+function IoRulerMarkers({
+  viewportRef,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>
+}) {
   const data = usePlaylistData()
-  const { ioRange, scrollLeft } = useIoRange()
+  const { ioRange } = useIoRange()
   const controlsWidth = data.controls.show ? data.controls.width : 0
+  const [viewportMetrics, setViewportMetrics] = useState({ scrollLeft: 0, width: 0 })
   const range = useMemo(
     () => getIoRangeBounds(ioRange),
     [ioRange],
   )
 
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+
+    const updateMetrics = () => {
+      setViewportMetrics({
+        scrollLeft: viewport.scrollLeft,
+        width: viewport.clientWidth,
+      })
+    }
+
+    updateMetrics()
+    viewport.addEventListener('scroll', updateMetrics, { passive: true })
+    window.addEventListener('resize', updateMetrics)
+    return () => {
+      viewport.removeEventListener('scroll', updateMetrics)
+      window.removeEventListener('resize', updateMetrics)
+    }
+  }, [viewportRef])
+
   const timeToPixel = (time: number) =>
-    controlsWidth + time * data.sampleRate / data.samplesPerPixel - scrollLeft
+    time * data.sampleRate / data.samplesPerPixel - viewportMetrics.scrollLeft
 
   const inLeft = ioRange.inPoint === null ? null : timeToPixel(ioRange.inPoint)
   const outLeft = ioRange.outPoint === null ? null : timeToPixel(ioRange.outPoint)
   const rangeLeft = range ? timeToPixel(range.start) : 0
   const rangeRight = range ? timeToPixel(range.end) : 0
+  const layerWidth = Math.max(0, viewportMetrics.width - controlsWidth)
 
   return (
-    <div className="io-ruler-layer" style={{ left: controlsWidth }}>
+    <div
+      className="io-ruler-layer"
+      style={{
+        left: controlsWidth + viewportMetrics.scrollLeft,
+        width: layerWidth,
+      }}
+    >
       {range && (
         <div
           className="io-range-region"
-          style={{
-            left: rangeLeft - controlsWidth,
-            width: Math.max(1, rangeRight - rangeLeft),
-          }}
+          style={{ left: rangeLeft, width: Math.max(1, rangeRight - rangeLeft) }}
         />
       )}
       {inLeft !== null && (
-        <div className="io-marker io-marker-in" style={{ left: inLeft - controlsWidth }}>
+        <div className="io-marker io-marker-in" style={{ left: inLeft }}>
           I
         </div>
       )}
       {outLeft !== null && (
-        <div className="io-marker io-marker-out" style={{ left: outLeft - controlsWidth }}>
+        <div className="io-marker io-marker-out" style={{ left: outLeft }}>
           O
         </div>
       )}
