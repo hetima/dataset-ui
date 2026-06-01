@@ -95,7 +95,7 @@ class VoiceFile:
         return cls(
             name=name,
             path=path,
-            is_expandable=True,
+            is_expandable=False,
             transcript=caption,
             default=default,
         )

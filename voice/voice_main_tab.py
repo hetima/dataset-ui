@@ -9,6 +9,7 @@ from common.xterm_dialog import XtermDialog
 from common.message_dialog import show_confirm_dialog
 import sys
 from voice.voice_app_ctx import VoiceCtx
+from common.wavesurfer import simple_player
 
 def tab_main(ctx: VoiceCtx):
 
@@ -339,13 +340,17 @@ def tab_main(ctx: VoiceCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    with ui.row().classes("items-center gap-4"):
-        player = ui.audio("")
-        play_info = ui.label("")
+    # with ui.row().classes("items-center gap-4"):
+    #     player = ui.audio("")
+    #     play_info = ui.label("")
+    # def play_src(path: str):
+    #     player.set_source(path)
+    #     player.play()
+    #     play_info.set_text(Path(path).name)
+    ws = simple_player("ws_02", visible=False, autoplay=True)
     def play_src(path: str):
-        player.set_source(path)
-        player.play()
-        play_info.set_text(Path(path).name)
+        ws.container.set_visibility(True)
+        ws.ws.load(path)
 
     ctx.table = ui.table(
         columns=[
