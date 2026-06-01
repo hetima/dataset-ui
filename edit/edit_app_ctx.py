@@ -13,7 +13,10 @@ class EditCtx:
     def __init__(self):
         self.name = "dataset-ui-music"
         self.files = []
+        self.pool_files = []
+        self.conpi_files = []
         self.table: Table
+        self.pool_table: Table
         self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
@@ -25,6 +28,7 @@ class EditCtx:
 
     def update_ui(self):
         self.table.update()
+        self.pool_table.update()
 
     def load_files(self, path: str | None) -> None:
         folder_path = path
@@ -49,10 +53,10 @@ class EditCtx:
         self.table.selected = []
         self.update_ui()
 
-        if not self.files:
-            self.notify("サポート対象のファイルが見つかりません")
-        else:
-            self.notify(f"{len(self.files)} 件のファイルを読み込みました", type="positive")
+    def load_pool(self):
+        self.pool_files = [EditFile.from_audio_file(Path(f)) for f in cnfg.edit_file_paths]
+        self.pool_table.rows = [f.to_dict() for f in self.pool_files]
+        self.pool_table.selected = []
 
     def add_file(self, path: str):
         editfile = EditFile.from_audio_file(Path(path))
@@ -96,4 +100,3 @@ class EditCtx:
                     voicefile = EditFile.from_audio_file(Path(dst))
                     parent_file.add_child(voicefile)
         self.update_ui()
-

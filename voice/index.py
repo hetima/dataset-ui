@@ -15,7 +15,7 @@ def main_page():
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'
     ) as tabs:
-        main_Tab = ui.tab("main", label="メイン", icon="music_note")
+        main_Tab = ui.tab("main", label="メイン", icon="headset_mic")
         setting_tab = ui.tab("setting", label="設定", icon="settings")
     with ui.tab_panels(tabs, animated=False, value=main_Tab).classes("w-full"):
         with ui.tab_panel(main_Tab):

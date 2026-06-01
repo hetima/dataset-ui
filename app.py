@@ -61,7 +61,7 @@ h4 {
 """)
     ui.colors(secondary='#747474')
     ui.html(
-        '<a href="/">dataset-ui</a> / <a href="/music">music</a> | <a href="/voice">voice</a>'
+        '<a href="/">dataset-ui</a> / <a href="/voice">voice</a> | <a href="/music">music</a> | <a href="/edit">edit</a> | '
     ).style("color: #646464")
     if _auto_reload_flag:
         ui.label(
@@ -131,18 +131,25 @@ def main_page():
 モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
         """).classes("items-start w-180")
     with ui.column().classes("items-start gap-0"):
-        ui.link("music", "/music").style(
-            "text-decoration: none; font-size: 3em; margin-top:16px;"
-        )
-        ui.label("主に ACE-Step 向けのメタデータを編集")
-        ui.label("楽曲のBPM、キーなどを解析します。歌詞の解析、編集などもできます")
+        
         ui.link("voice", "/voice").style(
             'text-decoration: none; font-size: 3em; margin-top:16px;'
         )
         ui.label("音声データを編集")
         ui.label("音声の分割や書き起こしなどができます")
+        
+        ui.link("music", "/music").style(
+            "text-decoration: none; font-size: 3em; margin-top:16px;"
+        )
+        ui.label("主に ACE-Step 向けのメタデータを編集")
+        ui.label("楽曲のBPM、キーなどを解析します。歌詞の解析、編集などもできます")
+
+        ui.link("edit", "/edit").style(
+            "text-decoration: none; font-size: 3em; margin-top:16px;"
+        )
+        ui.label("書き出した音声データを編集")
+        ui.label("")
     if _auto_reload_flag:
-        ui.link("edit", "/edit").style("text-decoration: none; font-size: 1.8em;")
         ui.link("test", "/test").style("text-decoration: none; font-size: 1.8em;")
 
     footer()

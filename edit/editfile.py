@@ -62,7 +62,6 @@ class EditFile:
         txt_path = file.with_suffix(".txt")
         name = file.name
         path = str(file)
-        caption = ""
 
         # txtが存在する場合は読み込み
         if txt_path.exists():
