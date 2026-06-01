@@ -289,13 +289,19 @@ def tab_main(ctx: MusicCtx):
             )
 
             ui.label("チャンクサイズ(秒): ")
-            roformer_chunk_size = ui.number(
-                label="chunk size",
-                value=8,
-                min=2,
-                max=30,
-                step=1,
-            ).props('style="min-width: 80px" outlined').tooltip("一度に処理する秒数。大きいほど品質が上がりますがVRAMを多く使います")
+            roformer_chunk_size = (
+                ui.number(
+                    label="chunk size",
+                    value=8,
+                    min=2,
+                    max=30,
+                    step=1,
+                )
+                .props('style="min-width: 80px" outlined')
+                .tooltip(
+                    "一度に処理する秒数。大きくするとVRAMを多く使います。2倍にすれば2倍速くなるというわけではありません。"
+                )
+            )
 
             roformer_prefix_num = ui.checkbox(
                 "連番プレフィクスを付加", value=False
