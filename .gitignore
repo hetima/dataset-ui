@@ -187,3 +187,5 @@ cython_debug/
 /dataset/
 /*_config.json
 /config.json
+
+node_modules/
