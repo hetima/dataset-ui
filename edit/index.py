@@ -19,14 +19,11 @@ def main_page():
         'inline-label align="left"'
     ) as ctx.tabs:
         main_Tab = ui.tab("main", label="メイン", icon="home")
-        compi_tab = ui.tab("compi", label="コンピング", icon="music_note")
         daw_tab = ui.tab("daw", label="DAW", icon="graphic_eq")
         setting_tab = ui.tab("setting", label="設定", icon="settings")
     with ui.tab_panels(ctx.tabs, animated=False, value=main_Tab).classes("w-full").props("keep-alive"):
         with ui.tab_panel(main_Tab):
             tab_main(ctx)
-        with ui.tab_panel(compi_tab):
-            tab_compi(ctx)
         with ui.tab_panel(daw_tab):
             tab_daw(ctx)
         with ui.tab_panel(setting_tab):

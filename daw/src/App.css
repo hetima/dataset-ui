@@ -199,105 +199,119 @@ dd {
   user-select: none;
 }
 
-.io-header-controls {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 25;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 240px;
-  height: 30px;
-  padding: 0 10px;
-  box-sizing: border-box;
-  background: #111827;
-  color: #cbd5e1;
-  font-size: 11px;
-}
-
-.io-play-button {
+/* === モード切替（ツールバー内） === */
+.height-toggle,
+.mode-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
+  gap: 10px;
+}
+
+.mode-toggle {
+  margin-left: auto;
+}
+
+.height-switch,
+.mode-switch {
+  display: inline-flex;
   border: 1px solid #334155;
   border-radius: 6px;
-  background: #1f2937;
-  color: #e5e7eb;
-  cursor: pointer;
-  font-size: 11px;
+  overflow: hidden;
 }
 
-.io-play-button:disabled {
-  color: #64748b;
-  cursor: default;
-  opacity: 0.65;
-}
-
-.io-loop-control {
+.height-button,
+.mode-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  background: #1f2937;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.height-toggle span {
+  color: #cbd5e1;
+  font-size: 12px;
   white-space: nowrap;
 }
 
-.io-loop-control input {
+.height-button {
+  min-width: 32px;
+  justify-content: center;
+}
+
+.height-button:hover,
+.mode-button:hover {
+  background: #263244;
+}
+
+.height-button.active,
+.mode-button.active {
+  background: #0e7490;
+  color: #fff;
+}
+
+.overlap-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.overlap-control input {
   width: 13px;
   height: 13px;
   margin: 0;
 }
 
-.io-ruler-layer {
+/* === リージョン（コンピング）オーバーレイ === */
+.region-layer {
   position: absolute;
   top: 0;
-  height: 30px;
-  z-index: 18;
-  overflow: hidden;
+  z-index: 15;
   pointer-events: none;
 }
 
-.io-range-region {
+/* 上部80%のキャプチャ帯（作成・クリックシーク）。それ以外は下のクリップへ貫通 */
+.region-capture {
   position: absolute;
-  top: 0;
-  height: 30px;
-  background: rgba(56, 189, 248, 0.16);
-  border-left: 1px solid rgba(56, 189, 248, 0.35);
-  border-right: 1px solid rgba(56, 189, 248, 0.35);
+  left: 0;
+  right: 0;
+  pointer-events: auto;
+  cursor: crosshair;
 }
 
-.io-marker {
+.region-box {
   position: absolute;
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 18px;
-  transform: translateX(-8px);
-  border-radius: 0 0 4px 4px;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
+  pointer-events: auto;
+  background: rgba(244, 114, 182, 0.28);
+  border: 2px solid rgba(244, 114, 182, 0.9);
+  border-radius: 3px;
+  cursor: grab;
+  box-sizing: border-box;
 }
 
-.io-marker::after {
-  content: "";
-  position: absolute;
-  top: 18px;
-  left: 7px;
-  width: 2px;
-  height: 12px;
-  background: currentColor;
-  opacity: 0.85;
+.region-box:active {
+  cursor: grabbing;
 }
 
-.io-marker-in {
-  background: #0284c7;
+.region-box.selected {
+  background: rgba(244, 114, 182, 0.38);
+  border-color: #f9a8d4;
+  box-shadow: 0 0 0 1px rgba(249, 168, 212, 0.6);
 }
 
-.io-marker-out {
-  background: #be123c;
+/* 作成・操作中のプレビュー（イベントを受けない） */
+.region-box.draft {
+  pointer-events: none;
+  background: rgba(244, 114, 182, 0.22);
+  border-style: dashed;
 }
 
 .playlist-view [aria-roledescription="draggable"] {
@@ -326,12 +340,43 @@ dd {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  width: 240px;
+  width: 200px;
   height: 100%;
   padding: 8px 10px;
   box-sizing: border-box;
   background: #182233;
   gap: 8px;
+}
+
+.track-controls.compact {
+  display: grid;
+  grid-template-columns: 30px 30px minmax(0, 1fr);
+  grid-template-areas:
+    "header header header"
+    "solo mute mute"
+    "volume volume volume";
+  gap: 6px 12px;
+  padding: 6px 8px;
+}
+
+.track-controls.compact .track-header-row {
+  grid-area: header;
+}
+
+.track-controls.compact > .track-toggle {
+  grid-area: solo;
+}
+
+.track-controls.compact .track-mute-row {
+  display: contents;
+}
+
+.track-controls.compact .track-mute-row .track-toggle {
+  grid-area: mute;
+}
+
+.track-controls.compact .track-volume {
+  grid-area: volume;
 }
 
 .track-header-row {
@@ -374,34 +419,6 @@ dd {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.track-solo-play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 7px;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  background: #1f2937;
-  color: #e5e7eb;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.track-solo-play:hover {
-  background: #263244;
-}
-
-.track-solo-play.active {
-  border-color: #38bdf8;
-  background: #0e7490;
-  color: #fff;
 }
 
 .track-volume {

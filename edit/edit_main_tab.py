@@ -28,7 +28,7 @@ def tab_main(ctx: EditCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
-            "選択したファイルを DAW タブで編集します"
+            "選択したファイルを DAW タブで編集します。マルチトラックでクリップ編集、コンピングなどが行なえます。"
         )
         ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
 

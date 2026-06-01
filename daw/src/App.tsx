@@ -4,6 +4,7 @@ import {
   type SetStateAction,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -36,6 +37,8 @@ import {
   usePlaylistData,
   usePlaylistState,
 } from '@waveform-playlist/browser'
+import { createPortal } from 'react-dom'
+import { Layers, SlidersHorizontal } from 'lucide-react'
 import './App.css'
 
 type DawTrack = {
@@ -54,63 +57,204 @@ type DawSession = {
   tracks: DawTrack[]
 }
 
-type SoloPlaybackState = {
+type SoloStateContextValue = {
+  soloedTrackIndex: number | null
+  setSoloedTrackIndex: Dispatch<SetStateAction<number | null>>
+}
+
+const SoloStateContext = createContext<SoloStateContextValue | null>(null)
+
+function useSoloState() {
+  const context = useContext(SoloStateContext)
+  if (!context) {
+    throw new Error('SoloStateContext が見つかりません')
+  }
+  return context
+}
+
+// === リージョン（コンピング）機能 ===
+
+type DawMode = 'daw' | 'comping'
+
+type Region = {
+  id: string
   trackIndex: number
-  startTime: number
-  soloedStates: boolean[]
+  start: number
+  end: number
 }
 
-type SoloPlaybackContextValue = {
-  soloPlayback: SoloPlaybackState | null
-  setSoloPlayback: Dispatch<SetStateAction<SoloPlaybackState | null>>
+type DawModeContextValue = {
+  mode: DawMode
+  setMode: Dispatch<SetStateAction<DawMode>>
+  allowOverlap: boolean
+  setAllowOverlap: Dispatch<SetStateAction<boolean>>
 }
 
-type IoRangeState = {
-  inPoint: number | null
-  outPoint: number | null
-  loop: boolean
+type RegionContextValue = {
+  regions: Region[]
+  setRegions: Dispatch<SetStateAction<Region[]>>
+  selectedRegionId: string | null
+  setSelectedRegionId: Dispatch<SetStateAction<string | null>>
 }
 
-type IoRangeContextValue = {
-  ioRange: IoRangeState
-  setIoRange: Dispatch<SetStateAction<IoRangeState>>
-}
+const DawModeContext = createContext<DawModeContextValue | null>(null)
+const RegionContext = createContext<RegionContextValue | null>(null)
 
-const SoloPlaybackContext = createContext<SoloPlaybackContextValue | null>(null)
-const IoRangeContext = createContext<IoRangeContextValue | null>(null)
-
-function useSoloPlayback() {
-  const context = useContext(SoloPlaybackContext)
+function useDawMode() {
+  const context = useContext(DawModeContext)
   if (!context) {
-    throw new Error('SoloPlaybackContext が見つかりません')
+    throw new Error('DawModeContext が見つかりません')
   }
   return context
 }
 
-function useIoRange() {
-  const context = useContext(IoRangeContext)
+function useRegions() {
+  const context = useContext(RegionContext)
   if (!context) {
-    throw new Error('IoRangeContext が見つかりません')
+    throw new Error('RegionContext が見つかりません')
   }
   return context
 }
 
-function loadIoRange(key: string): IoRangeState {
+// クリップヘッダの高さ（ui-components の CLIP_HEADER_HEIGHT）
+const CLIP_HEADER_HEIGHT = 22
+// リージョン矩形が覆うクリップ本体の縦割合（上部のみ覆い、下部はシーク用に空ける）
+const REGION_HEIGHT_RATIO = 0.8
+// リサイズハンドルの当たり幅（ピクセル）
+const REGION_RESIZE_HANDLE_PX = 6
+// 作成ドラッグとクリック（シーク）を分ける移動量しきい値（ピクセル）
+const REGION_DRAG_THRESHOLD_PX = 3
+// 重なり解消でこの秒数未満になったリージョンは削除する
+const REGION_MIN_DURATION = 0.02
+
+function makeRegionId(): string {
+  return `region-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function loadRegions(key: string): Region[] {
   try {
     const raw = window.sessionStorage.getItem(key)
     if (!raw) {
-      return { inPoint: null, outPoint: null, loop: false }
+      return []
     }
 
-    const value = JSON.parse(raw) as Partial<IoRangeState>
-    return {
-      inPoint: typeof value.inPoint === 'number' ? value.inPoint : null,
-      outPoint: typeof value.outPoint === 'number' ? value.outPoint : null,
-      loop: value.loop === true,
+    const value = JSON.parse(raw)
+    if (!Array.isArray(value)) {
+      return []
     }
+
+    return value
+      .filter(
+        (item): item is Region =>
+          item &&
+          typeof item.id === 'string' &&
+          typeof item.trackIndex === 'number' &&
+          typeof item.start === 'number' &&
+          typeof item.end === 'number',
+      )
+      .map((item) => ({
+        id: item.id,
+        trackIndex: item.trackIndex,
+        start: item.start,
+        end: item.end,
+      }))
   } catch {
-    return { inPoint: null, outPoint: null, loop: false }
+    return []
   }
+}
+
+/**
+ * ステップ1: ドラッグ中の同一トラッククランプ。
+ * 操作中リージョンが同一トラックの他リージョンにぶつかったら、ぶつかる方向へは伸ばさない。
+ * proposedStart/End は秒。edge は伸ばそうとしている向きの判定に使う。
+ */
+function clampToSameTrack(
+  regions: Region[],
+  trackIndex: number,
+  activeId: string | null,
+  proposedStart: number,
+  proposedEnd: number,
+): { start: number; end: number } {
+  let start = proposedStart
+  let end = proposedEnd
+
+  for (const other of regions) {
+    if (other.id === activeId || other.trackIndex !== trackIndex) {
+      continue
+    }
+    // 完全に分離しているなら無視
+    if (other.end <= start || other.start >= end) {
+      continue
+    }
+    // 重なっている: 操作中の中心から見て、相手が右ならend、左ならstartをクランプ
+    const activeCenter = (start + end) / 2
+    const otherCenter = (other.start + other.end) / 2
+    if (otherCenter >= activeCenter) {
+      // 相手は右側 → end を相手の手前まで
+      end = Math.min(end, other.start)
+    } else {
+      // 相手は左側 → start を相手の後ろまで
+      start = Math.max(start, other.end)
+    }
+  }
+
+  if (end < start) {
+    end = start
+  }
+  return { start, end }
+}
+
+/**
+ * ステップ2: 確定後の重なり解消（allowOverlap オフ時のみ呼ぶ）。
+ * active 以外で active と重なるリージョンを削る／完全内包は削除／幅が極小なら削除。
+ * allowOverlap オフでは他トラックも対象（呼び出し側で対象トラックを絞らず全件渡す）。
+ */
+function resolveOverlapsAfterCommit(regions: Region[], active: Region): Region[] {
+  const result: Region[] = []
+
+  for (const other of regions) {
+    if (other.id === active.id) {
+      result.push(other)
+      continue
+    }
+    // 分離しているならそのまま
+    if (other.end <= active.start || other.start >= active.end) {
+      result.push(other)
+      continue
+    }
+    // active が other を完全内包 → 削除
+    if (active.start <= other.start && active.end >= other.end) {
+      continue
+    }
+    // other が active を完全内包 → other を active の前後に分割
+    if (other.start < active.start && other.end > active.end) {
+      const left: Region = { ...other, end: active.start }
+      const right: Region = {
+        ...other,
+        id: `${other.id}-r`,
+        start: active.end,
+      }
+      if (left.end - left.start >= REGION_MIN_DURATION) {
+        result.push(left)
+      }
+      if (right.end - right.start >= REGION_MIN_DURATION) {
+        result.push(right)
+      }
+      continue
+    }
+    // 部分重なり: other を active と重ならないよう削る
+    let trimmed: Region
+    if (other.start < active.start) {
+      trimmed = { ...other, end: active.start }
+    } else {
+      trimmed = { ...other, start: active.end }
+    }
+    if (trimmed.end - trimmed.start >= REGION_MIN_DURATION) {
+      result.push(trimmed)
+    }
+  }
+
+  return result
 }
 
 async function fetchSession(id: string) {
@@ -259,19 +403,30 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
   )
 }
 
+type TrackHeightMode = 'large' | 'small'
+
+const TRACK_CONTROLS_WIDTH = 200
+const WAVE_HEIGHT_LARGE = 76
+const WAVE_HEIGHT_SMALL = 38
+
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
-  const ioRangeStorageKey = useMemo(() => {
+  const regionStorageKey = useMemo(() => {
     const session = new URLSearchParams(window.location.search).get('session') ?? 'default'
-    return `dataset-ui:daw:io-range:${session}`
+    return `dataset-ui:daw:regions:${session}`
   }, [])
   const [playlistTracks, setPlaylistTracks] = useState(initialTracks)
-  const [soloPlayback, setSoloPlayback] = useState<SoloPlaybackState | null>(null)
-  const [ioRange, setIoRange] = useState<IoRangeState>(() => loadIoRange(ioRangeStorageKey))
+  const [soloedTrackIndex, setSoloedTrackIndex] = useState<number | null>(null)
+  const [mode, setMode] = useState<DawMode>('daw')
+  const [allowOverlap, setAllowOverlap] = useState(false)
+  const [trackHeightMode, setTrackHeightMode] = useState<TrackHeightMode>('large')
+  const [regions, setRegions] = useState<Region[]>(() => loadRegions(regionStorageKey))
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
+  const waveHeight = trackHeightMode === 'small' ? WAVE_HEIGHT_SMALL : WAVE_HEIGHT_LARGE
 
   useEffect(() => {
-    window.sessionStorage.setItem(ioRangeStorageKey, JSON.stringify(ioRange))
-  }, [ioRange, ioRangeStorageKey])
+    window.sessionStorage.setItem(regionStorageKey, JSON.stringify(regions))
+  }, [regions, regionStorageKey])
 
   const focusClipHandle = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target
@@ -294,254 +449,52 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
       tracks={playlistTracks}
       onTracksChange={setPlaylistTracks}
       timescale
-      waveHeight={76}
+      waveHeight={waveHeight}
       samplesPerPixel={2048}
-      controls={{ show: true, width: 240 }}
+      controls={{ show: true, width: TRACK_CONTROLS_WIDTH }}
     >
-      <KeyboardShortcuts playback clipSplitting undo />
-      <PlaylistToolbar />
-      <SoloPlaybackContext.Provider value={{ soloPlayback, setSoloPlayback }}>
-        <IoRangeContext.Provider value={{ ioRange, setIoRange }}>
-          <IoKeyboardShortcuts />
-          <ClipInteractionProvider>
-            <div
-              ref={viewportRef}
-              className="playlist-view"
-              onMouseDownCapture={focusClipHandle}
-            >
-              <IoHeaderControls />
-              <IoRulerMarkers viewportRef={viewportRef} />
-              <RulerClickOverlay viewportRef={viewportRef} />
-              <Waveform
-                showClipHeaders
-                showFades
-                renderTrackControls={(trackIndex) => <TrackControls trackIndex={trackIndex} />}
-              />
-            </div>
-          </ClipInteractionProvider>
-        </IoRangeContext.Provider>
-      </SoloPlaybackContext.Provider>
+      <KeyboardShortcuts clipSplitting undo />
+      <PlaybackKeyboard />
+      <DawModeContext.Provider value={{ mode, setMode, allowOverlap, setAllowOverlap }}>
+        <RegionContext.Provider
+          value={{ regions, setRegions, selectedRegionId, setSelectedRegionId }}
+        >
+          <PlaylistToolbar
+            trackHeightMode={trackHeightMode}
+            setTrackHeightMode={setTrackHeightMode}
+          />
+          <SoloStateContext.Provider value={{ soloedTrackIndex, setSoloedTrackIndex }}>
+            <ClipInteractionProvider>
+              <div
+                ref={viewportRef}
+                className="playlist-view"
+                onMouseDownCapture={focusClipHandle}
+              >
+                <RulerClickOverlay viewportRef={viewportRef} />
+                <Waveform
+                  showClipHeaders
+                  showFades
+                  renderTrackControls={(trackIndex) => (
+                    <TrackControls
+                      trackIndex={trackIndex}
+                      trackHeightMode={trackHeightMode}
+                    />
+                  )}
+                />
+                {mode === 'comping' && (
+                  <RegionOverlay
+                    viewportRef={viewportRef}
+                    layoutKey={trackHeightMode}
+                  />
+                )}
+              </div>
+            </ClipInteractionProvider>
+            {mode === 'comping' && <RegionPlaybackGate />}
+            {mode === 'comping' && <RegionKeyboard />}
+          </SoloStateContext.Provider>
+        </RegionContext.Provider>
+      </DawModeContext.Provider>
     </WaveformPlaylistProvider>
-  )
-}
-
-function getIoRangeBounds(ioRange: IoRangeState) {
-  if (ioRange.inPoint === null || ioRange.outPoint === null) {
-    return null
-  }
-
-  const start = Math.min(ioRange.inPoint, ioRange.outPoint)
-  const end = Math.max(ioRange.inPoint, ioRange.outPoint)
-  if (end <= start) {
-    return null
-  }
-  return { start, end, duration: end - start }
-}
-
-function shouldIgnoreIoShortcut(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return Boolean(
-    target.closest('input, textarea, select, button, [contenteditable="true"]'),
-  )
-}
-
-function IoKeyboardShortcuts() {
-  const playback = usePlaybackAnimation()
-  const { setIoRange } = useIoRange()
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || shouldIgnoreIoShortcut(event.target)) {
-        return
-      }
-
-      const key = event.key.toLowerCase()
-      if (key !== 'i' && key !== 'o') {
-        return
-      }
-
-      event.preventDefault()
-      const time = Math.max(0, playback.currentTimeRef.current ?? 0)
-      setIoRange((current) =>
-        key === 'i' ? { ...current, inPoint: time } : { ...current, outPoint: time },
-      )
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    try {
-      if (window.parent !== window) {
-        window.parent.addEventListener('keydown', onKeyDown)
-      }
-    } catch {
-      // クロスオリジン埋め込み時は iframe 内だけで受ける
-    }
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      try {
-        if (window.parent !== window) {
-          window.parent.removeEventListener('keydown', onKeyDown)
-        }
-      } catch {
-        // クロスオリジン埋め込み時は解除不要
-      }
-    }
-  }, [playback.currentTimeRef, setIoRange])
-
-  return null
-}
-
-function IoHeaderControls() {
-  const controls = usePlaylistControls()
-  const playback = usePlaybackAnimation()
-  const { ioRange, setIoRange } = useIoRange()
-  const range = useMemo(
-    () => getIoRangeBounds(ioRange),
-    [ioRange],
-  )
-  const ioPlaybackActiveRef = useRef(false)
-  const loopResumePendingRef = useRef(false)
-
-  useEffect(() => {
-    if (!ioPlaybackActiveRef.current || loopResumePendingRef.current || !range) {
-      return
-    }
-    if (playback.isPlaying) {
-      return
-    }
-
-    const currentTime = playback.currentTimeRef.current ?? 0
-    const reachedOutPoint = currentTime >= range.end - 0.05
-    if (!reachedOutPoint) {
-      ioPlaybackActiveRef.current = false
-      return
-    }
-
-    if (!ioRange.loop) {
-      ioPlaybackActiveRef.current = false
-      return
-    }
-
-    loopResumePendingRef.current = true
-    controls.setCurrentTime(range.start)
-    void controls.play(range.start, range.duration).finally(() => {
-      loopResumePendingRef.current = false
-    })
-  }, [controls, ioRange.loop, playback.currentTimeRef, playback.isPlaying, range])
-
-  const playIoRange = async () => {
-    if (!range) {
-      return
-    }
-
-    ioPlaybackActiveRef.current = true
-    loopResumePendingRef.current = false
-    controls.stop()
-    controls.setCurrentTime(range.start)
-    await controls.play(range.start, range.duration)
-  }
-
-  const toggleLoop = (checked: boolean) => {
-    setIoRange((current) => ({ ...current, loop: checked }))
-  }
-
-  return (
-    <div className="io-header-controls">
-      <button
-        type="button"
-        className="io-play-button"
-        disabled={!range}
-        onMouseDown={(event) => event.stopPropagation()}
-        onClick={() => void playIoRange()}
-      >
-        <Play size={12} />
-        IO再生
-      </button>
-      <label className="io-loop-control" onMouseDown={(event) => event.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={ioRange.loop}
-          onChange={(event) => toggleLoop(event.currentTarget.checked)}
-        />
-        IOループ
-      </label>
-    </div>
-  )
-}
-
-function IoRulerMarkers({
-  viewportRef,
-}: {
-  viewportRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const data = usePlaylistData()
-  const { ioRange } = useIoRange()
-  const controlsWidth = data.controls.show ? data.controls.width : 0
-  const [viewportMetrics, setViewportMetrics] = useState({ scrollLeft: 0, width: 0 })
-  const range = useMemo(
-    () => getIoRangeBounds(ioRange),
-    [ioRange],
-  )
-
-  useEffect(() => {
-    const viewport = viewportRef.current
-    if (!viewport) {
-      return
-    }
-
-    const updateMetrics = () => {
-      setViewportMetrics({
-        scrollLeft: viewport.scrollLeft,
-        width: viewport.clientWidth,
-      })
-    }
-
-    updateMetrics()
-    viewport.addEventListener('scroll', updateMetrics, { passive: true })
-    window.addEventListener('resize', updateMetrics)
-    return () => {
-      viewport.removeEventListener('scroll', updateMetrics)
-      window.removeEventListener('resize', updateMetrics)
-    }
-  }, [viewportRef])
-
-  const timeToPixel = (time: number) =>
-    time * data.sampleRate / data.samplesPerPixel - viewportMetrics.scrollLeft
-
-  const inLeft = ioRange.inPoint === null ? null : timeToPixel(ioRange.inPoint)
-  const outLeft = ioRange.outPoint === null ? null : timeToPixel(ioRange.outPoint)
-  const rangeLeft = range ? timeToPixel(range.start) : 0
-  const rangeRight = range ? timeToPixel(range.end) : 0
-  const layerWidth = Math.max(0, viewportMetrics.width - controlsWidth)
-
-  return (
-    <div
-      className="io-ruler-layer"
-      style={{
-        left: controlsWidth + viewportMetrics.scrollLeft,
-        width: layerWidth,
-      }}
-    >
-      {range && (
-        <div
-          className="io-range-region"
-          style={{ left: rangeLeft, width: Math.max(1, rangeRight - rangeLeft) }}
-        />
-      )}
-      {inLeft !== null && (
-        <div className="io-marker io-marker-in" style={{ left: inLeft }}>
-          I
-        </div>
-      )}
-      {outLeft !== null && (
-        <div className="io-marker io-marker-out" style={{ left: outLeft }}>
-          O
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -680,7 +633,13 @@ function RulerClickOverlay({
   )
 }
 
-function PlaylistToolbar() {
+function PlaylistToolbar({
+  trackHeightMode,
+  setTrackHeightMode,
+}: {
+  trackHeightMode: TrackHeightMode
+  setTrackHeightMode: Dispatch<SetStateAction<TrackHeightMode>>
+}) {
   const controls = usePlaylistControls()
   const state = usePlaylistState()
   const data = usePlaylistData()
@@ -757,16 +716,738 @@ function PlaylistToolbar() {
         />
       </label>
 
+      <TrackHeightToggle
+        trackHeightMode={trackHeightMode}
+        setTrackHeightMode={setTrackHeightMode}
+      />
+
+      <ModeToggle />
+
       <span className="load-state">ready</span>
     </div>
   )
 }
 
-function TrackControls({ trackIndex }: { trackIndex: number }) {
+function TrackHeightToggle({
+  trackHeightMode,
+  setTrackHeightMode,
+}: {
+  trackHeightMode: TrackHeightMode
+  setTrackHeightMode: Dispatch<SetStateAction<TrackHeightMode>>
+}) {
+  return (
+    <div className="height-toggle" onMouseDown={(event) => event.stopPropagation()}>
+      <span>高さ</span>
+      <div className="height-switch">
+        <button
+          type="button"
+          className={trackHeightMode === 'large' ? 'height-button active' : 'height-button'}
+          onClick={() => setTrackHeightMode('large')}
+        >
+          大
+        </button>
+        <button
+          type="button"
+          className={trackHeightMode === 'small' ? 'height-button active' : 'height-button'}
+          onClick={() => setTrackHeightMode('small')}
+        >
+          小
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ModeToggle() {
+  const { mode, setMode, allowOverlap, setAllowOverlap } = useDawMode()
+
+  return (
+    <div className="mode-toggle" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="mode-switch">
+        <button
+          type="button"
+          className={mode === 'daw' ? 'mode-button active' : 'mode-button'}
+          onClick={() => setMode('daw')}
+        >
+          <SlidersHorizontal size={14} />
+          DAW
+        </button>
+        <button
+          type="button"
+          className={mode === 'comping' ? 'mode-button active' : 'mode-button'}
+          onClick={() => setMode('comping')}
+        >
+          <Layers size={14} />
+          コンピング
+        </button>
+      </div>
+      <label
+        className="overlap-control"
+        style={{ visibility: mode === 'comping' ? 'visible' : 'hidden' }}
+      >
+        <input
+          type="checkbox"
+          checked={allowOverlap}
+          onChange={(event) => setAllowOverlap(event.currentTarget.checked)}
+        />
+        重なり許容
+      </label>
+    </div>
+  )
+}
+
+// トラックごとの縦レイアウト（viewport 内ローカル座標）
+type TrackLayout = {
+  trackIndex: number
+  trackId: string
+  top: number // クリップ本体上端（ヘッダ下）
+  height: number // クリップ本体（波形）の高さ
+}
+
+/**
+ * viewport 内の各トラック行の縦位置を実測する。
+ * data-track-id は ChannelContainer（トラックごと1個）と ClipContainer（クリップごと）の両方に付く。
+ * ClipContainer は data-clip-container="true" も持つので :not([data-clip-container]) で除外する。
+ */
+// baseEl: top 計算の基準要素（portal 挿入先）
+function measureTrackLayouts(viewport: HTMLElement, baseEl?: HTMLElement): TrackLayout[] {
+  const trackEls = Array.from(
+    viewport.querySelectorAll<HTMLElement>('[data-track-id]:not([data-clip-container])'),
+  )
+  const base = baseEl ?? viewport
+  const baseRect = base.getBoundingClientRect()
+
+  return trackEls.map((el, index) => {
+    const rect = el.getBoundingClientRect()
+    const localTop = rect.top - baseRect.top + (baseEl ? baseEl.scrollTop : 0)
+    return {
+      trackIndex: index,
+      trackId: el.dataset.trackId ?? '',
+      top: localTop + CLIP_HEADER_HEIGHT,
+      height: Math.max(0, rect.height - CLIP_HEADER_HEIGHT),
+    }
+  })
+}
+
+type RegionDragState =
+  | {
+      kind: 'create'
+      trackIndex: number
+      anchorTime: number // 始点（固定）
+      startX: number
+      startY: number
+      moved: boolean
+    }
+  | {
+      kind: 'move'
+      regionId: string
+      trackIndex: number
+      grabOffset: number // 掴んだ位置 - region.start（秒）
+      width: number // region 幅（秒、固定）
+      startX: number
+      moved: boolean
+    }
+  | {
+      kind: 'resize'
+      regionId: string
+      trackIndex: number
+      edge: 'start' | 'end'
+      fixedTime: number // 反対端（固定）
+      startX: number
+    }
+
+function RegionOverlay({
+  viewportRef,
+  layoutKey,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>
+  layoutKey: TrackHeightMode
+}) {
+  const data = usePlaylistData()
+  const controls = usePlaylistControls()
+  const { regions, setRegions, selectedRegionId, setSelectedRegionId } = useRegions()
+  const { allowOverlap } = useDawMode()
+
+  const [layouts, setLayouts] = useState<TrackLayout[]>([])
+  const dragRef = useRef<RegionDragState | null>(null)
+  const [draftRegion, setDraftRegion] = useState<Region | null>(null)
+
+  // 最新の値を window リスナから参照するための ref
+  const stateRef = useRef({ regions, allowOverlap })
+  useEffect(() => {
+    stateRef.current = { regions, allowOverlap }
+  }, [regions, allowOverlap])
+
+  // portal 挿入先（ScrollArea）。スクロールするコンテナの中に絶対配置する。
+  const scrollEl = controls.scrollContainerRef.current
+
+  // ScrollArea 内の絶対ピクセル座標（スクロールを引かない）
+  const timeToPixel = (time: number) =>
+    (time * data.sampleRate) / data.samplesPerPixel
+
+  const measureLayouts = () => {
+    const viewport = viewportRef.current
+    const base = controls.scrollContainerRef.current ?? undefined
+    if (!viewport) return
+    setLayouts(measureTrackLayouts(viewport, base))
+  }
+
+  useEffect(() => {
+    measureLayouts()
+    window.addEventListener('resize', measureLayouts)
+    return () => window.removeEventListener('resize', measureLayouts)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    measureLayouts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.samplesPerPixel, data.tracks.length, data.duration])
+
+  useEffect(() => {
+    measureLayouts()
+    const frame = window.requestAnimationFrame(measureLayouts)
+    return () => window.cancelAnimationFrame(frame)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutKey])
+
+  // clientX → タイムライン秒数（ScrollArea の left + scrollLeft を基準）
+  const pixelToTime = (clientX: number) => {
+    const el = controls.scrollContainerRef.current
+    if (!el) return 0
+    const rect = el.getBoundingClientRect()
+    const waveformPixel = clientX - rect.left + el.scrollLeft
+    const seconds = (Math.max(0, waveformPixel) * data.samplesPerPixel) / data.sampleRate
+    return Math.max(0, Math.min(seconds, data.duration || seconds))
+  }
+
+  const commitActive = (active: Region) => {
+    setRegions((current) => {
+      // active を最新の幅で反映
+      const withActive = current.some((r) => r.id === active.id)
+        ? current.map((r) => (r.id === active.id ? active : r))
+        : [...current, active]
+      if (stateRef.current.allowOverlap) {
+        return withActive
+      }
+      return resolveOverlapsAfterCommit(withActive, active)
+    })
+  }
+
+  // drag 情報とマウス位置から、確定前リージョン（プレビュー兼確定値）を計算する。
+  // State(draftRegion) に依存しないので window リスナのクロージャ陳腐化を受けない。
+  const computeDraft = (drag: RegionDragState, clientX: number): Region => {
+    const time = pixelToTime(clientX)
+
+    if (drag.kind === 'create') {
+      const rawStart = Math.min(drag.anchorTime, time)
+      const rawEnd = Math.max(drag.anchorTime, time)
+      const clamped = clampToSameTrack(
+        stateRef.current.regions,
+        drag.trackIndex,
+        null,
+        rawStart,
+        rawEnd,
+      )
+      return {
+        id: '__draft__',
+        trackIndex: drag.trackIndex,
+        start: clamped.start,
+        end: clamped.end,
+      }
+    }
+
+    if (drag.kind === 'move') {
+      const newStart = Math.max(0, time - drag.grabOffset)
+      const clamped = clampToSameTrack(
+        stateRef.current.regions,
+        drag.trackIndex,
+        drag.regionId,
+        newStart,
+        newStart + drag.width,
+      )
+      // 幅維持を優先（ぶつかった端で止める）
+      const start = clamped.start
+      return {
+        id: drag.regionId,
+        trackIndex: drag.trackIndex,
+        start,
+        end: start + drag.width,
+      }
+    }
+
+    // resize
+    let rawStart: number
+    let rawEnd: number
+    if (drag.edge === 'start') {
+      rawStart = Math.min(time, drag.fixedTime)
+      rawEnd = drag.fixedTime
+    } else {
+      rawStart = drag.fixedTime
+      rawEnd = Math.max(time, drag.fixedTime)
+    }
+    const clamped = clampToSameTrack(
+      stateRef.current.regions,
+      drag.trackIndex,
+      drag.regionId,
+      rawStart,
+      rawEnd,
+    )
+    return {
+      id: drag.regionId,
+      trackIndex: drag.trackIndex,
+      start: clamped.start,
+      end: clamped.end,
+    }
+  }
+
+  const onWindowMouseMove = (event: MouseEvent) => {
+    const drag = dragRef.current
+    if (!drag) {
+      return
+    }
+    event.preventDefault()
+
+    // 作成・移動は移動量しきい値を超えるまで何もしない（クリック判定のため）
+    if (
+      (drag.kind === 'create' || drag.kind === 'move') &&
+      !drag.moved &&
+      Math.abs(event.clientX - drag.startX) >= REGION_DRAG_THRESHOLD_PX
+    ) {
+      drag.moved = true
+    }
+    if ((drag.kind === 'create' || drag.kind === 'move') && !drag.moved) {
+      return
+    }
+
+    setDraftRegion(computeDraft(drag, event.clientX))
+  }
+
+  const onWindowMouseUp = (event: MouseEvent) => {
+    const drag = dragRef.current
+    stopWindowDrag()
+    setDraftRegion(null)
+    if (!drag) {
+      return
+    }
+
+    if (drag.kind === 'create' && !drag.moved) {
+      // クリック扱い → シーク
+      controls.setCurrentTime(pixelToTime(event.clientX))
+      return
+    }
+    if (drag.kind === 'move' && !drag.moved) {
+      // 動かさずクリック → 選択のみ
+      setSelectedRegionId(drag.regionId)
+      return
+    }
+
+    // drag 情報から最終リージョンを再計算（State には依存しない）
+    const draft = computeDraft(drag, event.clientX)
+    if (draft.end - draft.start < REGION_MIN_DURATION) {
+      return
+    }
+
+    const committed: Region =
+      drag.kind === 'create' ? { ...draft, id: makeRegionId() } : draft
+    commitActive(committed)
+    if (drag.kind === 'create') {
+      setSelectedRegionId(committed.id)
+    }
+  }
+
+  const stopWindowDrag = () => {
+    window.removeEventListener('mousemove', onWindowMouseMove)
+    window.removeEventListener('mouseup', onWindowMouseUp)
+    dragRef.current = null
+  }
+
+  const startWindowDrag = (drag: RegionDragState) => {
+    dragRef.current = drag
+    window.addEventListener('mousemove', onWindowMouseMove)
+    window.addEventListener('mouseup', onWindowMouseUp)
+  }
+
+  // リージョン矩形上の mousedown（移動 or リサイズ or 選択）
+  const onRegionMouseDown = (event: React.MouseEvent, region: Region) => {
+    event.stopPropagation()
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    const offsetX = event.clientX - rect.left
+    const time = pixelToTime(event.clientX)
+
+    if (offsetX <= REGION_RESIZE_HANDLE_PX) {
+      startWindowDrag({
+        kind: 'resize',
+        regionId: region.id,
+        trackIndex: region.trackIndex,
+        edge: 'start',
+        fixedTime: region.end,
+        startX: event.clientX,
+      })
+      setSelectedRegionId(region.id)
+      return
+    }
+    if (offsetX >= rect.width - REGION_RESIZE_HANDLE_PX) {
+      startWindowDrag({
+        kind: 'resize',
+        regionId: region.id,
+        trackIndex: region.trackIndex,
+        edge: 'end',
+        fixedTime: region.start,
+        startX: event.clientX,
+      })
+      setSelectedRegionId(region.id)
+      return
+    }
+    startWindowDrag({
+      kind: 'move',
+      regionId: region.id,
+      trackIndex: region.trackIndex,
+      grabOffset: time - region.start,
+      width: region.end - region.start,
+      startX: event.clientX,
+      moved: false,
+    })
+  }
+
+  // 空き領域（上部80%）の mousedown（作成 or クリックシーク）
+  const onEmptyMouseDown = (event: React.MouseEvent, trackIndex: number) => {
+    event.preventDefault()
+    startWindowDrag({
+      kind: 'create',
+      trackIndex,
+      anchorTime: pixelToTime(event.clientX),
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    })
+  }
+
+  // 表示するリージョン（draft があれば該当を差し替え）
+  const displayRegions: Region[] = (() => {
+    if (!draftRegion) return regions
+    if (draftRegion.id === '__draft__') return [...regions, draftRegion]
+    return regions.map((r) => (r.id === draftRegion.id ? draftRegion : r))
+  })()
+
+  if (!scrollEl) return null
+
+  const tracksWidth = data.duration > 0
+    ? Math.ceil((data.duration * data.sampleRate) / data.samplesPerPixel)
+    : scrollEl.scrollWidth
+
+  const overlay = (
+    <div className="region-layer" style={{ left: 0, width: tracksWidth, top: 0, bottom: 0 }}>
+      {/* トラックごとの上部80%キャプチャ帯（作成・クリックシーク用） */}
+      {layouts.map((layout) => (
+        <div
+          key={`capture-${layout.trackIndex}`}
+          className="region-capture"
+          style={{
+            top: layout.top,
+            height: layout.height * REGION_HEIGHT_RATIO,
+          }}
+          onMouseDown={(event) => onEmptyMouseDown(event, layout.trackIndex)}
+        />
+      ))}
+
+      {/* リージョン矩形 */}
+      {displayRegions.map((region) => {
+        const layout = layouts.find((l) => l.trackIndex === region.trackIndex)
+        if (!layout) return null
+        const left = timeToPixel(region.start)
+        const width = Math.max(1, timeToPixel(region.end) - left)
+        const isSelected = region.id === selectedRegionId
+        const isDraft = region.id === '__draft__'
+        return (
+          <div
+            key={region.id}
+            className={
+              'region-box' +
+              (isSelected ? ' selected' : '') +
+              (isDraft ? ' draft' : '')
+            }
+            style={{
+              left,
+              width,
+              top: layout.top,
+              height: layout.height * REGION_HEIGHT_RATIO,
+            }}
+            onMouseDown={
+              isDraft ? undefined : (event) => onRegionMouseDown(event, region)
+            }
+            onMouseMove={
+              isDraft
+                ? undefined
+                : (event) => {
+                    const rect = event.currentTarget.getBoundingClientRect()
+                    const offsetX = event.clientX - rect.left
+                    const isHandle =
+                      offsetX <= REGION_RESIZE_HANDLE_PX ||
+                      offsetX >= rect.width - REGION_RESIZE_HANDLE_PX
+                    event.currentTarget.style.cursor = isHandle ? 'col-resize' : 'grab'
+                  }
+            }
+          />
+        )
+      })}
+    </div>
+  )
+
+  return createPortal(overlay, scrollEl)
+}
+
+function RegionPlaybackGate() {
+  const playback = usePlaybackAnimation()
+  const data = usePlaylistData()
+  const { regions } = useRegions()
+  const { soloedTrackIndex } = useSoloState()
+
+  // ゲートが mute を一元管理する。各トラックの実際の mute は単一の muteGain ノードで、
+  // ユーザーの M ボタンとゲートが同じ muteGain を共有するため、別管理にすると競合する。
+  // そこで effectiveMute = ユーザー mute(trackStates[i].muted) || リージョン無し を毎フレーム
+  // 合成し、engine.setTrackMute を trackId 指定で直接適用する（state を介さず各トラック独立）。
+  const regionsRef = useRef(regions)
+  const soloedTrackIndexRef = useRef(soloedTrackIndex)
+  useEffect(() => {
+    soloedTrackIndexRef.current = soloedTrackIndex
+  }, [soloedTrackIndex])
+  useEffect(() => {
+    regionsRef.current = regions
+  }, [regions])
+  const tracksRef = useRef(data.tracks)
+  useEffect(() => {
+    tracksRef.current = data.tracks
+  }, [data.tracks])
+  const trackStatesRef = useRef(data.trackStates)
+  useLayoutEffect(() => {
+    trackStatesRef.current = data.trackStates
+  }, [data.trackStates])
+
+  // 直前にゲートで適用した mute 状態（trackId 単位）
+  const lastGateRef = useRef<Map<string, boolean>>(new Map())
+  // 停止中（rAF が回らない）でも再適用できるよう applyGate を ref で保持
+  const applyGateRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    const engine = data.playoutRef.current
+    if (!engine) {
+      return
+    }
+    lastGateRef.current = new Map()
+
+    const applyGate = () => {
+      const eng = data.playoutRef.current
+      if (!eng) {
+        return
+      }
+      const t = playback.currentTimeRef.current ?? 0
+      const regs = regionsRef.current
+      const states = trackStatesRef.current
+      const soloIdx = soloedTrackIndexRef.current
+      tracksRef.current.forEach((track, i) => {
+        const hasRegion = regs.some(
+          (r) => r.trackIndex === i && t >= r.start && t < r.end,
+        )
+        const userMuted = states[i]?.muted ?? false
+        // ソロ中トラック: リージョンゲートをバイパス（普通のソロ再生）
+        // 他トラックがソロ中: 消音
+        // ソロなし: リージョンゲート通常動作
+        const effectiveMute = userMuted || (soloIdx !== null ? soloIdx !== i : !hasRegion)
+        if (lastGateRef.current.get(track.id) !== effectiveMute) {
+          eng.setTrackMute(track.id, effectiveMute)
+          lastGateRef.current.set(track.id, effectiveMute)
+        }
+      })
+    }
+    applyGateRef.current = applyGate
+
+    playback.registerFrameCallback('region-gate', applyGate)
+    // 再生していなくても現在位置で一度適用
+    applyGate()
+
+    return () => {
+      playback.unregisterFrameCallback('region-gate')
+      // ユーザー本来の mute 設定（trackStates[i].muted）へ復元
+      const eng = data.playoutRef.current
+      if (eng) {
+        const states = trackStatesRef.current
+        tracksRef.current.forEach((track, i) => {
+          eng.setTrackMute(track.id, states[i]?.muted ?? false)
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 停止中の Mボタン操作・リージョン変更でもゲートを即再適用（rAF を待たない）。
+  // trackStates 変化直後に controls.setTrackMute が engine.setTrackMute を呼んで
+  // muteGain を変えてしまうため、useLayoutEffect で DOM 更新前に上書きする。
+  useLayoutEffect(() => {
+    applyGateRef.current()
+  }, [data.trackStates, regions, soloedTrackIndex])
+
+  return null
+}
+
+// SPACE=停止して先頭へ戻る、ENTER=再生/一時停止
+function PlaybackKeyboard() {
+  const controls = usePlaylistControls()
+  const playback = usePlaybackAnimation()
+
+  const controlsRef = useRef(controls)
+  useEffect(() => {
+    controlsRef.current = controls
+  }, [controls])
+
+  const isPlayingRef = useRef(playback.isPlaying)
+  useEffect(() => {
+    isPlayingRef.current = playback.isPlaying
+  }, [playback.isPlaying])
+
+  useEffect(() => {
+    const isEditingTarget = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || isEditingTarget(event.target)) {
+        return
+      }
+      if (event.key === ' ') {
+        event.preventDefault()
+        if (isPlayingRef.current) {
+          controlsRef.current.stop()
+        } else {
+          void controlsRef.current.play()
+        }
+        return
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        if (isPlayingRef.current) {
+          controlsRef.current.pause()
+        } else {
+          void controlsRef.current.play()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    try {
+      if (window.parent !== window) {
+        window.parent.addEventListener('keydown', onKeyDown)
+      }
+    } catch {
+      // クロスオリジン
+    }
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      try {
+        if (window.parent !== window) {
+          window.parent.removeEventListener('keydown', onKeyDown)
+        }
+      } catch {
+        // クロスオリジン
+      }
+    }
+  }, [])
+
+  return null
+}
+
+function RegionKeyboard() {
+  const playback = usePlaybackAnimation()
+  const { regions, setRegions, selectedRegionId, setSelectedRegionId } = useRegions()
+
+  const stateRef = useRef({ regions, selectedRegionId })
+  useEffect(() => {
+    stateRef.current = { regions, selectedRegionId }
+  }, [regions, selectedRegionId])
+
+  useEffect(() => {
+    const isEditingTarget = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || isEditingTarget(event.target)) {
+        return
+      }
+      const { selectedRegionId: selId, regions: regs } = stateRef.current
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selId) {
+          event.preventDefault()
+          setRegions((current) => current.filter((r) => r.id !== selId))
+          setSelectedRegionId(null)
+        }
+        return
+      }
+
+      if (event.key.toLowerCase() === 'r') {
+        // 再生位置でリージョン分割
+        const t = playback.currentTimeRef.current ?? 0
+        const target = regs.find((r) => t > r.start && t < r.end)
+        if (!target) {
+          return
+        }
+        event.preventDefault()
+        const left: Region = { ...target, end: t }
+        const right: Region = {
+          ...target,
+          id: makeRegionId(),
+          start: t,
+        }
+        setRegions((current) => {
+          const others = current.filter((r) => r.id !== target.id)
+          const next: Region[] = [...others]
+          if (left.end - left.start >= REGION_MIN_DURATION) {
+            next.push(left)
+          }
+          if (right.end - right.start >= REGION_MIN_DURATION) {
+            next.push(right)
+          }
+          return next
+        })
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    try {
+      if (window.parent !== window) {
+        window.parent.addEventListener('keydown', onKeyDown)
+      }
+    } catch {
+      // クロスオリジン埋め込み時は iframe 内だけで受ける
+    }
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      try {
+        if (window.parent !== window) {
+          window.parent.removeEventListener('keydown', onKeyDown)
+        }
+      } catch {
+        // クロスオリジン埋め込み時は解除不要
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return null
+}
+
+function TrackControls({
+  trackIndex,
+  trackHeightMode,
+}: {
+  trackIndex: number
+  trackHeightMode: TrackHeightMode
+}) {
   const controls = usePlaylistControls()
   const data = usePlaylistData()
-  const playback = usePlaybackAnimation()
-  const { soloPlayback, setSoloPlayback } = useSoloPlayback()
+  const { soloedTrackIndex, setSoloedTrackIndex } = useSoloState()
   const track = data.tracks[trackIndex]
   const trackState = data.trackStates[trackIndex]
 
@@ -774,46 +1455,23 @@ function TrackControls({ trackIndex }: { trackIndex: number }) {
     return null
   }
 
-  const isSoloPlaybackActive = soloPlayback?.trackIndex === trackIndex
-  const restoreSoloStates = (soloedStates: boolean[]) => {
-    soloedStates.forEach((soloed, index) => {
-      controls.setTrackSolo(index, soloed)
-    })
-  }
-
-  const handleSoloPlayback = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-
-    if (soloPlayback?.trackIndex === trackIndex) {
-      controls.stop()
-      controls.setCurrentTime(soloPlayback.startTime)
-      restoreSoloStates(soloPlayback.soloedStates)
-      setSoloPlayback(null)
-      return
-    }
-
-    const startTime = soloPlayback ? soloPlayback.startTime : playback.currentTimeRef.current ?? 0
-    const soloedStates = soloPlayback?.soloedStates ?? data.trackStates.map((state) => state.soloed)
-    controls.stop()
-    controls.setCurrentTime(startTime)
-
-    data.trackStates.forEach((_, index) => {
-      controls.setTrackSolo(index, index === trackIndex)
-    })
-
-    setSoloPlayback({ trackIndex, startTime, soloedStates })
-    await controls.play(startTime)
-  }
-
   return (
-    <div className="track-controls">
+    <div className={trackHeightMode === 'small' ? 'track-controls compact' : 'track-controls'}>
       <div className="track-header-row">
         <strong>{trackState.name || track.name}</strong>
       </div>
       <button
         type="button"
-        className={trackState.soloed ? 'track-toggle active' : 'track-toggle'}
-        onClick={() => controls.setTrackSolo(trackIndex, !trackState.soloed)}
+        className={soloedTrackIndex === trackIndex ? 'track-toggle active' : 'track-toggle'}
+        onClick={() => {
+          const next = soloedTrackIndex !== trackIndex ? trackIndex : null
+          setSoloedTrackIndex(next)
+          const engine = data.playoutRef.current
+          data.tracks.forEach((t, i) => {
+            const s = next === i
+            if (engine) engine.setTrackSolo(t.id, s)
+          })
+        }}
       >
         S
       </button>
@@ -824,15 +1482,6 @@ function TrackControls({ trackIndex }: { trackIndex: number }) {
           onClick={() => controls.setTrackMute(trackIndex, !trackState.muted)}
         >
           M
-        </button>
-        <button
-          type="button"
-          className={isSoloPlaybackActive ? 'track-solo-play active' : 'track-solo-play'}
-          onClick={(event) => void handleSoloPlayback(event)}
-          title="このトラックだけ再生"
-        >
-          <Play size={14} />
-          <span>S</span>
         </button>
       </div>
       <label className="track-volume">

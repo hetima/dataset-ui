@@ -3,6 +3,10 @@ from edit.edit_app_ctx import EditCtx
 
 
 def tab_main(ctx: EditCtx):
+    ui.markdown(
+        "**S** 再生位置でオーディオイベントを分割<br>**R** 再生位置でコンピングリージョンを分割<br>**SPACE** 再生/停止（再生開始位置に戻る）<br>**ENTER** 再生/一時停止"
+    )
+
     frame_container = ui.element("div").classes("w-full")
 
     def update_frame() -> None:
@@ -35,6 +39,3 @@ def tab_main(ctx: EditCtx):
 
     ctx.daw_refresh_func.append(update_frame)
     ui.timer(0.1, update_frame, once=True)
-
-
-
