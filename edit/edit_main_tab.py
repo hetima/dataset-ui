@@ -10,6 +10,28 @@ from common.wavesurfer import simple_player
 def tab_main(ctx: EditCtx):
 
     # ═══════════════════════════════════════════════════════════════════════════════
+    # compi
+    # ═══════════════════════════════════════════════════════════════════════════════
+    def comping() -> None:
+        files = ctx.target_files()
+        paths = [music_file["path"] for music_file in files]  # type: ignore
+        if len(paths) == 0:
+            ui.notify("処理対象がありません")
+            return
+        cnfg.save()
+        ctx.update_compi()
+        ctx.tabs.set_value("compi")
+        # open compi tab
+
+    with ui.expansion("コンピング", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label(
+            "選択したファイルをコンピングタブで編集します"
+        )
+        ui.button("コンピングタブを開く", on_click=comping)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 

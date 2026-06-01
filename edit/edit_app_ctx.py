@@ -3,7 +3,7 @@ from typing import Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
-
+from nicegui.elements.tabs import Tabs
 from common.file_util import audio_files_in_folder
 from common.setting import cnfg
 from edit.editfile import EditFile
@@ -21,6 +21,7 @@ class EditCtx:
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.client = ui.context.client
+        self.tabs: Tabs
 
     def notify(self, text: str, type = None):
         with self.client:
@@ -63,10 +64,9 @@ class EditCtx:
         self.files.append(editfile)
 
     def target_files(self) -> list:
-        if self.target == "all":
-            return self.files
         rows = self.table.selected
-        return rows
+        poolrows = self.pool_table.selected
+        return rows + poolrows
 
     def voice_file_for_path(self, path: str) -> EditFile | None:
         if not path:
@@ -100,3 +100,8 @@ class EditCtx:
                     voicefile = EditFile.from_audio_file(Path(dst))
                     parent_file.add_child(voicefile)
         self.update_ui()
+    
+    def update_compi(self):
+        files = self.target_files()
+
+

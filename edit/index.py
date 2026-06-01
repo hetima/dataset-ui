@@ -15,11 +15,11 @@ def main_page():
 
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'
-    ) as tabs:
+    ) as ctx.tabs:
         main_Tab = ui.tab("main", label="メイン", icon="home")
         compi_tab = ui.tab("compi", label="コンピング", icon="music_note")
         setting_tab = ui.tab("setting", label="設定", icon="settings")
-    with ui.tab_panels(tabs, animated=False, value=main_Tab).classes("w-full"):
+    with ui.tab_panels(ctx.tabs, animated=False, value=main_Tab).classes("w-full"):
         with ui.tab_panel(main_Tab):
             tab_main(ctx)
         with ui.tab_panel(compi_tab):
