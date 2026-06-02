@@ -93,6 +93,24 @@ type DawExportOptions = {
   saveMode: 'save' | 'download'
 }
 
+type AafExportClip = {
+  name: string
+  sourcePath: string
+  timelineStart: number
+  sourceStart: number
+  duration: number
+}
+
+type AafExportTrack = {
+  name: string
+  clips: AafExportClip[]
+}
+
+type AafExportPayload = {
+  sampleRate: number
+  tracks: AafExportTrack[]
+}
+
 type DawModeContextValue = {
   mode: DawMode
   setMode: Dispatch<SetStateAction<DawMode>>
@@ -408,7 +426,11 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
         </div>
       )}
       {!loading && tracks.length > 0 && (
-        <EditablePlaylist key={sourceTracks.map((track) => track.id).join(':')} initialTracks={tracks} />
+        <EditablePlaylist
+          key={sourceTracks.map((track) => track.id).join(':')}
+          initialTracks={tracks}
+          sourceTracks={sourceTracks}
+        />
       )}
     </div>
   )
@@ -626,7 +648,80 @@ function renderPlaylistWav(params: {
   return encodeWavBuffer(output, sampleRate)
 }
 
-function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
+function buildAafExportPayload(params: {
+  tracks: ClipTrack[]
+  sourceByTrackId: Map<string, DawTrack>
+  regions: Region[]
+  mode: DawMode
+  sampleRate: number
+}): AafExportPayload {
+  const { tracks, sourceByTrackId, regions, mode, sampleRate } = params
+
+  return {
+    sampleRate,
+    tracks: tracks.map((track, trackIndex) => {
+      const source = sourceByTrackId.get(track.id)
+      const sourcePath = source?.sourcePath ?? track.name
+      const clips = asRenderTrack(track).clips ?? []
+
+      if (mode !== 'comping') {
+        return {
+          name: track.name,
+          clips: clips.map((clip) => ({
+            name: clipName(clip, track.name),
+            sourcePath,
+            timelineStart: Number(clip.startSample ?? 0) / sampleRate,
+            sourceStart: Number(clip.offsetSamples ?? 0) / sampleRate,
+            duration: Number(clip.durationSamples ?? 0) / sampleRate,
+          })),
+        }
+      }
+
+      const regionClips: AafExportClip[] = []
+      const trackRegions = regions
+        .filter((region) => region.trackIndex === trackIndex)
+        .sort((a, b) => a.start - b.start)
+
+      trackRegions.forEach((region) => {
+        clips.forEach((clip) => {
+          const clipStart = Number(clip.startSample ?? 0) / sampleRate
+          const clipDuration = Number(clip.durationSamples ?? 0) / sampleRate
+          const clipEnd = clipStart + clipDuration
+          const start = Math.max(region.start, clipStart)
+          const end = Math.min(region.end, clipEnd)
+          if (end - start < REGION_MIN_DURATION) {
+            return
+          }
+          const sourceStart = Number(clip.offsetSamples ?? 0) / sampleRate + (start - clipStart)
+          regionClips.push({
+            name: `${clipName(clip, track.name)} (${region.start.toFixed(2)}-${region.end.toFixed(2)})`,
+            sourcePath,
+            timelineStart: start,
+            sourceStart,
+            duration: end - start,
+          })
+        })
+      })
+
+      return {
+        name: track.name,
+        clips: regionClips,
+      }
+    }),
+  }
+}
+
+function clipName(clip: RenderClip, fallback: string) {
+  return String((clip as { name?: string }).name || fallback)
+}
+
+function EditablePlaylist({
+  initialTracks,
+  sourceTracks,
+}: {
+  initialTracks: ClipTrack[]
+  sourceTracks: DawTrack[]
+}) {
   const regionStorageKey = useMemo(() => {
     const session = new URLSearchParams(window.location.search).get('session') ?? 'default'
     return `dataset-ui:daw:regions:${session}`
@@ -640,6 +735,16 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const waveHeight = trackHeightMode === 'small' ? WAVE_HEIGHT_SMALL : WAVE_HEIGHT_LARGE
+  const sourceByTrackId = useMemo(() => {
+    const map = new Map<string, DawTrack>()
+    initialTracks.forEach((track, index) => {
+      const source = sourceTracks[index]
+      if (source) {
+        map.set(track.id, source)
+      }
+    })
+    return map
+  }, [initialTracks, sourceTracks])
 
   const moveTrack = (trackIndex: number, direction: -1 | 1) => {
     const nextIndex = trackIndex + direction
@@ -679,7 +784,12 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
     window.sessionStorage.setItem(regionStorageKey, JSON.stringify(regions))
   }, [regions, regionStorageKey])
 
+  const lockClipEditing = mode === 'comping' && !allowOverlap
+
   const focusClipHandle = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (lockClipEditing) {
+      return
+    }
     const target = event.target
     if (!(target instanceof HTMLElement)) {
       return
@@ -715,41 +825,79 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
             setTrackHeightMode={setTrackHeightMode}
           />
           <SoloStateContext.Provider value={{ soloedTrackIndex, setSoloedTrackIndex }}>
-            <ExportBridge />
-            <ClipInteractionProvider>
-              <div
-                ref={viewportRef}
-                className="playlist-view"
-                onMouseDownCapture={focusClipHandle}
-              >
-                <RulerClickOverlay viewportRef={viewportRef} />
-                <Waveform
-                  showClipHeaders
-                  showFades
-                  renderTrackControls={(trackIndex) => (
-                    <TrackControls
-                      trackIndex={trackIndex}
-                      trackHeightMode={trackHeightMode}
-                      canMoveUp={trackIndex > 0}
-                      canMoveDown={trackIndex < playlistTracks.length - 1}
-                      onMoveTrack={moveTrack}
-                    />
-                  )}
+            <ExportBridge sourceByTrackId={sourceByTrackId} />
+            {lockClipEditing ? (
+              <PlaylistView
+                viewportRef={viewportRef}
+                focusClipHandle={focusClipHandle}
+                trackHeightMode={trackHeightMode}
+                playlistTrackCount={playlistTracks.length}
+                moveTrack={moveTrack}
+                mode={mode}
+              />
+            ) : (
+              <ClipInteractionProvider>
+                <PlaylistView
+                  viewportRef={viewportRef}
+                  focusClipHandle={focusClipHandle}
+                  trackHeightMode={trackHeightMode}
+                  playlistTrackCount={playlistTracks.length}
+                  moveTrack={moveTrack}
+                  mode={mode}
                 />
-                {mode === 'comping' && (
-                  <RegionOverlay
-                    viewportRef={viewportRef}
-                    layoutKey={trackHeightMode}
-                  />
-                )}
-              </div>
-            </ClipInteractionProvider>
+              </ClipInteractionProvider>
+            )}
             {mode === 'comping' && <RegionPlaybackGate />}
             {mode === 'comping' && <RegionKeyboard />}
           </SoloStateContext.Provider>
         </RegionContext.Provider>
       </DawModeContext.Provider>
     </WaveformPlaylistProvider>
+  )
+}
+
+function PlaylistView({
+  viewportRef,
+  focusClipHandle,
+  trackHeightMode,
+  playlistTrackCount,
+  moveTrack,
+  mode,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>
+  focusClipHandle: (event: React.MouseEvent<HTMLDivElement>) => void
+  trackHeightMode: TrackHeightMode
+  playlistTrackCount: number
+  moveTrack: (trackIndex: number, direction: -1 | 1) => void
+  mode: DawMode
+}) {
+  return (
+    <div
+      ref={viewportRef}
+      className="playlist-view"
+      onMouseDownCapture={focusClipHandle}
+    >
+      <RulerClickOverlay viewportRef={viewportRef} />
+      <Waveform
+        showClipHeaders
+        showFades
+        renderTrackControls={(trackIndex) => (
+          <TrackControls
+            trackIndex={trackIndex}
+            trackHeightMode={trackHeightMode}
+            canMoveUp={trackIndex > 0}
+            canMoveDown={trackIndex < playlistTrackCount - 1}
+            onMoveTrack={moveTrack}
+          />
+        )}
+      />
+      {mode === 'comping' && (
+        <RegionOverlay
+          viewportRef={viewportRef}
+          layoutKey={trackHeightMode}
+        />
+      )}
+    </div>
   )
 }
 
@@ -944,6 +1092,19 @@ function PlaylistToolbar({
       '*',
     )
   }
+  const requestAafExport = (saveMode: DawExportOptions['saveMode']) => {
+    setExportMenuOpen(false)
+    window.parent.postMessage(
+      {
+        type: 'daw-aaf-export-request',
+        requestId: `aaf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        sessionId: new URLSearchParams(window.location.search).get('session') ?? '',
+        defaultFilename: filenameWithoutExtension(data.tracks[0]?.name ?? 'daw-edit'),
+        saveMode,
+      },
+      '*',
+    )
+  }
   useEffect(() => {
     if (!exportMenuOpen) {
       return
@@ -1023,6 +1184,12 @@ function PlaylistToolbar({
             <button type="button" onClick={() => requestExport('download')}>
               ダウンロード
             </button>
+            <button type="button" onClick={() => requestAafExport('save')}>
+              AAFを保存
+            </button>
+            <button type="button" onClick={() => requestAafExport('download')}>
+              AAFをダウンロード
+            </button>
           </div>
         </div>
       </div>
@@ -1100,7 +1267,7 @@ function TrackHeightToggle({
   )
 }
 
-function ExportBridge() {
+function ExportBridge({ sourceByTrackId }: { sourceByTrackId: Map<string, DawTrack> }) {
   const data = usePlaylistData()
   const { regions } = useRegions()
   const { mode } = useDawMode()
@@ -1113,6 +1280,7 @@ function ExportBridge() {
     regions,
     mode,
     soloedTrackIndex,
+    sourceByTrackId,
   })
 
   useEffect(() => {
@@ -1123,13 +1291,49 @@ function ExportBridge() {
       regions,
       mode,
       soloedTrackIndex,
+      sourceByTrackId,
     }
-  }, [data.tracks, data.trackStates, data.sampleRate, regions, mode, soloedTrackIndex])
+  }, [data.tracks, data.trackStates, data.sampleRate, regions, mode, soloedTrackIndex, sourceByTrackId])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const message = event.data
-      if (!message || message.type !== 'daw-export-start') {
+      if (!message) {
+        return
+      }
+      if (message.type === 'daw-aaf-export-start') {
+        const requestId = String(message.requestId ?? '')
+        try {
+          const current = exportStateRef.current
+          const aaf = buildAafExportPayload({
+            tracks: current.tracks,
+            sourceByTrackId: current.sourceByTrackId,
+            regions: current.regions,
+            mode: current.mode,
+            sampleRate: current.sampleRate,
+          })
+          window.parent.postMessage(
+            {
+              type: 'daw-aaf-export-data',
+              requestId,
+              options: message.options,
+              aaf,
+            },
+            '*',
+          )
+        } catch (error) {
+          window.parent.postMessage(
+            {
+              type: 'daw-export-error',
+              requestId,
+              message: error instanceof Error ? error.message : 'AAF 書き出しに失敗しました',
+            },
+            '*',
+          )
+        }
+        return
+      }
+      if (message.type !== 'daw-export-start') {
         return
       }
 
@@ -1798,22 +2002,8 @@ function PlaybackKeyboard() {
     }
 
     window.addEventListener('keydown', onKeyDown)
-    try {
-      if (window.parent !== window) {
-        window.parent.addEventListener('keydown', onKeyDown)
-      }
-    } catch {
-      // クロスオリジン
-    }
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      try {
-        if (window.parent !== window) {
-          window.parent.removeEventListener('keydown', onKeyDown)
-        }
-      } catch {
-        // クロスオリジン
-      }
     }
   }, [playback.currentTimeRef])
 
@@ -1878,22 +2068,8 @@ function RegionKeyboard() {
     }
 
     window.addEventListener('keydown', onKeyDown)
-    try {
-      if (window.parent !== window) {
-        window.parent.addEventListener('keydown', onKeyDown)
-      }
-    } catch {
-      // クロスオリジン埋め込み時は iframe 内だけで受ける
-    }
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      try {
-        if (window.parent !== window) {
-          window.parent.removeEventListener('keydown', onKeyDown)
-        }
-      } catch {
-        // クロスオリジン埋め込み時は解除不要
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

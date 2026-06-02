@@ -7,6 +7,7 @@ from edit.edit_app_ctx import EditCtx
 _EXPORT_REQUEST_EVENT = "daw-export-request"
 _EXPORT_COMPLETE_EVENT = "daw-export-complete"
 _EXPORT_ERROR_EVENT = "daw-export-error"
+_AAF_EXPORT_REQUEST_EVENT = "daw-aaf-export-request"
 
 
 def tab_main(ctx: EditCtx):
@@ -17,6 +18,7 @@ def tab_main(ctx: EditCtx):
     frame_container = ui.element("div").classes("w-full")
     element_id = f"c{frame_container.id}"
     pending_request: dict = {}
+    pending_aaf_request: dict = {}
 
     def on_export_complete(e) -> None:
         """JS 側のアップロード完了通知を表示する。"""
@@ -86,6 +88,52 @@ def tab_main(ctx: EditCtx):
 
     ui.on(_EXPORT_REQUEST_EVENT, on_export_request)
 
+    with ui.dialog() as aaf_dialog, ui.card().classes("w-96"):
+        ui.label("AAF 書き出し").classes("text-lg font-bold")
+        aaf_filename_input = ui.input("ファイル名").classes("w-full")
+
+        def confirm_aaf_export() -> None:
+            filename = str(aaf_filename_input.value or "").strip()
+            if not filename:
+                ui.notify("ファイル名を入力してください", type="warning")
+                return
+            options = {
+                "filename": filename,
+                "saveMode": pending_aaf_request.get("saveMode", "save"),
+            }
+            request_id = pending_aaf_request.get("requestId", "")
+            payload = json.dumps(
+                {
+                    "type": "daw-aaf-export-start",
+                    "requestId": request_id,
+                    "options": options,
+                },
+                ensure_ascii=False,
+            )
+            ui.run_javascript(
+                f'''
+                const dawContainer = document.getElementById("{element_id}");
+                const dawFrame = dawContainer?.querySelector("iframe");
+                dawFrame?.contentWindow?.postMessage({payload}, "*");
+                '''
+            )
+            aaf_dialog.close()
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("キャンセル", on_click=aaf_dialog.close).props("flat")
+            ui.button("OK", on_click=confirm_aaf_export).props("color=primary")
+
+    def on_aaf_export_request(e) -> None:
+        """DAW iframe から AAF 書き出し開始要求を受けて、設定ダイアログを開く。"""
+
+        args = e.args if isinstance(e.args, dict) else {}
+        pending_aaf_request.clear()
+        pending_aaf_request.update(args)
+        aaf_filename_input.value = str(args.get("defaultFilename") or "daw-edit")
+        aaf_dialog.open()
+
+    ui.on(_AAF_EXPORT_REQUEST_EVENT, on_aaf_export_request)
+
     ui.add_body_html(
         f'''
 <script>
@@ -95,6 +143,10 @@ if (!window.__datasetUiDawExportBridgeInstalled) {{
         const data = event.data || {{}};
         if (data.type === "daw-export-request") {{
             emitEvent("{_EXPORT_REQUEST_EVENT}", data);
+            return;
+        }}
+        if (data.type === "daw-aaf-export-request") {{
+            emitEvent("{_AAF_EXPORT_REQUEST_EVENT}", data);
             return;
         }}
         if (data.type === "daw-export-error") {{
@@ -143,6 +195,49 @@ if (!window.__datasetUiDawExportBridgeInstalled) {{
         }} catch (error) {{
             emitEvent("{_EXPORT_ERROR_EVENT}", {{
                 message: error instanceof Error ? error.message : "書き出しに失敗しました",
+            }});
+        }}
+    }});
+
+    window.addEventListener("message", async (event) => {{
+        const data = event.data || {{}};
+        if (data.type !== "daw-aaf-export-data") return;
+
+        try {{
+            const options = data.options || {{}};
+            const response = await fetch("/api/daw/export-aaf", {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify({{ options, aaf: data.aaf }}),
+            }});
+            if (!response.ok) {{
+                let message = `AAF 書き出し API エラー (${{response.status}})`;
+                try {{
+                    const errorBody = await response.json();
+                    message = errorBody.detail || message;
+                }} catch {{}}
+                throw new Error(message);
+            }}
+
+            if (options.saveMode === "download") {{
+                const outBlob = await response.blob();
+                const url = URL.createObjectURL(outBlob);
+                const a = document.createElement("a");
+                const name = (options.filename || "daw-edit").replace(/\\.[^/.]+$/, "");
+                a.href = url;
+                a.download = `${{name}}.aaf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                emitEvent("{_EXPORT_COMPLETE_EVENT}", {{}});
+            }} else {{
+                const result = await response.json();
+                emitEvent("{_EXPORT_COMPLETE_EVENT}", result);
+            }}
+        }} catch (error) {{
+            emitEvent("{_EXPORT_ERROR_EVENT}", {{
+                message: error instanceof Error ? error.message : "AAF 書き出しに失敗しました",
             }});
         }}
     }});

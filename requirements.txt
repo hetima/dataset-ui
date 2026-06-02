@@ -20,6 +20,7 @@ rotary_embedding_torch
 einops
 beartype
 
+pyaaf2
+
 # ckpt ダウンロードしたときの安全性スキャン
 # picklescan 
-
