@@ -31,7 +31,7 @@ def tab_main(ctx: EditCtx):
                 const dawFrame = dawContainer.querySelector("iframe");
                 if (!dawFrame || dawFrame.getAttribute("src") !== "{ctx.daw_url}") {{
                     dawContainer.innerHTML =
-                        '<iframe src="{ctx.daw_url}" style="width: 100%; height: 78vh; border: 1px solid #ccc; border-radius: 4px;"></iframe>';
+                        '<iframe src="{ctx.daw_url}" style="width: 100%; height: 90vh; border: 1px solid #ccc; border-radius: 4px;"></iframe>';
                 }}
             }}
             '''

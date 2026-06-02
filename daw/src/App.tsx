@@ -328,26 +328,13 @@ function App() {
       <header className="topbar">
         <div>
           <h1>DAW</h1>
-          <p>NiceGUI から渡された音声ファイルを確認します</p>
         </div>
         <button type="button" className="toolbar-button" onClick={reloadSession}>
           <RefreshCw size={17} />
-          再読み込み
+          再読み込み （変更は破棄されます）
         </button>
       </header>
 
-      <section className="status-line">
-        <span>
-          <Server size={16} />
-          session: {sessionId || '-'}
-        </span>
-        {loading && (
-          <span>
-            <LoaderCircle size={16} className="spin" />
-            読み込み中
-          </span>
-        )}
-      </section>
 
       {displayError && (
         <section className="notice error">
@@ -366,6 +353,20 @@ function App() {
           <PlaylistArea sourceTracks={session.tracks} />
         </section>
       )}
+
+      <section className="status-line">
+        <span>
+          <Server size={16} />
+          session: {sessionId || '-'}
+        </span>
+        {loading && (
+          <span>
+            <LoaderCircle size={16} className="spin" />
+            読み込み中
+          </span>
+        )}
+      </section>
+
     </main>
   )
 }
@@ -727,13 +728,11 @@ function PlaylistToolbar({
   }
   const toggleLoopPlayback = () => {
     if (selectionRange) {
-      const currentTime = playback.currentTimeRef.current ?? 0
       controls.setLoopRegion(selectionRange.start, selectionRange.end)
       if (!state.isLoopEnabled) {
         controls.setLoopEnabled(true)
       }
       controls.setSelection(0, 0)
-      controls.setCurrentTime(currentTime)
       return
     }
     if (loopRange) {
@@ -1459,13 +1458,11 @@ function PlaybackKeyboard() {
         const loopRange = loopRangeRef.current
         if (selectionRange) {
           event.preventDefault()
-          const currentTime = playback.currentTimeRef.current ?? 0
           controlsRef.current.setLoopRegion(selectionRange.start, selectionRange.end)
           if (!isLoopEnabledRef.current) {
             controlsRef.current.setLoopEnabled(true)
           }
           controlsRef.current.setSelection(0, 0)
-          controlsRef.current.setCurrentTime(currentTime)
           return
         }
         if (loopRange) {
