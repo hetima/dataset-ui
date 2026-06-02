@@ -11,6 +11,7 @@ import {
 } from 'react'
 import {
   AlertTriangle,
+  AudioLines,
   ChevronDown,
   ChevronUp,
   Download,
@@ -43,6 +44,7 @@ import {
 } from '@waveform-playlist/browser'
 import { createPortal } from 'react-dom'
 import { Layers, SlidersHorizontal } from 'lucide-react'
+import { useSilenceSplit } from './useSilenceSplit'
 import './App.css'
 
 type DawTrack = {
@@ -1057,6 +1059,7 @@ function PlaylistToolbar({
     samplesPerPixel: data.samplesPerPixel,
     engineRef: data.playoutRef,
   })
+  const splitOnSilence = useSilenceSplit()
   const playFromCurrentState = () => {
     const currentTime = playback.currentTimeRef.current ?? 0
     const startTime = getLoopAwarePlayStart(currentTime, loopRange, state.isLoopEnabled)
@@ -1167,6 +1170,14 @@ function PlaylistToolbar({
         </button>
         <button type="button" className="icon-button" onClick={splitClipAtPlayhead}>
           <Scissors size={16} />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          title="無音区間で分割"
+          onClick={splitOnSilence}
+        >
+          <AudioLines size={16} />
         </button>
         <div className="export-menu" ref={exportMenuRef}>
           <button
