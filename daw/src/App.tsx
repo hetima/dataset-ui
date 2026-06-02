@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Download,
   Infinity as InfinityIcon,
   LoaderCircle,
   Pause,
@@ -84,6 +85,12 @@ type Region = {
   trackIndex: number
   start: number
   end: number
+}
+
+type DawExportOptions = {
+  filename: string
+  format: 'wav' | 'flac'
+  saveMode: 'save' | 'download'
 }
 
 type DawModeContextValue = {
@@ -438,6 +445,187 @@ function getLoopAwarePlayStart(
     : loopRange.start
 }
 
+function filenameWithoutExtension(name: string) {
+  return name.replace(/\.[^/.]+$/, '') || 'daw-export'
+}
+
+function writeAscii(view: DataView, offset: number, value: string) {
+  for (let i = 0; i < value.length; i += 1) {
+    view.setUint8(offset + i, value.charCodeAt(i))
+  }
+}
+
+function encodeWavBuffer(channels: Float32Array[], sampleRate: number) {
+  const bitDepth = 16
+  const bytesPerSample = bitDepth / 8
+  const channelCount = channels.length
+  const sampleCount = channels[0]?.length ?? 0
+  const blockAlign = channelCount * bytesPerSample
+  const byteRate = sampleRate * blockAlign
+  const dataSize = sampleCount * blockAlign
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+
+  writeAscii(view, 0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeAscii(view, 8, 'WAVE')
+  writeAscii(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channelCount, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitDepth, true)
+  writeAscii(view, 36, 'data')
+  view.setUint32(40, dataSize, true)
+
+  let offset = 44
+  for (let i = 0; i < sampleCount; i += 1) {
+    for (let ch = 0; ch < channelCount; ch += 1) {
+      const sample = Math.max(-1, Math.min(1, channels[ch][i] ?? 0))
+      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+      view.setInt16(offset, intSample, true)
+      offset += 2
+    }
+  }
+
+  return buffer
+}
+
+function isSampleInRanges(sample: number, ranges: Array<{ start: number; end: number }>) {
+  return ranges.some((range) => sample >= range.start && sample < range.end)
+}
+
+type RenderClip = {
+  audioBuffer?: AudioBuffer
+  startSample?: number
+  durationSamples?: number
+  offsetSamples?: number
+  sampleRate?: number
+  gain?: number
+  fadeIn?: { duration?: number }
+  fadeOut?: { duration?: number }
+}
+
+type RenderTrack = {
+  clips?: RenderClip[]
+}
+
+function asRenderTrack(track: ClipTrack): RenderTrack {
+  return track as unknown as RenderTrack
+}
+
+function clipFadeGain(clip: RenderClip, clipTime: number, fallbackSampleRate: number) {
+  let gain = Number(clip.gain ?? 1)
+  const fadeInDuration = Number(clip.fadeIn?.duration ?? 0)
+  if (fadeInDuration > 0 && clipTime < fadeInDuration) {
+    gain *= Math.max(0, Math.min(1, clipTime / fadeInDuration))
+  }
+  const clipDuration = Number(clip.durationSamples ?? 0) / Number(clip.sampleRate ?? fallbackSampleRate)
+  const fadeOutDuration = Number(clip.fadeOut?.duration ?? 0)
+  if (fadeOutDuration > 0 && clipTime > clipDuration - fadeOutDuration) {
+    gain *= Math.max(0, Math.min(1, (clipDuration - clipTime) / fadeOutDuration))
+  }
+  return gain
+}
+
+function renderPlaylistWav(params: {
+  tracks: ClipTrack[]
+  trackStates: Array<{ muted: boolean; soloed: boolean; volume: number; pan?: number }>
+  regions: Region[]
+  mode: DawMode
+  soloedTrackIndex: number | null
+  sampleRate: number
+}) {
+  const { tracks, trackStates, regions, mode, soloedTrackIndex, sampleRate } = params
+  const paddingSamples = Math.round(sampleRate * 0.1)
+  let totalSamples = paddingSamples
+  let outputChannels = 1
+
+  tracks.forEach((track) => {
+    asRenderTrack(track).clips?.forEach((clip) => {
+      totalSamples = Math.max(
+        totalSamples,
+        Number(clip.startSample ?? 0) + Number(clip.durationSamples ?? 0) + paddingSamples,
+      )
+      outputChannels = Math.max(outputChannels, Number(clip.audioBuffer?.numberOfChannels ?? 1))
+    })
+  })
+  if (trackStates.some((state) => Math.abs(Number(state.pan ?? 0)) > 0.001)) {
+    outputChannels = Math.max(outputChannels, 2)
+  }
+
+  const output = Array.from({ length: outputChannels }, () => new Float32Array(totalSamples))
+  const hasSoloState = soloedTrackIndex !== null || trackStates.some((state) => state.soloed)
+  const regionRangesByTrack = new Map<number, Array<{ start: number; end: number }>>()
+  if (mode === 'comping') {
+    regions.forEach((region) => {
+      const ranges = regionRangesByTrack.get(region.trackIndex) ?? []
+      ranges.push({
+        start: Math.round(region.start * sampleRate),
+        end: Math.round(region.end * sampleRate),
+      })
+      regionRangesByTrack.set(region.trackIndex, ranges)
+    })
+  }
+
+  tracks.forEach((track, trackIndex) => {
+    const state = trackStates[trackIndex]
+    if (!state || state.muted) return
+    if (soloedTrackIndex !== null && soloedTrackIndex !== trackIndex) return
+    if (soloedTrackIndex === null && hasSoloState && !state.soloed) return
+
+    const trackVolume = Number(state.volume ?? 1)
+    const pan = Math.max(-1, Math.min(1, Number(state.pan ?? 0)))
+    const gateRanges = regionRangesByTrack.get(trackIndex) ?? []
+
+    asRenderTrack(track).clips?.forEach((clip) => {
+      const audioBuffer = clip.audioBuffer
+      if (!audioBuffer) return
+      const sourceChannels = audioBuffer.numberOfChannels
+      const startSample = Number(clip.startSample ?? 0)
+      const durationSamples = Number(clip.durationSamples ?? 0)
+      const offsetSamples = Number(clip.offsetSamples ?? 0)
+
+      for (let i = 0; i < durationSamples; i += 1) {
+        const destSample = startSample + i
+        if (destSample < 0 || destSample >= totalSamples) continue
+        if (
+          mode === 'comping' &&
+          soloedTrackIndex === null &&
+          !isSampleInRanges(destSample, gateRanges)
+        ) {
+          continue
+        }
+
+        const srcSample = offsetSamples + i
+        if (srcSample < 0 || srcSample >= audioBuffer.length) continue
+        const clipTime = i / sampleRate
+        const gain = trackVolume * clipFadeGain(clip, clipTime, sampleRate)
+
+        if (outputChannels === 1) {
+          let mixed = 0
+          for (let ch = 0; ch < sourceChannels; ch += 1) {
+            mixed += audioBuffer.getChannelData(ch)[srcSample] ?? 0
+          }
+          output[0][destSample] += (mixed / sourceChannels) * gain
+        } else {
+          const leftSource = audioBuffer.getChannelData(0)[srcSample] ?? 0
+          const rightSource =
+            sourceChannels > 1 ? audioBuffer.getChannelData(1)[srcSample] ?? 0 : leftSource
+          const leftGain = pan <= 0 ? 1 : 1 - pan
+          const rightGain = pan >= 0 ? 1 : 1 + pan
+          output[0][destSample] += leftSource * gain * leftGain
+          output[1][destSample] += rightSource * gain * rightGain
+        }
+      }
+    })
+  })
+
+  return encodeWavBuffer(output, sampleRate)
+}
+
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const regionStorageKey = useMemo(() => {
     const session = new URLSearchParams(window.location.search).get('session') ?? 'default'
@@ -527,6 +715,7 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
             setTrackHeightMode={setTrackHeightMode}
           />
           <SoloStateContext.Provider value={{ soloedTrackIndex, setSoloedTrackIndex }}>
+            <ExportBridge />
             <ClipInteractionProvider>
               <div
                 ref={viewportRef}
@@ -713,6 +902,8 @@ function PlaylistToolbar({
   const selectionRange = getSelectionRange(state.selectionStart, state.selectionEnd)
   const loopRange = getLoopRange(state.loopStart, state.loopEnd)
   const canToggleLoop = Boolean(selectionRange || loopRange)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks: data.tracks,
     samplesPerPixel: data.samplesPerPixel,
@@ -739,6 +930,39 @@ function PlaylistToolbar({
       controls.setLoopEnabled(!state.isLoopEnabled)
     }
   }
+  const requestExport = (saveMode: DawExportOptions['saveMode']) => {
+    setExportMenuOpen(false)
+    const defaultFilename = filenameWithoutExtension(data.tracks[0]?.name ?? 'daw-export')
+    window.parent.postMessage(
+      {
+        type: 'daw-export-request',
+        requestId: `export-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        sessionId: new URLSearchParams(window.location.search).get('session') ?? '',
+        defaultFilename,
+        saveMode,
+      },
+      '*',
+    )
+  }
+  useEffect(() => {
+    if (!exportMenuOpen) {
+      return
+    }
+
+    const onDocumentMouseDown = (event: MouseEvent) => {
+      if (
+        exportMenuRef.current &&
+        event.target instanceof Node &&
+        exportMenuRef.current.contains(event.target)
+      ) {
+        return
+      }
+      setExportMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', onDocumentMouseDown)
+    return () => document.removeEventListener('mousedown', onDocumentMouseDown)
+  }, [exportMenuOpen])
 
   return (
     <div className="playlist-toolbar">
@@ -783,6 +1007,24 @@ function PlaylistToolbar({
         <button type="button" className="icon-button" onClick={splitClipAtPlayhead}>
           <Scissors size={16} />
         </button>
+        <div className="export-menu" ref={exportMenuRef}>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setExportMenuOpen((current) => !current)}
+          >
+            <Download size={15} />
+            書き出し
+          </button>
+          <div className={exportMenuOpen ? 'export-menu-list open' : 'export-menu-list'}>
+            <button type="button" onClick={() => requestExport('save')}>
+              書き出しフォルダに保存
+            </button>
+            <button type="button" onClick={() => requestExport('download')}>
+              ダウンロード
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="tool-group">
@@ -856,6 +1098,80 @@ function TrackHeightToggle({
       </div>
     </div>
   )
+}
+
+function ExportBridge() {
+  const data = usePlaylistData()
+  const { regions } = useRegions()
+  const { mode } = useDawMode()
+  const { soloedTrackIndex } = useSoloState()
+
+  const exportStateRef = useRef({
+    tracks: data.tracks,
+    trackStates: data.trackStates,
+    sampleRate: data.sampleRate,
+    regions,
+    mode,
+    soloedTrackIndex,
+  })
+
+  useEffect(() => {
+    exportStateRef.current = {
+      tracks: data.tracks,
+      trackStates: data.trackStates,
+      sampleRate: data.sampleRate,
+      regions,
+      mode,
+      soloedTrackIndex,
+    }
+  }, [data.tracks, data.trackStates, data.sampleRate, regions, mode, soloedTrackIndex])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data
+      if (!message || message.type !== 'daw-export-start') {
+        return
+      }
+
+      const options = message.options as DawExportOptions
+      const requestId = String(message.requestId ?? '')
+      try {
+        const current = exportStateRef.current
+        const wavBuffer = renderPlaylistWav({
+          tracks: current.tracks,
+          trackStates: current.trackStates,
+          regions: current.regions,
+          mode: current.mode,
+          soloedTrackIndex: current.soloedTrackIndex,
+          sampleRate: current.sampleRate,
+        })
+        window.parent.postMessage(
+          {
+            type: 'daw-export-audio',
+            requestId,
+            options,
+            wavBuffer,
+          },
+          '*',
+          [wavBuffer],
+        )
+      } catch (error) {
+        window.parent.postMessage(
+          {
+            type: 'daw-export-error',
+            requestId,
+            message: error instanceof Error ? error.message : '書き出しに失敗しました',
+          },
+          '*',
+        )
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  return null
 }
 
 function ModeToggle() {

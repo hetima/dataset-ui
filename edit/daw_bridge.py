@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+import io
+import json
 from pathlib import Path
+import re
+import shutil
+import subprocess
 from uuid import uuid4
 
-from fastapi import HTTPException
+from fastapi import File, Form, HTTPException, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from nicegui import app
+
+from common.setting import cnfg
 
 
 _DAW_DEV_URL = "http://127.0.0.1:5173"
@@ -39,6 +47,65 @@ class DawSession:
 
 
 _sessions: dict[str, DawSession] = {}
+
+
+def _safe_export_filename(filename: str, fmt: str) -> str:
+    """書き出し用ファイル名を安全な単一ファイル名に整える。"""
+
+    stem = Path(filename or "daw-export").stem
+    stem = re.sub(r'[\\/:*?"<>|]+', "_", stem).strip()
+    if not stem:
+        stem = "daw-export"
+    return f"{stem}.{fmt}"
+
+
+def _unique_export_path(directory: Path, filename: str) -> Path:
+    """同名ファイルがある場合は stem に _数字 を付けた保存先を返す。"""
+
+    path = directory / filename
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix
+    index = 1
+    while True:
+        candidate = directory / f"{stem}_{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
+def _convert_wav_bytes(wav_bytes: bytes, fmt: str) -> tuple[bytes, str]:
+    """WAV bytes を指定フォーマットの bytes に変換する。"""
+
+    if fmt == "wav":
+        return wav_bytes, "audio/wav"
+
+    if fmt != "flac":
+        raise HTTPException(status_code=400, detail="未対応のフォーマットです")
+
+    try:
+        import soundfile as sf
+    except Exception:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            raise HTTPException(status_code=500, detail="FLAC 変換には soundfile または ffmpeg が必要です")
+        proc = subprocess.run(
+            [ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "wav", "-i", "pipe:0", "-f", "flac", "pipe:1"],
+            input=wav_bytes,
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            message = proc.stderr.decode("utf-8", errors="ignore") or "ffmpeg による FLAC 変換に失敗しました"
+            raise HTTPException(status_code=500, detail=message)
+        return proc.stdout, "audio/flac"
+
+    data, samplerate = sf.read(io.BytesIO(wav_bytes), always_2d=True, dtype="float32")
+    out = io.BytesIO()
+    sf.write(out, data, samplerate, format="FLAC")
+    return out.getvalue(), "audio/flac"
 
 
 def create_daw_session(paths: list[str]) -> DawSession:
@@ -90,3 +157,39 @@ def api_daw_session(session_id: str) -> dict:
         "id": session.id,
         "tracks": [asdict(track) for track in session.tracks],
     }
+
+
+@app.post("/api/daw/export")
+async def api_daw_export(
+    audio: UploadFile = File(...),
+    options: str = Form(...),
+):
+    """DAW iframe から受け取った WAV を保存/変換/ダウンロードする。"""
+
+    try:
+        opts = json.loads(options)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="書き出し設定の JSON が不正です") from exc
+
+    fmt = str(opts.get("format", "wav")).lower()
+    if fmt not in {"wav", "flac"}:
+        raise HTTPException(status_code=400, detail="未対応のフォーマットです")
+    save_mode = str(opts.get("saveMode", "save"))
+    if save_mode not in {"save", "download"}:
+        raise HTTPException(status_code=400, detail="未対応の保存方法です")
+
+    filename = _safe_export_filename(str(opts.get("filename", "daw-export")), fmt)
+    wav_bytes = await audio.read()
+    out_bytes, media_type = _convert_wav_bytes(wav_bytes, fmt)
+
+    if save_mode == "download":
+        return StreamingResponse(
+            io.BytesIO(out_bytes),
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    cnfg.outputs_dir.mkdir(parents=True, exist_ok=True)
+    out_path = _unique_export_path(cnfg.outputs_dir, filename)
+    out_path.write_bytes(out_bytes)
+    return JSONResponse({"ok": True, "path": str(out_path)})

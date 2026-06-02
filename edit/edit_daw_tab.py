@@ -1,5 +1,12 @@
+import json
+
 from nicegui import ui
 from edit.edit_app_ctx import EditCtx
+
+
+_EXPORT_REQUEST_EVENT = "daw-export-request"
+_EXPORT_COMPLETE_EVENT = "daw-export-complete"
+_EXPORT_ERROR_EVENT = "daw-export-error"
 
 
 def tab_main(ctx: EditCtx):
@@ -8,11 +15,145 @@ def tab_main(ctx: EditCtx):
     )
 
     frame_container = ui.element("div").classes("w-full")
+    element_id = f"c{frame_container.id}"
+    pending_request: dict = {}
+
+    def on_export_complete(e) -> None:
+        """JS 側のアップロード完了通知を表示する。"""
+
+        args = e.args if isinstance(e.args, dict) else {}
+        path = args.get("path")
+        if path:
+            ui.notify(f"書き出しました: {path}", type="positive")
+        else:
+            ui.notify("書き出しが完了しました", type="positive")
+
+    def on_export_error(e) -> None:
+        """JS/DAW/API 側の書き出しエラーを表示する。"""
+
+        args = e.args if isinstance(e.args, dict) else {}
+        ui.notify(str(args.get("message") or "書き出しに失敗しました"), type="negative")
+
+    ui.on(_EXPORT_COMPLETE_EVENT, on_export_complete)
+    ui.on(_EXPORT_ERROR_EVENT, on_export_error)
+
+    with ui.dialog() as export_dialog, ui.card().classes("w-96"):
+        ui.label("DAW 書き出し").classes("text-lg font-bold")
+        filename_input = ui.input("ファイル名").classes("w-full")
+        format_select = ui.select({"wav": "WAV", "flac": "FLAC"}, label="フォーマット", value="wav").classes("w-full")
+
+        def confirm_export() -> None:
+            filename = str(filename_input.value or "").strip()
+            if not filename:
+                ui.notify("ファイル名を入力してください", type="warning")
+                return
+            options = {
+                "filename": filename,
+                "format": format_select.value,
+                "saveMode": pending_request.get("saveMode", "save"),
+            }
+            request_id = pending_request.get("requestId", "")
+            payload = json.dumps(
+                {
+                    "type": "daw-export-start",
+                    "requestId": request_id,
+                    "options": options,
+                },
+                ensure_ascii=False,
+            )
+            ui.run_javascript(
+                f'''
+                const dawContainer = document.getElementById("{element_id}");
+                const dawFrame = dawContainer?.querySelector("iframe");
+                dawFrame?.contentWindow?.postMessage({payload}, "*");
+                '''
+            )
+            export_dialog.close()
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("キャンセル", on_click=export_dialog.close).props("flat")
+            ui.button("OK", on_click=confirm_export).props("color=primary")
+
+    def on_export_request(e) -> None:
+        """DAW iframe から書き出し開始要求を受けて、設定ダイアログを開く。"""
+
+        args = e.args if isinstance(e.args, dict) else {}
+        pending_request.clear()
+        pending_request.update(args)
+        filename_input.value = str(args.get("defaultFilename") or "daw-export")
+        format_select.value = "wav"
+        export_dialog.open()
+
+    ui.on(_EXPORT_REQUEST_EVENT, on_export_request)
+
+    ui.add_body_html(
+        f'''
+<script>
+if (!window.__datasetUiDawExportBridgeInstalled) {{
+    window.__datasetUiDawExportBridgeInstalled = true;
+    window.addEventListener("message", async (event) => {{
+        const data = event.data || {{}};
+        if (data.type === "daw-export-request") {{
+            emitEvent("{_EXPORT_REQUEST_EVENT}", data);
+            return;
+        }}
+        if (data.type === "daw-export-error") {{
+            emitEvent("{_EXPORT_ERROR_EVENT}", {{ message: data.message || "書き出しに失敗しました" }});
+            return;
+        }}
+        if (data.type !== "daw-export-audio") return;
+
+        try {{
+            const options = data.options || {{}};
+            const blob = new Blob([data.wavBuffer], {{ type: "audio/wav" }});
+            const form = new FormData();
+            form.append("audio", blob, "render.wav");
+            form.append("options", JSON.stringify(options));
+
+            const response = await fetch("/api/daw/export", {{
+                method: "POST",
+                body: form,
+            }});
+            if (!response.ok) {{
+                let message = `書き出し API エラー (${{response.status}})`;
+                try {{
+                    const errorBody = await response.json();
+                    message = errorBody.detail || message;
+                }} catch {{}}
+                throw new Error(message);
+            }}
+
+            if (options.saveMode === "download") {{
+                const outBlob = await response.blob();
+                const url = URL.createObjectURL(outBlob);
+                const a = document.createElement("a");
+                const ext = options.format || "wav";
+                const name = (options.filename || "daw-export").replace(/\\.[^/.]+$/, "");
+                a.href = url;
+                a.download = `${{name}}.${{ext}}`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                emitEvent("{_EXPORT_COMPLETE_EVENT}", {{}});
+            }} else {{
+                const result = await response.json();
+                emitEvent("{_EXPORT_COMPLETE_EVENT}", result);
+            }}
+        }} catch (error) {{
+            emitEvent("{_EXPORT_ERROR_EVENT}", {{
+                message: error instanceof Error ? error.message : "書き出しに失敗しました",
+            }});
+        }}
+    }});
+}}
+</script>
+'''
+    )
 
     def update_frame() -> None:
         """DAW iframe を現在の URL で描画する。"""
 
-        element_id = f"c{frame_container.id}"
         if not ctx.daw_url:
             ui.run_javascript(
                 f'''

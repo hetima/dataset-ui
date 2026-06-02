@@ -151,7 +151,64 @@ dd {
   height: 30px;
 }
 
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.export-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.export-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  display: none;
+  min-width: 170px;
+  overflow: hidden;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #111827;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.export-menu-list.open {
+  display: block;
+}
+
+.export-menu-list button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.export-menu-list button:hover {
+  background: #263244;
+}
+
 .icon-button:hover,
+.text-button:hover,
 .track-toggle:hover {
   background: #263244;
 }
