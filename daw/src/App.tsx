@@ -62,6 +62,7 @@ type DawTrack = {
 type DawSession = {
   id: string
   tracks: DawTrack[]
+  singleTrack?: boolean
 }
 
 type SoloStateContextValue = {
@@ -378,7 +379,7 @@ function App() {
             <span>{session.tracks.length} files</span>
           </div>
 
-          <PlaylistArea sourceTracks={session.tracks} />
+          <PlaylistArea sourceTracks={session.tracks} singleTrack={session.singleTrack ?? false} />
         </section>
       )}
 
@@ -399,7 +400,7 @@ function App() {
   )
 }
 
-function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
+function PlaylistArea({ sourceTracks, singleTrack }: { sourceTracks: DawTrack[]; singleTrack: boolean }) {
   const configs = useMemo(
     () =>
       sourceTracks.map((track) => ({
@@ -412,7 +413,21 @@ function PlaylistArea({ sourceTracks }: { sourceTracks: DawTrack[] }) {
       })),
     [sourceTracks],
   )
-  const { tracks, loading, error, loadedCount, totalCount } = useAudioTracks(configs)
+  const { tracks: rawTracks, loading, error, loadedCount, totalCount } = useAudioTracks(configs)
+
+  // シングルトラックモード: 全クリップを1本の ClipTrack にまとめる
+  const tracks = useMemo((): ClipTrack[] => {
+    if (!singleTrack || rawTracks.length === 0) return rawTracks
+    const allClips = rawTracks.flatMap((t) => t.clips)
+    const first = rawTracks[0]
+    const merged: ClipTrack = {
+      ...first,
+      id: first.id,
+      name: sourceTracks[0]?.name ?? first.name,
+      clips: allClips,
+    }
+    return [merged]
+  }, [singleTrack, rawTracks, sourceTracks])
 
   return (
     <div className="playlist-shell">

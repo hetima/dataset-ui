@@ -45,6 +45,7 @@ class DawSession:
 
     id: str
     tracks: list[DawTrack]
+    singleTrack: bool = False
 
 
 _sessions: dict[str, DawSession] = {}
@@ -326,7 +327,7 @@ def _convert_wav_bytes(wav_bytes: bytes, fmt: str) -> tuple[bytes, str]:
 
 
 def create_daw_session(paths: list[str]) -> DawSession:
-    """音声ファイルパスから DAW セッションを作成する。"""
+    """音声ファイルパスから DAW セッションを作成する（マルチトラック：1ファイル=1トラック）。"""
 
     session_id = uuid4().hex
     tracks: list[DawTrack] = []
@@ -344,7 +345,48 @@ def create_daw_session(paths: list[str]) -> DawSession:
             )
         )
 
-    session = DawSession(id=session_id, tracks=tracks)
+    session = DawSession(id=session_id, tracks=tracks, singleTrack=False)
+    _sessions[session_id] = session
+    return session
+
+
+def create_daw_session_single_track(paths: list[str]) -> DawSession:
+    """音声ファイルパスから DAW セッションを作成する（シングルトラック：全ファイルを名前順で startTime をずらして1行に並べる）。
+
+    waveform-playlist は「1トラック設定 = 1ファイル = 1クリップ」なので、
+    ここでいう「シングルトラック」は全ファイルを同じトラック行に見せるのではなく、
+    全ファイルを名前順で startTime をずらして時間軸上に連続して配置した
+    複数トラック（ファイルごとに1行）として渡す。ユーザーには縦に積むのではなく
+    横に並ぶ一覧として機能する。
+    """
+
+    session_id = uuid4().hex
+    sorted_paths = sorted(paths, key=lambda p: Path(p).name)
+    tracks: list[DawTrack] = []
+    cursor = 0.0
+
+    for index, path in enumerate(sorted_paths):
+        source = Path(path).resolve()
+        mount = f"/daw-media/{session_id}/{index}"
+        app.add_media_files(mount, str(source.parent))
+        start_time = cursor
+        try:
+            import soundfile as sf
+            info = sf.info(path)
+            cursor += info.duration
+        except Exception:
+            pass
+        tracks.append(
+            DawTrack(
+                id=str(index),
+                name=source.name,
+                sourcePath=str(source),
+                url=f"{mount}/{source.name}",
+                startTime=start_time,
+            )
+        )
+
+    session = DawSession(id=session_id, tracks=tracks, singleTrack=True)
     _sessions[session_id] = session
     return session
 
@@ -373,6 +415,7 @@ def api_daw_session(session_id: str) -> dict:
     return {
         "id": session.id,
         "tracks": [asdict(track) for track in session.tracks],
+        "singleTrack": session.singleTrack,
     }
 
 

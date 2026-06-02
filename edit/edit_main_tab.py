@@ -1,7 +1,7 @@
 from nicegui import ui
 from common.setting import cnfg
 from edit.edit_app_ctx import EditCtx
-from edit.daw_bridge import create_daw_session, get_daw_url
+from edit.daw_bridge import create_daw_session, create_daw_session_single_track, get_daw_url
 from common.wavesurfer import simple_player
 
 
@@ -10,6 +10,8 @@ def tab_main(ctx: EditCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # DAW
     # ═══════════════════════════════════════════════════════════════════════════════
+    daw_mode = {"single": False}  # False=マルチトラック、True=シングルトラック
+
     def open_daw() -> None:
         """選択中のファイルを DAW タブで開く。"""
 
@@ -19,7 +21,10 @@ def tab_main(ctx: EditCtx):
             ui.notify("処理対象がありません")
             return
         cnfg.save()
-        session = create_daw_session(paths)
+        if daw_mode["single"]:
+            session = create_daw_session_single_track(paths)
+        else:
+            session = create_daw_session(paths)
         ctx.daw_url = get_daw_url(session.id)
         ctx.tabs.set_value("daw")
         ui.timer(0.1, lambda: [func() for func in ctx.daw_refresh_func], once=True)
@@ -30,7 +35,13 @@ def tab_main(ctx: EditCtx):
         ui.label(
             "選択したファイルを DAW タブで編集します。マルチトラックでクリップ編集、コンピングなどが行なえます。"
         )
-        ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
+        with ui.row().classes("items-center gap-4"):
+            ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
+            ui.toggle(
+                {"multi": "マルチトラック", "single": "シングルトラック"},
+                value="multi",
+                on_change=lambda e: daw_mode.update({"single": e.value == "single"}),
+            ).props("dense")
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧
