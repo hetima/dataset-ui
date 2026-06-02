@@ -4,7 +4,7 @@ from edit.edit_app_ctx import EditCtx
 
 def tab_main(ctx: EditCtx):
     ui.markdown(
-        "**S** 再生位置でオーディオイベントを分割<br>**R** 再生位置でコンピングリージョンを分割<br>**SPACE** 再生/停止（再生開始位置に戻る）<br>**ENTER** 再生/一時停止"
+        "**S** 再生位置でオーディオイベントを分割<br>**R** 再生位置でコンピングリージョンを分割<br>**SPACE** 再生/停止（再生開始位置に戻る）<br>**ENTER** 再生/一時停止<br>**L** ループ再生オンオフ（波形ビューを右方向にドラッグで選択範囲を作ります。コンピングモードで選択範囲を作るには下側2割くらいのスペースでドラッグしてください）"
     )
 
     frame_container = ui.element("div").classes("w-full")

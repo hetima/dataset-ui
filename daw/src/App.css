@@ -156,6 +156,12 @@ dd {
   background: #263244;
 }
 
+.icon-button.active {
+  border-color: #38bdf8;
+  background: #0e7490;
+  color: #fff;
+}
+
 .icon-button:disabled {
   color: #64748b;
   cursor: default;
@@ -394,6 +400,36 @@ dd {
   white-space: nowrap;
   color: #f8fafc;
   font-size: 13px;
+}
+
+.track-order-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.track-order-button {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  background: #1f2937;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.track-order-button:hover {
+  background: #263244;
+}
+
+.track-order-button:disabled {
+  color: #64748b;
+  cursor: default;
+  opacity: 0.55;
 }
 
 .track-header-row span {

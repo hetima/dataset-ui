@@ -11,6 +11,9 @@ import {
 } from 'react'
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Infinity as InfinityIcon,
   LoaderCircle,
   Pause,
   Play,
@@ -409,6 +412,31 @@ const TRACK_CONTROLS_WIDTH = 200
 const WAVE_HEIGHT_LARGE = 76
 const WAVE_HEIGHT_SMALL = 38
 
+function getSelectionRange(selectionStart: number, selectionEnd: number) {
+  const start = Math.min(selectionStart, selectionEnd)
+  const end = Math.max(selectionStart, selectionEnd)
+  return end > start ? { start, end } : null
+}
+
+function getLoopRange(loopStart: number, loopEnd: number) {
+  const start = Math.min(loopStart, loopEnd)
+  const end = Math.max(loopStart, loopEnd)
+  return end > start ? { start, end } : null
+}
+
+function getLoopAwarePlayStart(
+  currentTime: number,
+  loopRange: { start: number; end: number } | null,
+  isLoopEnabled: boolean,
+) {
+  if (!isLoopEnabled || !loopRange) {
+    return currentTime
+  }
+  return currentTime >= loopRange.start && currentTime < loopRange.end
+    ? currentTime
+    : loopRange.start
+}
+
 function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const regionStorageKey = useMemo(() => {
     const session = new URLSearchParams(window.location.search).get('session') ?? 'default'
@@ -423,6 +451,40 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const waveHeight = trackHeightMode === 'small' ? WAVE_HEIGHT_SMALL : WAVE_HEIGHT_LARGE
+
+  const moveTrack = (trackIndex: number, direction: -1 | 1) => {
+    const nextIndex = trackIndex + direction
+    if (nextIndex < 0 || nextIndex >= playlistTracks.length) {
+      return
+    }
+
+    setPlaylistTracks((current) => {
+      if (trackIndex >= current.length || nextIndex >= current.length) {
+        return current
+      }
+      const next = [...current]
+      const moving = next[trackIndex]
+      next[trackIndex] = next[nextIndex]
+      next[nextIndex] = moving
+      return next
+    })
+    setRegions((current) =>
+      current.map((region) => {
+        if (region.trackIndex === trackIndex) {
+          return { ...region, trackIndex: nextIndex }
+        }
+        if (region.trackIndex === nextIndex) {
+          return { ...region, trackIndex }
+        }
+        return region
+      }),
+    )
+    setSoloedTrackIndex((current) => {
+      if (current === trackIndex) return nextIndex
+      if (current === nextIndex) return trackIndex
+      return current
+    })
+  }
 
   useEffect(() => {
     window.sessionStorage.setItem(regionStorageKey, JSON.stringify(regions))
@@ -478,6 +540,9 @@ function EditablePlaylist({ initialTracks }: { initialTracks: ClipTrack[] }) {
                     <TrackControls
                       trackIndex={trackIndex}
                       trackHeightMode={trackHeightMode}
+                      canMoveUp={trackIndex > 0}
+                      canMoveDown={trackIndex < playlistTracks.length - 1}
+                      onMoveTrack={moveTrack}
                     />
                   )}
                 />
@@ -643,16 +708,43 @@ function PlaylistToolbar({
   const controls = usePlaylistControls()
   const state = usePlaylistState()
   const data = usePlaylistData()
+  const playback = usePlaybackAnimation()
+  const selectionRange = getSelectionRange(state.selectionStart, state.selectionEnd)
+  const loopRange = getLoopRange(state.loopStart, state.loopEnd)
+  const canToggleLoop = Boolean(selectionRange || loopRange)
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks: data.tracks,
     samplesPerPixel: data.samplesPerPixel,
     engineRef: data.playoutRef,
   })
+  const playFromCurrentState = () => {
+    const currentTime = playback.currentTimeRef.current ?? 0
+    const startTime = getLoopAwarePlayStart(currentTime, loopRange, state.isLoopEnabled)
+    if (startTime !== currentTime) {
+      controls.setCurrentTime(startTime)
+    }
+    void controls.play(startTime)
+  }
+  const toggleLoopPlayback = () => {
+    if (selectionRange) {
+      const currentTime = playback.currentTimeRef.current ?? 0
+      controls.setLoopRegion(selectionRange.start, selectionRange.end)
+      if (!state.isLoopEnabled) {
+        controls.setLoopEnabled(true)
+      }
+      controls.setSelection(0, 0)
+      controls.setCurrentTime(currentTime)
+      return
+    }
+    if (loopRange) {
+      controls.setLoopEnabled(!state.isLoopEnabled)
+    }
+  }
 
   return (
     <div className="playlist-toolbar">
       <div className="tool-group">
-        <button type="button" className="icon-button" onClick={() => void controls.play()}>
+        <button type="button" className="icon-button" onClick={playFromCurrentState}>
           <Play size={17} />
         </button>
         <button type="button" className="icon-button" onClick={controls.pause}>
@@ -660,6 +752,15 @@ function PlaylistToolbar({
         </button>
         <button type="button" className="icon-button" onClick={controls.stop}>
           <Square size={15} />
+        </button>
+        <button
+          type="button"
+          className={state.isLoopEnabled ? 'icon-button active' : 'icon-button'}
+          disabled={!canToggleLoop}
+          title="ループ再生切替 (L)"
+          onClick={toggleLoopPlayback}
+        >
+          <InfinityIcon size={17} />
         </button>
       </div>
 
@@ -1295,11 +1396,27 @@ function RegionPlaybackGate() {
 function PlaybackKeyboard() {
   const controls = usePlaylistControls()
   const playback = usePlaybackAnimation()
+  const state = usePlaylistState()
 
   const controlsRef = useRef(controls)
   useEffect(() => {
     controlsRef.current = controls
   }, [controls])
+
+  const selectionRangeRef = useRef(getSelectionRange(state.selectionStart, state.selectionEnd))
+  useEffect(() => {
+    selectionRangeRef.current = getSelectionRange(state.selectionStart, state.selectionEnd)
+  }, [state.selectionStart, state.selectionEnd])
+
+  const loopRangeRef = useRef(getLoopRange(state.loopStart, state.loopEnd))
+  useEffect(() => {
+    loopRangeRef.current = getLoopRange(state.loopStart, state.loopEnd)
+  }, [state.loopStart, state.loopEnd])
+
+  const isLoopEnabledRef = useRef(state.isLoopEnabled)
+  useEffect(() => {
+    isLoopEnabledRef.current = state.isLoopEnabled
+  }, [state.isLoopEnabled])
 
   const isPlayingRef = useRef(playback.isPlaying)
   useEffect(() => {
@@ -1307,6 +1424,19 @@ function PlaybackKeyboard() {
   }, [playback.isPlaying])
 
   useEffect(() => {
+    const playFromCurrentState = () => {
+      const currentTime = playback.currentTimeRef.current ?? 0
+      const startTime = getLoopAwarePlayStart(
+        currentTime,
+        loopRangeRef.current,
+        isLoopEnabledRef.current,
+      )
+      if (startTime !== currentTime) {
+        controlsRef.current.setCurrentTime(startTime)
+      }
+      void controlsRef.current.play(startTime)
+    }
+
     const isEditingTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
@@ -1320,7 +1450,27 @@ function PlaybackKeyboard() {
         if (isPlayingRef.current) {
           controlsRef.current.stop()
         } else {
-          void controlsRef.current.play()
+          playFromCurrentState()
+        }
+        return
+      }
+      if (event.key.toLowerCase() === 'l') {
+        const selectionRange = selectionRangeRef.current
+        const loopRange = loopRangeRef.current
+        if (selectionRange) {
+          event.preventDefault()
+          const currentTime = playback.currentTimeRef.current ?? 0
+          controlsRef.current.setLoopRegion(selectionRange.start, selectionRange.end)
+          if (!isLoopEnabledRef.current) {
+            controlsRef.current.setLoopEnabled(true)
+          }
+          controlsRef.current.setSelection(0, 0)
+          controlsRef.current.setCurrentTime(currentTime)
+          return
+        }
+        if (loopRange) {
+          event.preventDefault()
+          controlsRef.current.setLoopEnabled(!isLoopEnabledRef.current)
         }
         return
       }
@@ -1329,7 +1479,7 @@ function PlaybackKeyboard() {
         if (isPlayingRef.current) {
           controlsRef.current.pause()
         } else {
-          void controlsRef.current.play()
+          playFromCurrentState()
         }
       }
     }
@@ -1352,7 +1502,7 @@ function PlaybackKeyboard() {
         // クロスオリジン
       }
     }
-  }, [])
+  }, [playback.currentTimeRef])
 
   return null
 }
@@ -1441,9 +1591,15 @@ function RegionKeyboard() {
 function TrackControls({
   trackIndex,
   trackHeightMode,
+  canMoveUp,
+  canMoveDown,
+  onMoveTrack,
 }: {
   trackIndex: number
   trackHeightMode: TrackHeightMode
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveTrack: (trackIndex: number, direction: -1 | 1) => void
 }) {
   const controls = usePlaylistControls()
   const data = usePlaylistData()
@@ -1459,6 +1615,28 @@ function TrackControls({
     <div className={trackHeightMode === 'small' ? 'track-controls compact' : 'track-controls'}>
       <div className="track-header-row">
         <strong>{trackState.name || track.name}</strong>
+        <div className="track-order-buttons">
+          <button
+            type="button"
+            className="track-order-button"
+            disabled={!canMoveUp}
+            title="トラックを上へ移動"
+            aria-label={`${trackState.name || track.name} を上へ移動`}
+            onClick={() => onMoveTrack(trackIndex, -1)}
+          >
+            <ChevronUp size={13} />
+          </button>
+          <button
+            type="button"
+            className="track-order-button"
+            disabled={!canMoveDown}
+            title="トラックを下へ移動"
+            aria-label={`${trackState.name || track.name} を下へ移動`}
+            onClick={() => onMoveTrack(trackIndex, 1)}
+          >
+            <ChevronDown size={13} />
+          </button>
+        </div>
       </div>
       <button
         type="button"
