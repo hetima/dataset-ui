@@ -26,6 +26,7 @@ import {
   Square,
   Undo2,
   Volume2,
+  Wrench,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -804,6 +805,8 @@ function EditablePlaylist({
         .forEach((element) => element.classList.remove('clip-focus-visible'))
       handle.classList.add('clip-focus-visible')
       handle.focus()
+      // クリップを選択したらリージョン選択を解除する
+      setSelectedRegionId(null)
     }
   }
 
@@ -1054,6 +1057,8 @@ function PlaylistToolbar({
   const canToggleLoop = Boolean(selectionRange || loopRange)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const [toolMenuOpen, setToolMenuOpen] = useState(false)
+  const toolMenuRef = useRef<HTMLDivElement | null>(null)
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks: data.tracks,
     samplesPerPixel: data.samplesPerPixel,
@@ -1128,6 +1133,26 @@ function PlaylistToolbar({
     return () => document.removeEventListener('mousedown', onDocumentMouseDown)
   }, [exportMenuOpen])
 
+  useEffect(() => {
+    if (!toolMenuOpen) {
+      return
+    }
+
+    const onDocumentMouseDown = (event: MouseEvent) => {
+      if (
+        toolMenuRef.current &&
+        event.target instanceof Node &&
+        toolMenuRef.current.contains(event.target)
+      ) {
+        return
+      }
+      setToolMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', onDocumentMouseDown)
+    return () => document.removeEventListener('mousedown', onDocumentMouseDown)
+  }, [toolMenuOpen])
+
   return (
     <div className="playlist-toolbar">
       <div className="tool-group">
@@ -1171,14 +1196,29 @@ function PlaylistToolbar({
         <button type="button" className="icon-button" onClick={splitClipAtPlayhead}>
           <Scissors size={16} />
         </button>
-        <button
-          type="button"
-          className="icon-button"
-          title="無音区間で分割"
-          onClick={splitOnSilence}
-        >
-          <AudioLines size={16} />
-        </button>
+        <div className="export-menu" ref={toolMenuRef}>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setToolMenuOpen((current) => !current)}
+          >
+            <Wrench size={15} />
+            ツール
+          </button>
+          <div className={toolMenuOpen ? 'export-menu-list open' : 'export-menu-list'}>
+            <button
+              type="button"
+              title="-60dBのしきい値で分割します"
+              onClick={() => {
+                setToolMenuOpen(false)
+                splitOnSilence()
+              }}
+            >
+              <AudioLines size={14} />
+              無音区間で分割
+            </button>
+          </div>
+        </div>
         <div className="export-menu" ref={exportMenuRef}>
           <button
             type="button"
@@ -1487,6 +1527,12 @@ type RegionDragState =
       startX: number
     }
 
+function clearClipFocus(viewportRef: React.RefObject<HTMLDivElement | null>) {
+  viewportRef.current
+    ?.querySelectorAll('.clip-focus-visible')
+    .forEach((element) => element.classList.remove('clip-focus-visible'))
+}
+
 function RegionOverlay({
   viewportRef,
   layoutKey,
@@ -1498,6 +1544,14 @@ function RegionOverlay({
   const controls = usePlaylistControls()
   const { regions, setRegions, selectedRegionId, setSelectedRegionId } = useRegions()
   const { allowOverlap } = useDawMode()
+
+  // リージョンを選択するときにクリップのフォーカスも解除する
+  const selectRegion = (id: string | null) => {
+    setSelectedRegionId(id)
+    if (id !== null) {
+      clearClipFocus(viewportRef)
+    }
+  }
 
   const [layouts, setLayouts] = useState<TrackLayout[]>([])
   const dragRef = useRef<RegionDragState | null>(null)
@@ -1669,7 +1723,7 @@ function RegionOverlay({
     }
     if (drag.kind === 'move' && !drag.moved) {
       // 動かさずクリック → 選択のみ
-      setSelectedRegionId(drag.regionId)
+      selectRegion(drag.regionId)
       return
     }
 
@@ -1683,7 +1737,7 @@ function RegionOverlay({
       drag.kind === 'create' ? { ...draft, id: makeRegionId() } : draft
     commitActive(committed)
     if (drag.kind === 'create') {
-      setSelectedRegionId(committed.id)
+      selectRegion(committed.id)
     }
   }
 
@@ -1716,7 +1770,7 @@ function RegionOverlay({
         fixedTime: region.end,
         startX: event.clientX,
       })
-      setSelectedRegionId(region.id)
+      selectRegion(region.id)
       return
     }
     if (offsetX >= rect.width - REGION_RESIZE_HANDLE_PX) {
@@ -1728,7 +1782,7 @@ function RegionOverlay({
         fixedTime: region.start,
         startX: event.clientX,
       })
-      setSelectedRegionId(region.id)
+      selectRegion(region.id)
       return
     }
     startWindowDrag({
@@ -1927,11 +1981,17 @@ function PlaybackKeyboard() {
   const controls = usePlaylistControls()
   const playback = usePlaybackAnimation()
   const state = usePlaylistState()
+  const data = usePlaylistData()
 
   const controlsRef = useRef(controls)
   useEffect(() => {
     controlsRef.current = controls
   }, [controls])
+
+  const dataRef = useRef(data)
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   const selectionRangeRef = useRef(getSelectionRange(state.selectionStart, state.selectionEnd))
   useEffect(() => {
@@ -1971,8 +2031,31 @@ function PlaybackKeyboard() {
       target instanceof HTMLElement &&
       Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 
+    const deleteSelectedClip = () => {
+      const focused = document.querySelector<HTMLElement>('.clip-focus-visible')
+      const clipId = focused?.dataset.clipId
+      if (!clipId) return false
+
+      const d = dataRef.current
+      for (const track of d.tracks) {
+        if (track.clips.some((c) => c.id === clipId)) {
+          const newClips = track.clips.filter((c) => c.id !== clipId)
+          d.playoutRef.current?.updateTrack(track.id, { ...track, clips: newClips })
+          focused.classList.remove('clip-focus-visible')
+          return true
+        }
+      }
+      return false
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isEditingTarget(event.target)) {
+        return
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (deleteSelectedClip()) {
+          event.preventDefault()
+        }
         return
       }
       if (event.key === ' ') {

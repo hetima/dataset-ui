@@ -191,7 +191,9 @@ dd {
 }
 
 .export-menu-list button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   padding: 8px 10px;
   border: none;
@@ -396,6 +398,14 @@ dd {
 
 .playlist-view [aria-roledescription="draggable"]:active {
   cursor: grabbing;
+}
+
+/* ClipBoundary（リサイズハンドル）は col-resize を維持する */
+.playlist-view [data-boundary-edge] {
+  cursor: col-resize;
+}
+.playlist-view [data-boundary-edge]:active {
+  cursor: col-resize;
 }
 
 .track-controls {
