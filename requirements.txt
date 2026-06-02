@@ -8,6 +8,7 @@ transformers>=5.4
 accelerate
 bitsandbytes
 send2trash
+pozalabs-pydub
 tqdm
 # torchcodec #==0.10.0
 
