@@ -242,7 +242,7 @@ def _build_aaf_bytes(payload: AafPayload, filename: str) -> bytes:
             f.content.mobs.append(composition)
 
             for track_index, track in enumerate(payload.tracks, start=1):
-                slot = composition.create_empty_sequence_slot(
+                slot = composition.create_empty_sequence_slot( # type: ignore
                     edit_rate,
                     track_index,
                     media_kind="sound",
@@ -276,7 +276,7 @@ def _build_aaf_bytes(payload: AafPayload, filename: str) -> bytes:
                         audio_format,
                     )
                     sequence.components.append(
-                        master.create_source_clip(slot_id=1, start=source_start, length=length)
+                        master.create_source_clip(slot_id=1, start=source_start, length=length) # type: ignore
                     )
                     cursor = start + length
 

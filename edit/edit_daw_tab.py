@@ -12,17 +12,48 @@ _AAF_EXPORT_REQUEST_EVENT = "daw-aaf-export-request"
 
 def tab_main(ctx: EditCtx):
     ui.markdown(
-        "**S** 再生位置でオーディオイベントを分割<br>**R** 再生位置でコンピングリージョンを分割<br>**SPACE** 再生/停止（再生開始位置に戻る）<br>**ENTER** 再生/一時停止<br>**L** ループ再生オンオフ（波形ビューを右方向にドラッグで選択範囲を作ります。コンピングモードで選択範囲を作るには下側2割くらいのスペースでドラッグしてください）"
+        "**S** 再生位置でオーディオイベントを分割"
+        "<br>**R** 再生位置でコンピングリージョンを分割<br>"
+        "**SPACE** 再生/停止（再生開始位置に戻る）<br>"
+        "**ENTER** 再生/一時停止"
+        "<br>**L** ループ再生オンオフ（波形ビューを右方向にドラッグで選択範囲を作ります。コンピングモードで選択範囲を作るには下側2割くらいのスペースでドラッグしてください）<br>"
+        "<br>"
+        "コンピングモードではリージョンが存在する箇所のみ再生され、存在しない箇所はミュートされます。<br>"
+        "<br>"
+        "書き出し時にはマスターボリュームの数値は無視されます。<br>"
+        "AAFファイルにはファイルのフルパスで記入されます。書き出し後にファイルを移動すると見失います。<br>"
+        "品質を重視するならAAFで書き出してちゃんとしたDAWで作業することをお勧めします。"
     )
 
     frame_container = ui.element("div").classes("w-full")
     element_id = f"c{frame_container.id}"
     pending_request: dict = {}
     pending_aaf_request: dict = {}
+    # 音声書き出しの進行状態。active=True の間だけ進行中スピナー通知を扱う。
+    export_progress: dict = {"active": False, "notification": None}
+
+    def finish_export_progress() -> None:
+        """進行中スピナー通知が出ていれば閉じ、進行状態を解除する。"""
+
+        export_progress["active"] = False
+        notification = export_progress["notification"]
+        if notification is not None:
+            notification.dismiss()
+            export_progress["notification"] = None
+
+    def show_export_progress() -> None:
+        """3秒経過してもまだ書き出し中なら進行中スピナー通知を表示する。"""
+
+        if not export_progress["active"] or export_progress["notification"] is not None:
+            return
+        export_progress["notification"] = ui.notification(
+            "書き出し中です", spinner=True, timeout=None
+        )
 
     def on_export_complete(e) -> None:
         """JS 側のアップロード完了通知を表示する。"""
 
+        finish_export_progress()
         args = e.args if isinstance(e.args, dict) else {}
         path = args.get("path")
         if path:
@@ -33,6 +64,7 @@ def tab_main(ctx: EditCtx):
     def on_export_error(e) -> None:
         """JS/DAW/API 側の書き出しエラーを表示する。"""
 
+        finish_export_progress()
         args = e.args if isinstance(e.args, dict) else {}
         ui.notify(str(args.get("message") or "書き出しに失敗しました"), type="negative")
 
@@ -71,6 +103,9 @@ def tab_main(ctx: EditCtx):
                 '''
             )
             export_dialog.close()
+            # 進行状態をセットし、3秒経過してもまだ書き出し中なら通知を出す。
+            export_progress["active"] = True
+            ui.timer(3.0, show_export_progress, once=True)
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("キャンセル", on_click=export_dialog.close).props("flat")
