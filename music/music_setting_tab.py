@@ -225,7 +225,7 @@ def tab_setting(ctx: MusicCtx):
                     with ui.row().classes("items-center gap-2 q-px-sm padd4 w-full"):
                         ui.label(m["name"]).classes("flex-1 text-sm")
                         ui.label(m.get("size", "")).classes("text-xs infotxt")
-                        ui.button("情報", on_click=lambda _, m=m: show_info_dialog(m)).props(
+                        ui.button("編集", on_click=lambda _, m=m: show_info_dialog(m)).props(
                             "flat dense size=sm"
                         )
                         ui.button("削除", on_click=lambda _, m=m: delete_model(m)).props(
