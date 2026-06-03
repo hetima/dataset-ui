@@ -1,1 +1,83 @@
 # dataset-ui
+
+音声データセットに様々な処理を施すWeb UIです。
+
+
+## voice
+主に音声データを扱うページ
+- Qwen3-ASR での書き起こし
+- 無音区間で分割、均等に分割
+- タイムストレッチ
+
+
+## music
+主に音楽データを扱うページ
+- Roformer での音声分離
+- BPM、キー、拍子の解析
+- ACE-Step Transcriber で歌詞を解析
+
+音声分離は MelBand Roformer と BS Roformer に対応しています。
+
+
+## audio-edit
+オーディファイルを編集するページ
+書き出しフォルダのファイルをDAW風のUIでマルチトラック編集できます。
+コンピングとかも一応できます。編集結果を書き出すことができます。
+編集状態は保存できませんが、AAFに書き出せます。コンピングのリージョンはそれぞれのオーディオイベントに変換されます。
+
+
+## インストール
+```
+git clone https://github.com/hetima/dataset-ui
+```
+venv を作ってください。バージョンは3.12で開発してます。torch 関連は requirements.txt に書いてないので手動でお好みのものを入れてください。ちなみに2.10.0を入れて開発してます。
+
+```
+uv pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu130
+uv pip install -r requirements.txt
+```
+
+`app.py` を実行すると web UI が開きます。
+
+
+## その他説明
+各ページの設定タブで書き出しフォルダとモデルフォルダは必ず確認することをお勧めします。初期設定ではレポジトリの中に作成されます。この2つの設定はすべてのページで共有されます。
+
+自動保存されない操作が多いので保存ボタンを押し忘れないように注意してください。
+
+モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
+
+voice
+![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/01.jpg)
+
+music
+![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/02.jpg)
+
+audio-edit
+![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/03.jpg)
+
+
+## 開発環境
+Pyrhon 3.12 で開発しています。Web UI のフレームワークは NiceGUI です。
+daw フォルダの中は Node.js プロジェクトです。パッケージマネージャーは `pnpm` を使っています。
+
+```
+cd daw
+pnpm build
+pnpm deploy
+```
+
+`deploy` で `publish\daw_ui` にコピーされて使えるようになります。
+
+`app.py` に引数 `--develop-mode` をつけて起動すると、pyファイルを編集すると自動でリロードされるようになります。開発時以外は邪魔なので気をつけてください。また、`daw_ui` を見に行く先が `deploy` されたパスではなく `daw\dist` に変わります。
+
+
+## 使用したライブラリなど
+
+- [zauberzeug/nicegui](https://github.com/zauberzeug/nicegui/)
+- [naomiaro/waveform-playlist](https://github.com/naomiaro/waveform-playlist)
+- [Qwen3-ASR support-transformers-v5.4](https://github.com/One-sixth/Qwen3-ASR/tree/support-transformers-v5.4)
+
+
+## ライセンス
+MIT
