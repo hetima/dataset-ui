@@ -3,6 +3,7 @@ from pathlib import Path
 from nicegui import ui
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
+from common.xterm_view import XtermView
 
 IRODORI_TRAIN_SUB_DIR = "irodori"
 
@@ -31,6 +32,8 @@ def tab_iridori_train(ctx: VoiceCtx):
             )
             ui.button("データセット検証", on_click=lambda: validate_dataset(path_input.value))  # type: ignore
             ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value))  # type: ignore
+
+        xterm = XtermView(title="ターミナル").classes("w-full")
 
     def dataset_paths(text:str) -> list[Path]:
         """strを改行で区切ってリストにして返す。エラーがあったらnotifyして空配列を返す"""
