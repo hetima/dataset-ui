@@ -4,7 +4,7 @@ from typing import Callable
 from nicegui import binding, ui
 from nicegui.elements.table import Table
 
-from common.file_util import audio_files_in_folder
+from common.file_util import audio_files_in_folder, Mtdt
 from common.setting import cnfg
 from voice.voicefile import VoiceFile
 
@@ -12,10 +12,12 @@ from voice.voicefile import VoiceFile
 class VoiceCtx:
     def __init__(self):
         self.name = "dataset-ui-music"
+        self.folder = None
         self.files = []
         self.table: Table
         self.save_json: bool = False
         self.save_txt: bool = True
+        self.save_mtdt: bool = True
         self.target = "selected"
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
@@ -31,17 +33,20 @@ class VoiceCtx:
             self.notify("フォルダパスを入力してください", type="warning")
             return
 
-        folder = Path(folder_path.strip())
-        if not folder.is_dir():
+        self.folder = Path(folder_path.strip())
+        if not self.folder.is_dir():
             self.notify(f"フォルダが見つかりません: {folder_path}", type="negative")
             return
 
         cnfg.voice.last_dataset_path = folder_path
         cnfg.save()
 
+        mtdt_path = self.folder / "mtdt.json"
+        mtdt = Mtdt(mtdt_path) if mtdt_path.exists() else None
+
         self.files = []
-        for file in audio_files_in_folder(folder_path):
-            musicfile = VoiceFile.from_audio_file(file)
+        for file in audio_files_in_folder(self.folder):
+            musicfile = VoiceFile.from_audio_file(file, mtdt)
             self.files.append(musicfile)
 
         self.table.rows = self.files
@@ -69,14 +74,22 @@ class VoiceCtx:
         if len(files) == 0:
             self.notify("処理対象がありません")
             return
+        mtdt = None
+        if self.save_mtdt and self.folder:
+            mtdt_path = self.folder / "mtdt.json"
+            mtdt = Mtdt(mtdt_path)
         for file in files:
             if self.save_json:
                 file.save_to_json()
             if self.save_txt:
                 file.save_to_txt()
+            if mtdt:
+                mtdt.merge_file(file.name, file.to_mtdt())
+        if mtdt:
+            mtdt.save()
         self.notify("保存しました", type="positive")
 
-    def set_metadata(self, key: str, val: str) -> None:
+    def set_metadata_all(self, key: str, val: str) -> None:
         targets = self.target_files()
         if len(targets) == 0:
             self.notify("処理対象がありません")
@@ -92,7 +105,7 @@ class VoiceCtx:
         self.table.update()
 
     def set_transcript(self, val: str) -> None:
-        self.set_metadata("transcript", val)
+        self.set_metadata_all("transcript", val)
 
     def set_models_root(self, path: str | None):
         if path and cnfg.set_models_dir(path):

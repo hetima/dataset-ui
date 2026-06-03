@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional
+from common.file_util import Mtdt
 import re
 
 try:
@@ -50,12 +51,29 @@ class MusicFile:
     def as_dict(self):
         return {k: v for k, v in asdict(self).items() if k != "default"}
 
+    def to_mtdt(self) -> dict:
+        """mtdt用の辞書を返す"""
+        return {
+            "lyrics": self.lyrics,
+            "synced_lyrics": self.synced_lyrics,
+            "caption": self.caption,
+            "bpm": self.bpm,
+            "keyscale": self.keyscale,
+            "timesignature": self.timesignature,
+            "language": self.language,
+            "duration": self.duration,
+            "artist": self.artist,
+            "album_artist": self.album_artist,
+            "ttml": self.ttml,
+        }
+
     def to_dict(self) -> dict:
         """MusicFile の各フィールドを辞書として返す"""
         return {
             "name": self.name,
             "path": self.path,
             "lyrics": self.lyrics,
+            "synced_lyrics": self.synced_lyrics,
             "caption": self.caption,
             "bpm": self.bpm,
             "keyscale": self.keyscale,
@@ -133,7 +151,7 @@ class MusicFile:
             f.write(output)
 
     @classmethod
-    def from_audio_file(cls , file:Path) -> "MusicFile":
+    def from_audio_file(cls, file: Path, mtdt: "Mtdt|None" = None) -> "MusicFile":
         json_path = file.with_suffix(".json")
         lyrics_path = file.with_suffix(".lyrics.txt")
         aitk_path = file.with_suffix(".txt")
@@ -142,12 +160,17 @@ class MusicFile:
         path = str(file)
         lyrics = ""
         synced_lyrics = ""
+        ttml = ""
         caption = ""
         bpm = ""
         keyscale = ""
         timesignature = ""
         language = ""
         duration = ""
+
+        title = ""
+        artist = ""
+        album_artist = ""
 
         # txtが存在する場合は読み込み
         if aitk_path.exists():
@@ -182,11 +205,27 @@ class MusicFile:
             language = data.get("language", language)
             duration = data.get("duration", duration)
 
+        # mtdt.json
+        mtdt_data = mtdt.song_data(name) if mtdt else None
+        if mtdt_data:
+            title = mtdt_data.get("title", title)
+            album_artist = mtdt_data.get("album_artist", album_artist)
+            artist = mtdt_data.get("artist", album_artist)
+            lyrics = mtdt_data.get("lyrics", lyrics)
+            synced_lyrics = mtdt_data.get("synced_lyrics", synced_lyrics)
+            ttml = mtdt_data.get("ttml", ttml)
+            caption = mtdt_data.get("caption", caption)
+            bpm = mtdt_data.get("bpm", bpm)
+            keyscale = mtdt_data.get("keyscale", keyscale)
+            timesignature = mtdt_data.get("timesignature", timesignature)
+            language = mtdt_data.get("language", language)
+            duration = mtdt_data.get("duration", duration)
+            bpm = mtdt_data.get("bpm", bpm)
+            bpm = mtdt_data.get("bpm", bpm)
+            bpm = mtdt_data.get("bpm", bpm)
+
         # mutagenで音声ファイルのタグを読み取る
-        title = ""
-        artist = ""
-        album_artist = ""
-        if MutagenFile is not None:
+        if (not artist or not title) and MutagenFile is not None:
             audio = MutagenFile(file, easy=True)
             if audio is not None:
                 title = (audio.get("title") or [""])[0]
@@ -194,11 +233,12 @@ class MusicFile:
                 album_artist = (audio.get("albumartist") or [""])[0]
         if album_artist and not artist:
             artist = album_artist
-            
+
         default = cls(
             name=name,
             path=path,
             lyrics=lyrics,
+            ttml=ttml,
             synced_lyrics=synced_lyrics,
             caption=caption,
             bpm=bpm,
@@ -215,6 +255,7 @@ class MusicFile:
             name=name,
             path=path,
             lyrics=lyrics,
+            ttml=ttml,
             synced_lyrics=synced_lyrics,
             caption=caption,
             bpm=bpm,

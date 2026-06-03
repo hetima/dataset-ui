@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import json
 
 SUPPORTED_EXTENSIONS = [".flac", ".ogg", ".mp3", ".wav", ".m4a"]
 
@@ -29,7 +29,118 @@ def audio_files_in_list(files: list[Path]) -> list[Path]:
     return [candidates[k] for k in sorted(candidates)]
 
 
-def audio_files_in_folder(folder_path: str) -> list[Path]:
+def audio_files_in_folder(folder_path: str|Path) -> list[Path]:
     """フォルダ内の対応音声ファイルをファイル名でソートして返す。"""
     folder = Path(folder_path)
     return audio_files_in_list(list(folder.iterdir()))
+
+
+def merge_mtdt_data(mtdt_all:dict, key: str, filename: str, data:dict) -> dict:
+    # mtdt_all[key]のリストから("filename") == filenameのdictを探し、そこへdataをマージする
+    items = mtdt_all.get(key, [])
+    found = False
+    for item in items:
+        if item.get("filename") == filename:
+            item.update(data)
+            found = True
+            break
+    if not found:
+        new_item = {"filename": filename}
+        new_item.update(data)
+        items.append(new_item)
+    mtdt_all[key] = items
+    return mtdt_all
+
+def data_in_mtdt(mtdt: Path|None) -> dict|None:
+    if not mtdt or not mtdt.exists():
+        return None
+    result = {}
+    with open(mtdt, "r", encoding="utf-8") as f:
+        result = json.load(f)
+    return result
+
+def file_data_in_mtdt(mtdt: Path|None, filename: str, key: str = "songs") -> dict|None:
+    data = data_in_mtdt(mtdt)
+    if not data:
+        return None
+    result = {}
+    items = data.get(key, [])
+    for item in items:
+        if item.get("filename") == filename:
+            result = item
+            break
+
+    return result
+
+
+class Mtdt:
+    def __init__(self, mtdt_path: str|Path|None):
+        self.mtdt_path = Path(mtdt_path) if mtdt_path else None
+        # songs / files を {filename: data} の dict として保持
+        self.songs: dict[str, dict] = {}
+        self.files: dict[str, dict] = {}
+        self._load()
+
+    def _read_raw(self) -> dict:
+        """ファイルを読み込んで生の dict を返す。存在しない場合は空 dict。"""
+        if not self.mtdt_path or not self.mtdt_path.exists():
+            return {}
+        with open(self.mtdt_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _load(self) -> None:
+        """ファイルを読み込んで songs / files を構築する。"""
+        raw = self._read_raw()
+        for key in ("songs", "files"):
+            store: dict[str, dict] = {}
+            for item in raw.get(key, []):
+                fn = item.get("filename")
+                if fn:
+                    store[fn] = item
+            setattr(self, key, store)
+
+    def song_data(self, filename: str) -> dict|None:
+        """songs から filename に一致するエントリを返す。"""
+        return self.songs.get(filename)
+
+    def file_data(self, filename: str) -> dict|None:
+        """files から filename に一致するエントリを返す。"""
+        return self.files.get(filename)
+
+    def merge_song(self, filename: str, data: dict) -> None:
+        self.merge("songs", filename, data)
+
+    def merge_file(self, filename: str, data: dict) -> None:
+        self.merge("files", filename, data)
+
+    def merge(self, key: str, filename: str, data: dict) -> None:
+        """key ストアの filename エントリに data をマージする（保存はしない）。"""
+        store: dict[str, dict] = getattr(self, key, {})
+        if filename in store:
+            store[filename].update(data)
+        else:
+            store[filename] = {"filename": filename, **data}
+
+    def save(self) -> None:
+        """ファイルから再読み込みしてインスタンスデータをマージして保存する。
+        songs / files 以外のキーや他プロセスによる変更を保持する。
+        """
+        if not self.mtdt_path:
+            return
+        # 現在のファイル内容をベースにする
+        mtdt_all = self._read_raw()
+        for k in ("songs", "files"):
+            entries: dict[str, dict] = getattr(self, k)
+            if not entries:
+                continue
+            # ファイル上のリストを {filename: data} に変換
+            on_disk = {item["filename"]: item for item in mtdt_all.get(k, []) if "filename" in item}
+            # インスタンスの変更をマージ
+            for filename, data in entries.items():
+                if filename in on_disk:
+                    on_disk[filename].update(data)
+                else:
+                    on_disk[filename] = data
+            mtdt_all[k] = list(on_disk.values())
+        with open(self.mtdt_path, "w", encoding="utf-8") as f:
+            json.dump(mtdt_all, f, ensure_ascii=False, indent=2)

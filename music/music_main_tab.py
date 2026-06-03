@@ -149,6 +149,7 @@ def tab_main(ctx: MusicCtx):
             ui.checkbox(".json").bind_value(ctx, "save_json")
             ui.checkbox(".lyrics.txt").bind_value(ctx, "save_lyrics")
             ui.checkbox(".txt (for AI Toolkit)").bind_value(ctx, "save_aitk")
+            ui.checkbox("mtdt.json").bind_value(ctx, "save_mtdt")
             ui.button("保存", on_click=lambda: ctx.save_metadata())
 
     # ═══════════════════════════════════════════════════════════════════════════════

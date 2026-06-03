@@ -209,6 +209,7 @@ def tab_main(ctx: VoiceCtx):
             ui.label("保存対象:")
             # ui.checkbox(".json").bind_value(ctx, "save_json")
             ui.checkbox("書き起こし.txt").bind_value(ctx, "save_txt")
+            ui.checkbox("mtdt.json").bind_value(ctx, "save_mtdt")
             ui.button("保存", on_click=lambda: ctx.save_metadata())
 
     # ═══════════════════════════════════════════════════════════════════════════════

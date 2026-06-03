@@ -30,7 +30,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             project_name = ui.input(label="プロジェクト名", placeholder="my_lora", value="").props(
                 "outlined style='width: 200px;'"
             )
-            ui.button("データセット検証", on_click=lambda: validate_dataset(path_input.value))  # type: ignore
+            ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value))  # type: ignore
             ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value))  # type: ignore
 
         xterm = XtermView(title="ターミナル").classes("w-full")

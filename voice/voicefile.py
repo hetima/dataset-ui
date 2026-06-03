@@ -2,12 +2,15 @@ import json
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional
+from common.file_util import Mtdt
 
 @dataclass
 class VoiceFile:
     name: str
     path: str
     transcript: Optional[str]
+    caption: Optional[str]
+    speaker_id: Optional[str]
     default: Optional["VoiceFile"] = None
     is_expandable: bool = False
     children: Optional[list["VoiceFile"]] = None
@@ -33,13 +36,23 @@ class VoiceFile:
     def as_dict(self):
         return {k: v for k, v in asdict(self).items() if k != "default"}
 
+    def to_mtdt(self) -> dict:
+        """mtdt用の辞書を返す"""
+        return {
+            "transcript": self.transcript,
+            "caption": self.caption,
+            "speaker_id": self.speaker_id,
+        }
+
     def to_dict(self) -> dict:
         """VoiceFile の各フィールドを辞書として返す"""
 
         return {
             "name": self.name,
             "path": self.path,
-            "caption": self.transcript,
+            "transcript": self.transcript,
+            "caption": self.caption,
+            "speaker_id": self.speaker_id,
         }
 
     def add_child(self, child: "VoiceFile") -> None:
@@ -57,6 +70,8 @@ class VoiceFile:
             name=data.get("name", ""),
             path=data.get("path", ""),
             transcript=data.get("transcript", ""),
+            caption=data.get("caption", ""),
+            speaker_id=data.get("speaker_id", ""),
         )
 
     def save_to_json(self) -> None:
@@ -71,31 +86,42 @@ class VoiceFile:
                 f.write(output.strip())
 
     @classmethod
-    def from_audio_file(cls, file: Path) -> "VoiceFile":
+    def from_audio_file(cls, file: Path, mtdt: "Mtdt|None" = None) -> "VoiceFile":
         file = Path(file)
         txt_path = file.with_suffix(".txt")
         name = file.name
         path = str(file)
         caption = ""
+        transcript = ""
+        speaker_id = ""
 
         # txtが存在する場合は読み込み
         if txt_path.exists():
             with open(txt_path, "r", encoding="utf-8") as f:
                 text = f.read()
-
-            caption = text.strip()
+            transcript = text.strip()
+        # mtdt.json
+        mtdt_data = mtdt.file_data(name) if mtdt else None
+        if mtdt_data:
+            transcript = mtdt_data.get("transcript", transcript)
+            caption = mtdt_data.get("caption", caption)
+            speaker_id = mtdt_data.get("speaker_id", speaker_id)
 
         default = cls(
             name=name,
             path=path,
             is_expandable=False,
-            transcript=caption,
+            transcript=transcript,
+            caption=caption,
+            speaker_id=speaker_id,
         )
 
         return cls(
             name=name,
             path=path,
             is_expandable=False,
-            transcript=caption,
+            transcript=transcript,
             default=default,
+            caption=caption,
+            speaker_id=speaker_id,
         )
