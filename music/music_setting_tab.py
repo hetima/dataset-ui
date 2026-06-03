@@ -5,8 +5,8 @@ from common.setting import cnfg
 from common.cpu_task_dialog import CpuTaskDialog
 from common.message_dialog import show_confirm_dialog
 from music.music_app_ctx import MusicCtx
-from roformer.roformer import list_roformer_models, list_known_models
-from roformer.task_download import download_roformer_model
+from lib.roformer.roformer import list_roformer_models, list_known_models
+from lib.roformer.task_download import download_roformer_model
 
 def tab_setting(ctx: MusicCtx):
     # ═══════════════════════════════════════════════════════════════════════════════

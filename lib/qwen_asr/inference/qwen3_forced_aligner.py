@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import nagisa
 import torch
-from qwen_asr.core.transformers_backend import (
+from lib.qwen_asr.core.transformers_backend import (
     Qwen3ASRConfig,
     Qwen3ASRForConditionalGeneration,
     Qwen3ASRProcessor,

@@ -189,7 +189,7 @@ def _get_stem_labels(path: str, num_stems: int) -> list[str]:
 
 def load_model(path: str) -> Any:
     """モデルファイルをロードしてインスタンスを返す。yaml があれば model: セクションを config として使い、なければ state dict から自動検出する。"""
-    from roformer.model.mel_band_roformer import MelBandRoformer
+    from lib.roformer.model.mel_band_roformer import MelBandRoformer
     sd = _load_torch_file(path)
 
     yaml_config = _load_yaml_model_config(path)
@@ -203,7 +203,7 @@ def load_model(path: str) -> Any:
         model_type, config = _infer_config(sd)
 
     if model_type == 'bsroformer':
-        from roformer.model.bs_roformer import BSRoformer
+        from lib.roformer.model.bs_roformer import BSRoformer
         model = BSRoformer(**_filter_kwargs(BSRoformer, config)).eval()
     else:
         model = MelBandRoformer(**_filter_kwargs(MelBandRoformer, config)).eval()

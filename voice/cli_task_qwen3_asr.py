@@ -35,7 +35,7 @@ class QwenASRPipeline:
     @classmethod
     def from_pretrained(cls, model_path: str, device, dtype):
         import torch
-        from qwen_asr import Qwen3ASRModel
+        from lib.qwen_asr import Qwen3ASRModel
 
         local_files_only = True
         if not os.path.exists(model_path):

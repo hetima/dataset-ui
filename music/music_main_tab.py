@@ -9,8 +9,8 @@ from common.setting import cnfg
 from common.xterm_dialog import XtermDialog
 from common.thread_task_dialog import ThreadTaskDialog
 from music.music_app_ctx import MusicCtx
-from roformer.roformer import list_roformer_models
-from roformer.task_infer import infer_roformer
+from lib.roformer.roformer import list_roformer_models
+from lib.roformer.task_infer import infer_roformer
 from common.wavesurfer import simple_player
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]

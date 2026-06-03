@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from qwen_asr.core.transformers_backend import (
+from lib.qwen_asr.core.transformers_backend import (
     Qwen3ASRConfig,
     Qwen3ASRForConditionalGeneration,
     Qwen3ASRProcessor,
@@ -48,7 +48,7 @@ from .utils import (
 
 try:
     from vllm import ModelRegistry
-    from qwen_asr.core.vllm_backend import Qwen3ASRForConditionalGeneration
+    from lib.qwen_asr.core.vllm_backend import Qwen3ASRForConditionalGeneration
     ModelRegistry.register_model("Qwen3ASRForConditionalGeneration", Qwen3ASRForConditionalGeneration)
 except Exception as e:
     pass

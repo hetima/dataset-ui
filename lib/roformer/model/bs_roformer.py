@@ -5,7 +5,7 @@ from torch import nn, einsum, tensor, Tensor
 from torch.nn import Module, ModuleList
 import torch.nn.functional as F
 
-from roformer.model.bs_roformer_attend import Attend
+from lib.roformer.model.bs_roformer_attend import Attend
 
 from torch.utils.checkpoint import checkpoint
 

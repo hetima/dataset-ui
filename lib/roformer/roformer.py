@@ -2,7 +2,7 @@ import copy
 import json
 from pathlib import Path
 from common.setting import cnfg
-from roformer.constant import KNOWN_MODELS
+from lib.roformer.constant import KNOWN_MODELS
 
 
 def list_roformer_models() -> list[dict]:

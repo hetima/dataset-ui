@@ -1,15 +1,13 @@
 from nicegui import ui
 
-from common.wavesurfer import setup_wavesurfer, setup_multitrack
+from common.wavesurfer import setup_wavesurfer
 from edit.edit_main_tab import tab_main
 from edit.edit_setting_tab import tab_setting
-from edit.edit_compi_tab import tab_compi
 from edit.edit_daw_tab import tab_main as tab_daw
 from edit.edit_app_ctx import EditCtx
 
 def main_page():
     setup_wavesurfer()
-    setup_multitrack()
     ctx = EditCtx()
 
     ui.markdown("""# dataset-ui-audio-edit""")

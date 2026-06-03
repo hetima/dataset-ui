@@ -1,15 +1,8 @@
-from pathlib import Path
-from typing import cast
-from functools import partial
-
-from nicegui import ui
-from common.folder_picker import FolderPicker
-from common.setting import cnfg
-from common.xterm_dialog import XtermDialog
-from common.message_dialog import show_confirm_dialog
 import sys
+from pathlib import Path
+from nicegui import ui
+from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
-from common.wavesurfer import simple_player
 
 IRODORI_TRAIN_SUB_DIR = "irodori"
 

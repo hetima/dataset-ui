@@ -6,7 +6,7 @@ from testpage.testpage_ctx import TestCtx
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
 from common.setting import cnfg
-from common.wavesurfer import WaveSurferWidget, simple_player
+from common.wavesurfer import simple_player
 
 def tab_02(tctx: TestCtx, ctx: MusicCtx):
 

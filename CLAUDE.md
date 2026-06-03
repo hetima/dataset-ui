@@ -47,8 +47,8 @@ common/                   # 共通モジュール
 │   folder_picker.py, file_picker.py, message_dialog.py
 │   download_repo.py
 │   xterm_dialog.py
-qwen_asr/                 # Qwen3-ASR 実装（同梱、--no-deps でインストール）
-roformer/                 # MelBandRoFormer 音源分離モデル（同梱）
+lib/qwen_asr/             # Qwen3-ASR 実装（同梱、--no-deps でインストール）
+lib/roformer/             # MelBandRoFormer 音源分離モデル（同梱）
 cli/                      # スタンドアロン CLI ツール（HF モデルダウンロード等）
 var/                      # 試験的スクリプト — メインアプリの一部ではない
 ```
