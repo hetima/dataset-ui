@@ -15,10 +15,14 @@ from nicegui import app
 from pydantic import BaseModel
 
 from common.setting import cnfg
+import common.runtime_flags as runtime_flags
 
 
 _DAW_DEV_URL = "http://127.0.0.1:5173"
-_DAW_DIST = Path(__file__).parent.parent / "daw" / "dist"
+if runtime_flags.develop_mode:
+    _DAW_DIST = Path(__file__).parent.parent / "daw" / "dist"
+else:
+    _DAW_DIST = Path(__file__).parent.parent / "publish" / "daw_ui"
 _DAW_STATIC_REGISTERED = _DAW_DIST.exists()
 
 if _DAW_STATIC_REGISTERED:

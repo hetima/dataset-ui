@@ -1,3 +1,10 @@
+import sys
+# 先に--develop-modeだけ調べる
+_develop_mode = "--develop-mode" in sys.argv
+_auto_reload_flag = False
+import common.runtime_flags as runtime_flags
+runtime_flags.develop_mode = _develop_mode
+
 import argparse
 from nicegui import ui, app
 from common.model_cache import model_cache
@@ -7,7 +14,6 @@ from voice.index import main_page as page_voice
 from edit.index import main_page as page_edit
 from testpage.index import main_page as page_testpage
 
-_auto_reload_flag = False
 
 def header():
     ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
@@ -202,15 +208,18 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=7869, help="default: 7869")
     parser.add_argument("--native", action="store_true", help="ブラウザでなくネイティブウィンドウで開く")
     parser.add_argument("--auto-reload", default=False, action="store_true", help="ソースコードが編集されたら自動でリロードする")
-
+    parser.add_argument("--develop-mode", default=False, action="store_true", help="開発者モード")
     args = parser.parse_args()
     _auto_reload_flag = args.auto_reload
+    if args.develop_mode:
+        _auto_reload_flag = True
+
     app.on_startup(make_startup_message(args.host, args.port))
     ui.run(
         host=args.host,
         port=args.port,
         title="dataset-ui",
-        reload=args.auto_reload,
+        reload=_auto_reload_flag,
         native=args.native,
         show_welcome_message=False,
     )

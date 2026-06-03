@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && xcopy /E /I /Y dist ..\\publish\\daw_ui"
   },
   "dependencies": {
     "@dnd-kit/react": "^0.4.0",
