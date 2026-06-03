@@ -56,7 +56,7 @@ def tab_main(ctx: VoiceCtx):
         cli = str(Path(__file__).parent / "cli_task_qwen3_asr.py")
         dlg = XtermDialog(
             args=[sys.executable, cli],
-            title="音声認識",
+            title="書き起こし",
             input_json={"model_path": model_path_str, "files": paths},
             part_callback=progress_transcript,
         )
@@ -208,14 +208,14 @@ def tab_main(ctx: VoiceCtx):
         with ui.row().classes("items-center gap-4"):
             ui.label("保存対象:")
             # ui.checkbox(".json").bind_value(ctx, "save_json")
-            ui.checkbox("歌詞.txt").bind_value(ctx, "save_txt")
+            ui.checkbox("書き起こし.txt").bind_value(ctx, "save_txt")
             ui.button("保存", on_click=lambda: ctx.save_metadata())
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    with ui.expansion("音声認識", value=False).classes(
+    with ui.expansion("書き起こし", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")
@@ -468,15 +468,15 @@ def tab_main(ctx: VoiceCtx):
     with ctx.table.add_slot("body-cell-expand"):
         with ctx.table.cell("expand"):
             with ui.row().classes("items-center no-wrap gap-0"):
-                ui.button().props(
-                    'flat'
-                    ' :icon="props.expand ? \'expand_less\' : \'expand_more\'"'
-                    ' :style="props.row.is_expandable ? \'padding: 2px 4px\' : \'padding: 2px 4px; display: none\'"'
-                ).on(
-                    "click",
-                    js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
-                    handler=lambda e: print(e.args),
-                )
+                # ui.button().props(
+                #     'flat'
+                #     ' :icon="props.expand ? \'expand_less\' : \'expand_more\'"'
+                #     ' :style="props.row.is_expandable ? \'padding: 2px 4px\' : \'padding: 2px 4px; display: none\'"'
+                # ).on(
+                #     "click",
+                #     js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
+                #     handler=lambda e: print(e.args),
+                # )
                 with ui.button(icon="more_horiz").props('flat').style('padding: 2px 4px;'):
                     with ui.element("q-menu").props("auto-close"):
                         with ui.element("q-list"):

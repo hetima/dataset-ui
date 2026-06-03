@@ -9,8 +9,7 @@ def main_page():
     setup_wavesurfer()
     ctx = VoiceCtx()
 
-    ui.markdown("""# dataset-ui-voice
-音声ファイルのメタデータを書き出す webui です""")
+    ui.markdown("""# dataset-ui-voice""")
 
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'

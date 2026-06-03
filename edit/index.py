@@ -12,8 +12,7 @@ def main_page():
     setup_multitrack()
     ctx = EditCtx()
 
-    ui.markdown("""# dataset-ui-edit
-音声ファイルのメタデータを書き出す webui です""")
+    ui.markdown("""# dataset-ui-audio-edit""")
 
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'

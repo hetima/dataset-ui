@@ -485,15 +485,15 @@ def tab_main(ctx: MusicCtx):
     with ctx.table.add_slot("body-cell-expand"):
         with ctx.table.cell("expand"):
             with ui.row().classes("items-center no-wrap gap-0"):
-                ui.button().props(
-                    "flat"
-                    " :icon=\"props.expand ? 'expand_less' : 'expand_more'\""
-                    " :style=\"props.row.is_expandable ? 'padding: 2px 4px' : 'padding: 2px 4px; display: none'\""
-                ).on(
-                    "click",
-                    js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
-                    handler=lambda e: print(e.args),
-                )
+                # ui.button().props(
+                #     "flat"
+                #     " :icon=\"props.expand ? 'expand_less' : 'expand_more'\""
+                #     " :style=\"props.row.is_expandable ? 'padding: 2px 4px' : 'padding: 2px 4px; display: none'\""
+                # ).on(
+                #     "click",
+                #     js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
+                #     handler=lambda e: print(e.args),
+                # )
                 with ui.button(icon="more_horiz").props('flat').style('padding: 2px 4px;'):
                     with ui.element("q-menu").props("auto-close"):
                         with ui.element("q-list"):

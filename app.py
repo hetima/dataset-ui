@@ -67,7 +67,7 @@ h4 {
 """)
     ui.colors(secondary='#747474')
     ui.html(
-        '<a href="/">dataset-ui</a> / <a href="/voice">voice</a> | <a href="/music">music</a> | <a href="/edit">edit</a> | '
+        '<a href="/">dataset-ui</a> / <a href="/voice">voice</a> | <a href="/music">music</a> | <a href="/edit">audio-edit</a> | '
     ).style("color: #646464")
     if _auto_reload_flag:
         ui.label(
@@ -137,25 +137,25 @@ def main_page():
 モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
         """).classes("items-start w-180")
     with ui.column().classes("items-start gap-0"):
-        
+
         ui.link("voice", "/voice").style(
             'text-decoration: none; font-size: 3em; margin-top:16px;'
         )
         ui.label("音声データを編集")
         ui.label("音声の分割や書き起こしなどができます")
-        
+
         ui.link("music", "/music").style(
             "text-decoration: none; font-size: 3em; margin-top:16px;"
         )
         ui.label("主に ACE-Step 向けのメタデータを編集")
         ui.label("楽曲のBPM、キーなどを解析します。歌詞の解析、編集などもできます")
 
-        ui.link("edit", "/edit").style(
+        ui.link("audio-edit", "/edit").style(
             "text-decoration: none; font-size: 3em; margin-top:16px;"
         )
         ui.label("書き出した音声データを編集")
         ui.label("")
-    if _auto_reload_flag:
+    if runtime_flags.develop_mode:
         ui.link("test", "/test").style("text-decoration: none; font-size: 1.8em;")
 
     footer()
@@ -179,7 +179,7 @@ def main_page_voice():
     efit_file_footer()
 
 
-@ui.page("/edit", title="edit - dataset-ui")
+@ui.page("/edit", title="audio-edit - dataset-ui")
 def main_page_edit():
     header()
     page_edit()
@@ -203,7 +203,7 @@ def make_startup_message(host: str, port: int):
 
 def main() -> None:
     global _auto_reload_flag
-    parser = argparse.ArgumentParser(description="ACE-Step向けのメタデータを書き出すwebuiです")
+    parser = argparse.ArgumentParser(description="音声データを解析・編集するwebuiです")
     parser.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
     parser.add_argument("--port", type=int, default=7869, help="default: 7869")
     parser.add_argument("--native", action="store_true", help="ブラウザでなくネイティブウィンドウで開く")

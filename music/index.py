@@ -10,8 +10,7 @@ def main_page():
     setup_wavesurfer()
     ctx = MusicCtx()
 
-    ui.markdown("""# dataset-ui-music
-ACE-Step 向けのメタデータを書き出す webui です""")
+    ui.markdown("""# dataset-ui-music""")
 
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'

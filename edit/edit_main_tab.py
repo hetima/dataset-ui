@@ -87,17 +87,6 @@ def tab_main(ctx: EditCtx):
                         js_handler='() => emit(props.value)',
                         handler=lambda e: play_src(e.args),
                     ).style('padding: 2px 4px;')
-            with ctx.table.add_slot("body-cell-expand"):
-                with ctx.table.cell("expand"):
-                    ui.button().props(
-                        'flat'
-                        ' :icon="props.expand ? \'expand_less\' : \'expand_more\'"'
-                        ' :style="props.row.is_expandable ? \'padding: 2px 4px\' : \'padding: 2px 4px; display: none\'"'
-                    ).on(
-                        "click",
-                        js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
-                        handler=lambda e: print(e.args),
-                    )
         with ui.column().classes("flex-1 gap-1"):
             ui.label("エディットプール").classes("font-bold")
             ctx.pool_table = ui.table(
