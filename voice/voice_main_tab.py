@@ -343,9 +343,9 @@ def tab_main(ctx: VoiceCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # 速度を変更（タイムストレッチ）
     # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion("速度変更", value=False).classes(
+    with ui.expansion("タイムストレッチ", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
-        ).props('header-class="bg-grey-2 text-black"'):
+    ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
             "処理対象ファイルの速度を変更します。"
             "fps基準で変更します。処理されるfps/変換後のfpsで入力してください。手前のfpsが大きいほど速くなります。"

@@ -254,7 +254,8 @@ def tab_main(ctx: MusicCtx):
     with ui.expansion("オーディオ分離", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを Roformer で分離処理します。各パラメータの詳細はマウスオーバーしてツールチップを参照してください。")
+        ui.label("処理対象ファイルを Roformer で分離処理します。各パラメータの詳細はマウスオーバーしてツールチップを参照してください。"
+                 "いくつかのモデルは設定タブからダウンロードできます。また表示名の編集などもできます。")
         selected_roformer_model: dict = {}
 
         with ui.row().classes("items-center gap-4"):
