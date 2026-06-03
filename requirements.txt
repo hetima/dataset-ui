@@ -10,6 +10,7 @@ bitsandbytes
 send2trash
 pozalabs-pydub
 tqdm
+pyrubberband
 # torchcodec #==0.10.0
 
 # qwen_asr

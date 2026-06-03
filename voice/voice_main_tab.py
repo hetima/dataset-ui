@@ -245,6 +245,10 @@ def tab_main(ctx: VoiceCtx):
 
             ui.button("解析する", on_click=transcript_qwen_asr)
 
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 音声分割
+    # ═══════════════════════════════════════════════════════════════════════════════
+
     with ui.expansion("音声分割", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
@@ -260,7 +264,7 @@ def tab_main(ctx: VoiceCtx):
                     input_thresh = ui.input(label="無音閾値(dB)", placeholder="例: -60", value="-60").props("outlined style='width: 100px;'")
                     input_format = ui.select(
                         label="出力",
-                        options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
+                        options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                         value="wav",
                     ).props("outlined style='width: 120px;'")
                     ui.button("分割する").on_click(
@@ -285,7 +289,7 @@ def tab_main(ctx: VoiceCtx):
                     input_fps = ui.input(label="FPS", placeholder="例: 24", value="1").props("outlined style='width: 100px;'")
                     input_format2 = ui.select(
                         label="出力",
-                        options={"wav": "wav", "mp3": "mp3", "flac": "flac"},
+                        options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                         value="wav",
                     ).props("outlined style='width: 120px;'")
                     ui.button("分割する").on_click(
@@ -335,6 +339,86 @@ def tab_main(ctx: VoiceCtx):
 
     reload_asr_model()
     ctx.model_refresh_func.append(reload_asr_model)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 速度を変更（タイムストレッチ）
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("速度変更", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+        ).props('header-class="bg-grey-2 text-black"'):
+        ui.label(
+            "処理対象ファイルの速度を変更します。"
+            "fps基準で変更します。処理されるfps/変換後のfpsで入力してください。手前のfpsが大きいほど速くなります。"
+            "例えば2倍速くしたいときは2/1などと入力してください。"
+            "25fpsで生成される動画の参照に使用し、後で15fpsに強制変換する場合 25/15と入力します。"
+        ).classes("infotxt")
+        ui.label(
+            "rubberbandでの変換にはpyrubberband pipライブラリのインストールと、rubberband.exeにパスを通す必要があります。"
+        ).classes("infotxt")
+
+        ui.label("ファイルは書き出しフォルダに保存されます。").classes("infotxt")
+        with ui.row().classes("items-center gap-4"):
+            to_fps = ui.input(label="FPS", placeholder="例: 25", value="").props(
+                "outlined style='width: 100px;'"
+            )
+            ui.label(" / ")
+            from_fps = ui.input(label="FPS", placeholder="例: 15", value="").props(
+                "outlined style='width: 100px;'"
+            )
+            method = ui.select(
+                label="変換方法",
+                options={"librosa": "librosa", "rubberband": "rubberband"},
+                value="librosa",
+            ).props("outlined style='width: 170px;'")
+            input_format = ui.select(
+                label="出力",
+                options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
+                value="wav",
+            ).props("outlined style='width: 120px;'")
+            ui.button("速度変更する").on_click(
+                lambda: change_speed(
+                    from_fps=from_fps.value,  # type: ignore
+                    method=method.value,  # type: ignore
+                    to_fps=to_fps.value,  # type: ignore
+                    output_format=input_format.value,
+                )
+            )
+
+    async def change_speed(from_fps, to_fps, method, output_format) -> None:
+        """速度変更タスクを実行
+        Args: from_fps:
+              to_fps:
+        """
+        def is_numeric(val):
+            try:
+                if not val:
+                    return False
+                num = float(val)
+                return num > 0
+            except ValueError:
+                return False
+        if not is_numeric(from_fps) or not is_numeric(to_fps):
+            ui.notify("正の数値を入力してください")
+            return
+        files = ctx.target_files()
+        if len(files) == 0:
+            ui.notify("処理対象がありません")
+            return
+        cli = str(Path(__file__).parent / "cli_task_time_stretch.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="速度変更",
+            input_json={
+                "files": [f["path"] for f in files],
+                "from_fps": from_fps,
+                "to_fps": to_fps,
+                "method": method,
+                "output_format": output_format,
+                "output_dir": str(cnfg.outputs_dir),
+            },
+            part_callback=on_segment_part,
+        )
+        dlg.open()
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧
