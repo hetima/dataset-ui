@@ -16,12 +16,14 @@ def main_page():
         'inline-label align="left"'
     ) as tabs:
         main_Tab = ui.tab("main", label="メイン", icon="headset_mic")
-        # iridori_train_Tab = ui.tab("iridori_train", label="Irodori Train", icon="headset_mic")
+        iridori_train_Tab = ui.tab(
+            "iridori_train", label="Irodori Train", icon="source"
+        )
         setting_tab = ui.tab("setting", label="設定", icon="settings")
     with ui.tab_panels(tabs, animated=False, value=main_Tab).classes("w-full"):
         with ui.tab_panel(main_Tab):
             tab_main(ctx)
-        # with ui.tab_panel(iridori_train_Tab):
-        #     tab_iridori_train(ctx)
+        with ui.tab_panel(iridori_train_Tab):
+            tab_iridori_train(ctx)
         with ui.tab_panel(setting_tab):
             tab_setting(ctx)
