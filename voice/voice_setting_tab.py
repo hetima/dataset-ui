@@ -46,6 +46,26 @@ def tab_setting(ctx: VoiceCtx):
             )
 
     # ═══════════════════════════════════════════════════════════════════════════════
+    # トレーニングパス設定
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with (
+        ui.expansion("トレーニングパス", value=True)
+        .classes("rounded-borders brdr overflow-hidden w-full")
+        .props('header-class="bg-grey-2 text-black"')
+    ):
+        ui.label("トレーニングデータを配置するフォルダパスを入力してください")
+        with ui.row().classes("items-center gap-4").classes("w-full"):
+            train_path_input = ui.input(
+                value=str(cnfg.train_dir),
+                label="train path",
+                placeholder="フォルダのパスを入力...",
+            ).props('style="min-width: 500px" outlined')
+            ui.button(
+                "保存",
+                on_click=lambda: ctx.set_train_dir(train_path_input.value or ""),
+            )
+
+    # ═══════════════════════════════════════════════════════════════════════════════
     # dataset_dirs
     # ═══════════════════════════════════════════════════════════════════════════════
     with (

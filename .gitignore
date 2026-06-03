@@ -185,6 +185,7 @@ cython_debug/
 /checkpoints/
 /data/
 /dataset/
+/train/
 /*_config.json
 /config.json
 

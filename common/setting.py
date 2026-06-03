@@ -10,6 +10,7 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = REPO_DIR / "models"
 OUTPUTS_DIR = REPO_DIR / "outputs"
+TRAIN_DIR = REPO_DIR / "train"
 SETTING_FILE = "config.json"
 
 
@@ -114,6 +115,7 @@ class Setting:
     setting_path: Path = REPO_DIR / SETTING_FILE
     models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
+    train_dir: Path = TRAIN_DIR
     output_prefix: str = ""
     edit_file_paths: list[str] = dataclasses.field(default_factory=list)
 
@@ -191,6 +193,8 @@ class Setting:
 
         if not self.models_dir:
             self.models_dir = MODELS_DIR
+        if not self.train_dir:
+            self.train_dir = TRAIN_DIR
 
     # ── setter ──────────────────────────────────────────────────────────────
 
@@ -202,6 +206,18 @@ class Setting:
             path = Path(path)
         if self.models_dir != path:
             self.models_dir = path
+            self.save()
+            return True
+        return False
+
+    def set_train_dir(self, path: str | Path) -> bool:
+        if isinstance(path, str):
+            path = path.strip()
+            if path.startswith('"') and path.endswith('"'):
+                path = path.strip('"')
+            path = Path(path)
+        if self.train_dir != path:
+            self.train_dir = path
             self.save()
             return True
         return False
