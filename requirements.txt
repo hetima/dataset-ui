@@ -25,5 +25,8 @@ beartype
 # daw
 pyaaf2
 
+# Irodori-TTS
+datasets>=3.0.0
+
 # ckpt ダウンロードしたときの安全性スキャン
 # picklescan 
