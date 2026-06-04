@@ -205,7 +205,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             return None
         voice_dir = Path(__file__).parent.resolve()
         repo_root = voice_dir.parent
-        train_script = voice_dir / "irodori_train.py"
+        train_script = repo_root / "cli" / "irodori_train.py"
         config_yaml = repo_root / "configs" / "irodoritts" / "train_500m_v3_speaker_inversion.yaml"
         manifest = cnfg.train_dir / "irodori-tts" / dataset / "train_manifest.jsonl"
         output_dir = cnfg.models_dir / "irodori-tts" / dataset
