@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import shutil
+import time
 from pathlib import Path
 
 
@@ -1470,6 +1471,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--save-every", type=int, default=1000)
     parser.add_argument(
+        "--save-by-time",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Save periodic checkpoints by elapsed time instead of step interval.",
+    )
+    parser.add_argument(
+        "--save-interval-minutes",
+        type=int,
+        default=None,
+        help="Elapsed minutes between periodic checkpoints when save_by_time is enabled.",
+    )
+    parser.add_argument(
         "--checkpoint-best-n",
         type=int,
         default=0,
@@ -1615,6 +1628,10 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, log_every=args.log_every)
     if cli_provided(raw_argv, "--save-every"):
         train_cfg = replace(train_cfg, save_every=args.save_every)
+    if args.save_by_time is not None:
+        train_cfg = replace(train_cfg, save_by_time=bool(args.save_by_time))
+    if cli_provided(raw_argv, "--save-interval-minutes"):
+        train_cfg = replace(train_cfg, save_interval_minutes=args.save_interval_minutes)
     if cli_provided(raw_argv, "--checkpoint-best-n"):
         train_cfg = replace(train_cfg, checkpoint_best_n=args.checkpoint_best_n)
     if cli_provided(raw_argv, "--valid-ratio"):
@@ -1869,6 +1886,13 @@ def main() -> None:
         )
     if train_cfg.caption_warmup_steps < 0:
         raise ValueError(f"caption_warmup_steps must be >= 0, got {train_cfg.caption_warmup_steps}")
+    if train_cfg.save_every <= 0:
+        raise ValueError(f"save_every must be > 0, got {train_cfg.save_every}")
+    if train_cfg.save_by_time and train_cfg.save_interval_minutes <= 0:
+        raise ValueError(
+            "save_interval_minutes must be > 0 when save_by_time=True, "
+            f"got {train_cfg.save_interval_minutes}"
+        )
     if train_cfg.dataloader_prefetch_factor <= 0:
         raise ValueError(
             f"dataloader_prefetch_factor must be > 0, got {train_cfg.dataloader_prefetch_factor}"
@@ -2052,7 +2076,16 @@ def main() -> None:
     if checkpoint_retention_enabled:
         periodic_checkpoint_keep = 1 if has_validation else int(train_cfg.checkpoint_best_n) + 1
     best_val_checkpoints: list[tuple[float, int, Path]] = []
+    save_interval_seconds = float(train_cfg.save_interval_minutes) * 60.0
+    last_periodic_save_monotonic = time.monotonic()
     if is_main_process:
+        if train_cfg.save_by_time:
+            print(
+                "Periodic checkpoint saving: "
+                f"time-based every {train_cfg.save_interval_minutes} minute(s)."
+            )
+        else:
+            print(f"Periodic checkpoint saving: step-based every {train_cfg.save_every} step(s).")
         if checkpoint_retention_enabled and has_validation:
             best_val_checkpoints = list_best_val_loss_checkpoints(output_dir)
             best_val_checkpoints = prune_best_val_loss_checkpoints(
@@ -2585,7 +2618,15 @@ def main() -> None:
                                 f"lr={lr_value:.3e}"
                             )
 
-                if step % train_cfg.save_every == 0 and is_main_process:
+                should_save_periodic = False
+                if is_main_process:
+                    if train_cfg.save_by_time:
+                        should_save_periodic = (
+                            time.monotonic() - last_periodic_save_monotonic
+                        ) >= save_interval_seconds
+                    else:
+                        should_save_periodic = (step % train_cfg.save_every) == 0
+                if should_save_periodic:
                     save_checkpoint(
                         _periodic_checkpoint_path(output_dir, step, train_cfg),
                         raw_model,
@@ -2600,6 +2641,7 @@ def main() -> None:
                         output_dir=output_dir,
                         keep_count=periodic_checkpoint_keep,
                     )
+                    last_periodic_save_monotonic = time.monotonic()
 
                 if (
                     valid_loader is not None
