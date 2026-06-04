@@ -26,7 +26,7 @@ beartype
 pyaaf2
 
 # Irodori-TTS
-datasets>=3.0.0
+dacvae @ git+https://github.com/facebookresearch/dacvae
 
 # ckpt ダウンロードしたときの安全性スキャン
 # picklescan 
