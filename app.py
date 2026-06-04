@@ -18,6 +18,10 @@ from testpage.index import main_page as page_testpage
 def header():
     ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
     ui.add_css("""
+* {
+    text-transform: none !important;
+}
+
 h1 {
     font-size: 3.4em;
     margin: 0.2em 0 0.2em 0;

@@ -239,7 +239,10 @@ def tab_main(ctx: MusicCtx):
 
     reload_acestep_transcriber_model()
     ctx.model_refresh_func.append(reload_acestep_transcriber_model)
-
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 手動変更
+    # ═══════════════════════════════════════════════════════════════════════════════
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
         with ui.row().classes("items-center gap-4"):

@@ -103,6 +103,7 @@ class VoiceCtx:
                 result[key] = val
         # self.table.rows = self.files
         self.table.update()
+        self.notify(f"{len(targets)}件のデータを更新しました")
 
     def set_transcript(self, val: str) -> None:
         self.set_metadata_all("transcript", val)
@@ -175,3 +176,6 @@ class VoiceCtx:
                     voicefile = VoiceFile.from_audio_file(Path(dst))
                     parent_file.add_child(voicefile)
         self.table.update()
+
+    def set_speaker_id(self, val: str) -> None:
+        self.set_metadata_all("caption", val)

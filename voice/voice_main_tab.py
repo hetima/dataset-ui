@@ -420,6 +420,23 @@ def tab_main(ctx: VoiceCtx):
             part_callback=on_segment_part,
         )
         dlg.open()
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 手動変更
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("手動変更", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label("処理対象ファイルのメタデータを手動で変更します")
+        with ui.row().classes("items-center gap-4"):
+            capt = (
+                ui.input(placeholder="speaker_idを入力", label="speaker_id")
+                .classes("w-100")
+                .props("outlined")
+            )
+            ui.button(
+                "speaker_idを設定",
+                on_click=lambda e: ctx.set_speaker_id(cast(str, capt.value)),
+            )
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧

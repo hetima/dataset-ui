@@ -131,6 +131,7 @@ class MusicCtx:
                 result[key] = val
         # self.table.rows = self.files
         self.table.update()
+        self.notify(f"{len(targets)}件のデータを更新しました")
 
     def set_lang(self, val: str) -> None:
         self.set_metadata_all("language", val)

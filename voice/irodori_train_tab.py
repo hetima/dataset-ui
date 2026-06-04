@@ -5,7 +5,7 @@ from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
 from common.xterm_view import XtermView
 
-IRODORI_TRAIN_SUB_DIR = "irodori"
+IRODORI_SUB_DIR = "irodori-tts"
 
 def tab_iridori_train(ctx: VoiceCtx):
 
@@ -15,7 +15,7 @@ def tab_iridori_train(ctx: VoiceCtx):
     with ui.expansion("データセット作成", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("データセットの検証と作成を行います。「データセットフォルダ/irodori/プロジェクト名」に作成されます。")
+        ui.label("データセットの検証と作成を行います。「データセットフォルダ/irodori/プロジェクト名」に作成されます。この工程には mtdt.json が必要です。メインタブで生成してください。")
         with ui.row().classes("items-center gap-2"):
             path_input = (
                 ui.textarea(
