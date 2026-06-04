@@ -33,8 +33,8 @@ git clone https://github.com/hetima/dataset-ui
 venv を作ってください。バージョンは3.12で開発してます。torch 関連は requirements.txt に書いてないので手動でお好みのものを入れてください。ちなみに2.10.0を入れて開発してます。
 
 ```
-uv pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu130
-uv pip install -r requirements.txt
+pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu130
+pip install -r requirements.txt
 ```
 
 `app.py` を実行すると web UI が開きます。
@@ -46,6 +46,12 @@ uv pip install -r requirements.txt
 自動保存されない操作が多いので保存ボタンを押し忘れないように注意してください。
 
 モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
+
+ダウンロードが途中で止まる場合は手動でダウンロードして配置してください。hf-xetをアンインストールすると改善する場合があります。
+
+```
+pip uninstall hf-xet
+```
 
 voice
 ![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/01.jpg)

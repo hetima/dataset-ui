@@ -10,7 +10,7 @@ IRODORI_SUB_DIR = "irodori-tts"
 def tab_iridori_train(ctx: VoiceCtx):
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Load files
+    # トレーニングデータ作成
     # ═══════════════════════════════════════════════════════════════════════════════
     with ui.expansion("トレーニングデータ作成", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
@@ -38,7 +38,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             )
             create_dataset_btn =ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
 
-        xterm = XtermView(title="ターミナル").classes("w-full")
+        xterm = XtermView(title="ターミナル", rows=10).classes("w-full")
         validate_dataset_btn.bind_enabled(xterm, "is_idle")
         create_dataset_btn.bind_enabled(xterm, "is_idle")
 
@@ -95,4 +95,13 @@ def tab_iridori_train(ctx: VoiceCtx):
         xterm.run(
             args=[sys.executable, cli],
             input_json=input_json,
+        )
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # トレーニングデータ
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("トレーニング実行", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label(
+            "トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
         )

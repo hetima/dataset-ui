@@ -17,7 +17,7 @@ from common.xterm_dialog import (
 class XtermView(ui.column):
     """CLI タスクの出力を配置用 xterm にストリーミング表示する。"""
 
-    def __init__(self, title: str = "") -> None:
+    def __init__(self, title: str = "", rows: int | None = None) -> None:
         super().__init__()
         self._process: subprocess.Popen | None = None
         self._is_running = False
@@ -29,11 +29,12 @@ class XtermView(ui.column):
         self._part_callback: Callable[[dict], None] | None = None
         self._finish_callback: Callable[[bool], None] | None = None
 
+        opt = {**xterm_option, "rows": rows} if rows is not None else xterm_option
         self.classes("gap-1")
         with self:
             if title:
                 ui.label(title).classes("text-sm")
-            self._terminal = ui.xterm(xterm_option).classes("dialog-xterm")
+            self._terminal = ui.xterm(opt).classes("dialog-xterm")
             with ui.row().classes("w-full justify-end items-center"):
                 self._progress = (
                     ui.circular_progress(min=0, max=1, value=0, size="30px")

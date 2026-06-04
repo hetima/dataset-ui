@@ -71,6 +71,12 @@ class VoiceSubSetting:
     asr_model: str = ""
     last_dataset_path: str = ""
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
+    irodori_tts_model: str = ""
+    
+    def set_irodori_tts_model(self, name: str | None):
+        if name and name != self.irodori_tts_model:
+            self.irodori_tts_model = name
+            self.save()
 
     def save(self):
         self._root.save()

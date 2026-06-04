@@ -1,8 +1,9 @@
+import sys
 from pathlib import Path
 from nicegui import binding, ui
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
-
+from common.xterm_dialog import XtermDialog
 
 def tab_setting(ctx: VoiceCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -64,6 +65,104 @@ def tab_setting(ctx: VoiceCtx):
                 "保存",
                 on_click=lambda: ctx.set_train_dir(train_path_input.value or ""),
             )
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # モデル選択
+    # ═══════════════════════════════════════════════════════════════════════════════
+    def irodori_tts_download_finished(success: bool) -> None:
+        reload_irodori_tts_model()
+
+    def irodori_tts_download(repo_id: str) -> None:
+        cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="ダウンロード",
+            input_json={
+                "repo_id": repo_id,
+                "output_dir": str(cnfg.models_dir / "irodori-tts"),
+            },
+            finish_callback=irodori_tts_download_finished,
+        )
+        dlg.open()
+
+    def irodori_tts_models() -> list[str]:
+        models_dir = cnfg.models_dir / "irodori-tts"
+        if not models_dir.exists():
+            return []
+        return [p.name for p in models_dir.iterdir() if p.is_dir()]
+
+    with ui.expansion("Irodori-TTS モデルダウンロード", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label(
+            "モデルの選択、ダウンロードを行います。トレーニングや推論に必要です。必ずダウンロードしてください"
+        )
+        ui.label(
+            "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
+            "ダウンロードが途中で止まる場合は、hf-xetをアンインストールすると改善する場合があります（pip uninstall hf-xet）。それでも駄目な場合は手動でダウンロードして配置してください。「モデルフォルダ/irodori-tts/Irodori-TTS-500M-v3/model.safetensors」と配置してください。"
+        ).classes("infotxt")
+        with ui.row().classes("items-center gap-4"):
+            opt = irodori_tts_models()
+            val = cnfg.voice.irodori_tts_model
+            if not val in opt:
+                val = opt[0] if len(opt) > 0 else ""
+            irodoti_tts_model_input = (
+                ui.input(
+                    label="irodori-tts model",
+                    placeholder="モデルを選択、または入力",
+                    on_change=lambda e: setattr(e.sender, "value", e.value),
+                )
+                .props('style="min-width: 300px" outlined')
+                .bind_value(cnfg.voice, "irodori_tts_model")
+            )
+            with irodoti_tts_model_input.add_slot("append"):
+                with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
+                    ace_models_menu = ui.menu()
+
+    def reload_irodori_tts_model():
+        def hf_menu_item(models: list, repo_id: str):
+            rid = repo_id.split("/")[-1]
+            if rid not in models:
+                with ui.item(
+                    on_click=lambda: [
+                        setattr(irodoti_tts_model_input, "value", repo_id),
+                        ace_models_menu.close(),
+                    ]
+                ).classes("padd8 items-center"):
+                    ui.item_section(repo_id)
+                    ui.button(
+                        "ダウンロード",
+                        on_click=lambda: irodori_tts_download(repo_id),
+                    ).props("flat dense color=primary").style("margin-left: 8px").on(
+                        "click", js_handler="(e) => e.stopPropagation()"
+                    )
+            else:
+                ui.menu_item(
+                    repo_id,
+                    lambda: setattr(irodoti_tts_model_input, "value", repo_id),
+                ).classes("padd8")
+
+        models = irodori_tts_models()
+        ace_models_menu.clear()
+        local_added = False
+        with ace_models_menu:
+            for model in models:
+                ui.menu_item(
+                    model, lambda m=model: setattr(irodoti_tts_model_input, "value", m)
+                ).classes("padd8")
+                local_added = True
+            if local_added:
+                ui.separator()
+            ui.menu_item("from huggingface").classes("padd8").enabled = False
+            # ACE-Step/acestep-transcriber
+            hf_menu_item(models, "Aratako/Irodori-TTS-500M-v3")
+            hf_menu_item(models, "Aratako/Irodori-TTS-600M-v3-VoiceDesign")
+            ui.separator()
+            ui.menu_item("メニューを更新", lambda: reload_irodori_tts_model()).classes(
+                "padd8"
+            )
+
+    reload_irodori_tts_model()
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # dataset_dirs
