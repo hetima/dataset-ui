@@ -284,7 +284,7 @@ KNOWN_MODELS = [
     },
     {
         "display_name": "[BS] Vocals - Gabox",
-        "repo_id": "buckets/hrktxz/MelBand_BS_Roformers-bucket",
+        "repo_id": "hrktxz/roformers",
         "filename": "BS_Vocals_by_Gabox.ckpt",
         "config": "BS_Vocals_by_Gabox.yaml",
         "size": "639MB",
@@ -312,7 +312,7 @@ KNOWN_MODELS = [
     },
     {
         "display_name": "[BS] Chorus Male-Female - Sucial",
-        "repo_id": "buckets/hrktxz/MelBand_BS_Roformers-bucket",
+        "repo_id": "hrktxz/roformers",
         "filename": "BS_Chorus_Male-Female_Sucial.ckpt",
         "config": "BS_Chorus_Male-Female_Sucial.yaml",
         "size": "527MB",
