@@ -7,10 +7,7 @@ import os
 import sys
 import re
 import shutil
-from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -22,13 +19,10 @@ import random
 
 from contextlib import nullcontext
 from dataclasses import asdict, replace
-from pathlib import Path
 
 import torch
-import torch.distributed as dist
 import torch.nn.functional as F
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 
 from lib.irodori_tts.config import (
     ModelConfig,
@@ -919,45 +913,8 @@ def _initialize_base_model_from_pretrained_embeddings(
     raw_model: torch.nn.Module,
     *,
     model_cfg: ModelConfig,
-    distributed: bool,
     is_main_process: bool,
 ) -> None:
-    if distributed:
-        if is_main_process:
-            print(
-                f"Initializing text embedding from pretrained model: {model_cfg.text_tokenizer_repo}"
-            )
-            initialize_text_embedding_from_pretrained(
-                raw_model,
-                model_cfg,
-                local_files_only=False,
-            )
-            if model_cfg.use_caption_condition:
-                print(
-                    "Initializing caption embedding from pretrained model: "
-                    f"{model_cfg.caption_tokenizer_repo_resolved}"
-                )
-                initialize_caption_embedding_from_pretrained(
-                    raw_model,
-                    model_cfg,
-                    local_files_only=False,
-                )
-        dist.barrier()
-        if not is_main_process:
-            initialize_text_embedding_from_pretrained(
-                raw_model,
-                model_cfg,
-                local_files_only=True,
-            )
-            if model_cfg.use_caption_condition:
-                initialize_caption_embedding_from_pretrained(
-                    raw_model,
-                    model_cfg,
-                    local_files_only=True,
-                )
-        dist.barrier()
-        return
-
     if is_main_process:
         print(f"Initializing text embedding from pretrained model: {model_cfg.text_tokenizer_repo}")
     initialize_text_embedding_from_pretrained(
@@ -983,7 +940,6 @@ def _apply_base_initialization(
     *,
     model_cfg: ModelConfig,
     base_init: dict | None,
-    distributed: bool,
     is_main_process: bool,
 ) -> None:
     mode = None if base_init is None else base_init.get("mode")
@@ -991,7 +947,6 @@ def _apply_base_initialization(
         _initialize_base_model_from_pretrained_embeddings(
             raw_model,
             model_cfg=model_cfg,
-            distributed=distributed,
             is_main_process=is_main_process,
         )
         return
@@ -1052,36 +1007,16 @@ def _apply_base_initialization(
             raw_model.load_state_dict(init_state, strict=True)
 
         if upgrade_caption:
-            if distributed:
-                if is_main_process:
-                    print(
-                        "Initializing caption embedding from pretrained model after caption-free checkpoint load: "
-                        f"{model_cfg.caption_tokenizer_repo_resolved}"
-                    )
-                    initialize_caption_embedding_from_pretrained(
-                        raw_model,
-                        model_cfg,
-                        local_files_only=False,
-                    )
-                dist.barrier()
-                if not is_main_process:
-                    initialize_caption_embedding_from_pretrained(
-                        raw_model,
-                        model_cfg,
-                        local_files_only=True,
-                    )
-                dist.barrier()
-            else:
-                if is_main_process:
-                    print(
-                        "Initializing caption embedding from pretrained model after caption-free checkpoint load: "
-                        f"{model_cfg.caption_tokenizer_repo_resolved}"
-                    )
-                initialize_caption_embedding_from_pretrained(
-                    raw_model,
-                    model_cfg,
-                    local_files_only=False,
+            if is_main_process:
+                print(
+                    "Initializing caption embedding from pretrained model after caption-free checkpoint load: "
+                    f"{model_cfg.caption_tokenizer_repo_resolved}"
                 )
+            initialize_caption_embedding_from_pretrained(
+                raw_model,
+                model_cfg,
+                local_files_only=False,
+            )
             initialized_caption_embedding = True
 
         if is_main_process:
@@ -1095,48 +1030,6 @@ def _apply_base_initialization(
         return
 
     raise ValueError(f"Unsupported base_init mode: {mode!r}")
-
-
-def resolve_dist_env() -> tuple[int, int, int]:
-    world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    rank = int(os.environ.get("RANK", "0"))
-    local_rank = int(os.environ.get("LOCAL_RANK", str(rank)))
-    return rank, world_size, local_rank
-
-
-def setup_distributed(device_arg: str) -> tuple[int, int, int, bool, torch.device]:
-    rank, world_size, local_rank = resolve_dist_env()
-    distributed = world_size > 1
-    if distributed:
-        if not str(device_arg).startswith("cuda"):
-            raise ValueError(
-                f"WORLD_SIZE={world_size} detected, but --device={device_arg!r}. "
-                "DDP multi-GPU training requires --device cuda."
-            )
-        if not torch.cuda.is_available():
-            raise RuntimeError("WORLD_SIZE>1 detected, but CUDA is not available.")
-        torch.cuda.set_device(local_rank)
-        dist.init_process_group(backend="nccl")
-        device = torch.device(f"cuda:{local_rank}")
-    else:
-        device = torch.device(device_arg)
-    return rank, world_size, local_rank, distributed, device
-
-
-def reduce_mean(value: torch.Tensor, world_size: int, distributed: bool) -> torch.Tensor:
-    reduced = value.detach().clone()
-    if not distributed:
-        return reduced
-    dist.all_reduce(reduced, op=dist.ReduceOp.SUM)
-    reduced /= float(world_size)
-    return reduced
-
-
-def reduce_sum(value: torch.Tensor, distributed: bool) -> torch.Tensor:
-    reduced = value.detach().clone()
-    if distributed:
-        dist.all_reduce(reduced, op=dist.ReduceOp.SUM)
-    return reduced
 
 
 def duration_condition_group_totals(
@@ -1273,10 +1166,9 @@ def run_validation(
     train_cfg: TrainConfig,
     device: torch.device,
     use_bf16: bool,
-    distributed: bool,
 ) -> dict[str, float]:
     was_training = model.training
-    model_cfg = model.module.cfg if isinstance(model, DDP) else model.cfg
+    model_cfg = model.cfg
     duration_only = train_cfg.train_mode == "duration_only"
     model.eval()
     totals = torch.zeros(
@@ -1463,8 +1355,6 @@ def run_validation(
             totals[4] += float(num_frames.detach().float().mean().item()) * weight
             totals[5] += weight
 
-    if distributed:
-        dist.all_reduce(totals, op=dist.ReduceOp.SUM)
     denom = max(float(totals[5].item()), 1.0)
     metrics = {
         "loss": float(totals[0].item() / denom),
@@ -1490,7 +1380,6 @@ def parse_args() -> argparse.Namespace:
         help="JSONL manifest with text+latent_path (optional speaker_id for reference sampling).",
     )
     parser.add_argument("--output-dir", default="outputs/irodori_tts")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument(
         "--precision",
         choices=["fp32", "bf16"],
@@ -1701,12 +1590,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Enable tqdm progress bar.",
     )
-    parser.add_argument(
-        "--progress-all",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="Show tqdm progress bars for all ranks in DDP mode (default: rank0 only).",
-    )
     lora_group = parser.add_mutually_exclusive_group()
     lora_group.add_argument(
         "--lora",
@@ -1752,23 +1635,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--seed", type=int, default=0)
-    ddp_group = parser.add_mutually_exclusive_group()
-    ddp_group.add_argument(
-        "--ddp-find-unused-parameters",
-        dest="ddp_find_unused_parameters",
-        action="store_true",
-        help=(
-            "Enable DDP find_unused_parameters. Useful when conditional branches "
-            "(e.g., speaker/text conditioning) may be fully masked in some steps."
-        ),
-    )
-    ddp_group.add_argument(
-        "--no-ddp-find-unused-parameters",
-        dest="ddp_find_unused_parameters",
-        action="store_false",
-        help="Disable DDP find_unused_parameters.",
-    )
-    parser.set_defaults(ddp_find_unused_parameters=None)
     args = parser.parse_args()
     if args.resume is not None and Path(args.resume).suffix.lower() == ".safetensors":
         raise ValueError(
@@ -1902,8 +1768,6 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, valid_every=args.valid_every)
     if args.progress is not None:
         train_cfg = replace(train_cfg, progress=args.progress)
-    if args.progress_all is not None:
-        train_cfg = replace(train_cfg, progress_all_ranks=args.progress_all)
     train_cfg = replace(train_cfg, wandb_enabled=False)
     if args.lora_enabled is not None:
         train_cfg = replace(train_cfg, lora_enabled=args.lora_enabled)
@@ -1919,11 +1783,6 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, lora_target_modules=args.lora_target_modules)
     if cli_provided(raw_argv, "--lora-modules-to-save"):
         train_cfg = replace(train_cfg, lora_modules_to_save=args.lora_modules_to_save)
-    if args.ddp_find_unused_parameters is not None:
-        train_cfg = replace(
-            train_cfg,
-            ddp_find_unused_parameters=args.ddp_find_unused_parameters,
-        )
     if cli_provided(raw_argv, "--seed"):
         train_cfg = replace(train_cfg, seed=args.seed)
 
@@ -1958,14 +1817,14 @@ def resolve_training_config(
 
 def main() -> None:
     args = parse_args()
-    rank, world_size, local_rank, distributed, device = setup_distributed(args.device)
-    is_main_process = rank == 0
+    is_main_process = True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     raw_argv = sys.argv[1:]
     model_cfg, train_cfg, resume_path, resume_train_cfg, resume_base_init, exp_cfg = (
         resolve_training_config(args, raw_argv, is_main_process)
     )
 
-    set_seed(train_cfg.seed + rank)
+    set_seed(train_cfg.seed)
     if not (0.0 <= train_cfg.text_condition_dropout <= 1.0):
         raise ValueError(
             f"text_condition_dropout must be in [0, 1], got {train_cfg.text_condition_dropout}"
@@ -2202,53 +2061,16 @@ def main() -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         dump_configs(output_dir / "config.json", model_cfg, train_cfg)
         print(f"Compute precision={train_cfg.precision} (weights/optimizer states kept in fp32).")
-    if distributed:
-        dist.barrier()
-    if is_main_process and distributed:
-        print(f"DDP enabled: world_size={world_size} (local_rank={local_rank})")
-    if distributed:
-        local_files_only = not is_main_process
-        if is_main_process:
-            tokenizer = build_text_tokenizer(model_cfg, local_files_only=False)
-            text_hidden_size = validate_text_backbone_dim(model_cfg, local_files_only=False)
-            caption_tokenizer = None
-            caption_hidden_size = None
-            if model_cfg.use_caption_condition:
-                caption_tokenizer = build_caption_tokenizer(model_cfg, local_files_only=False)
-                caption_hidden_size = validate_caption_backbone_dim(
-                    model_cfg,
-                    local_files_only=False,
-                )
-        dist.barrier()
-        if not is_main_process:
-            tokenizer = build_text_tokenizer(model_cfg, local_files_only=local_files_only)
-            text_hidden_size = validate_text_backbone_dim(
-                model_cfg,
-                local_files_only=local_files_only,
-            )
-            caption_tokenizer = None
-            caption_hidden_size = None
-            if model_cfg.use_caption_condition:
-                caption_tokenizer = build_caption_tokenizer(
-                    model_cfg,
-                    local_files_only=local_files_only,
-                )
-                caption_hidden_size = validate_caption_backbone_dim(
-                    model_cfg,
-                    local_files_only=local_files_only,
-                )
-        dist.barrier()
-    else:
-        tokenizer = build_text_tokenizer(model_cfg, local_files_only=False)
-        text_hidden_size = validate_text_backbone_dim(model_cfg, local_files_only=False)
-        caption_tokenizer = None
-        caption_hidden_size = None
-        if model_cfg.use_caption_condition:
-            caption_tokenizer = build_caption_tokenizer(model_cfg, local_files_only=False)
-            caption_hidden_size = validate_caption_backbone_dim(
-                model_cfg,
-                local_files_only=False,
-            )
+    tokenizer = build_text_tokenizer(model_cfg, local_files_only=False)
+    text_hidden_size = validate_text_backbone_dim(model_cfg, local_files_only=False)
+    caption_tokenizer = None
+    caption_hidden_size = None
+    if model_cfg.use_caption_condition:
+        caption_tokenizer = build_caption_tokenizer(model_cfg, local_files_only=False)
+        caption_hidden_size = validate_caption_backbone_dim(
+            model_cfg,
+            local_files_only=False,
+        )
     if is_main_process:
         print(
             f"Text tokenizer={model_cfg.text_tokenizer_repo} vocab={tokenizer.vocab_size} add_bos={model_cfg.text_add_bos} padding_side=right "
@@ -2340,15 +2162,6 @@ def main() -> None:
             )
     if train_cfg.timestep_stratified and is_main_process:
         print("Using stratified logit-normal timestep sampling.")
-    train_sampler = None
-    if distributed:
-        train_sampler = DistributedSampler(
-            train_dataset,
-            num_replicas=world_size,
-            rank=rank,
-            shuffle=True,
-            drop_last=drop_last,
-        )
     dataloader_common_kwargs = {
         "batch_size": train_cfg.batch_size,
         "num_workers": train_cfg.num_workers,
@@ -2364,28 +2177,17 @@ def main() -> None:
         print("warning: dataloader_persistent_workers=True is ignored because num_workers=0.")
     loader = DataLoader(
         dataset=train_dataset,
-        shuffle=(train_sampler is None),
-        sampler=train_sampler,
+        shuffle=True,
         drop_last=drop_last,
         **dataloader_common_kwargs,
     )
     if len(loader) == 0:
         raise ValueError("Dataloader yielded zero batches. Check manifest and batch_size settings.")
     valid_loader = None
-    valid_sampler = None
     if valid_dataset is not None:
-        if distributed:
-            valid_sampler = DistributedSampler(
-                valid_dataset,
-                num_replicas=world_size,
-                rank=rank,
-                shuffle=False,
-                drop_last=False,
-            )
         valid_loader = DataLoader(
             dataset=valid_dataset,
             shuffle=False,
-            sampler=valid_sampler,
             drop_last=False,
             **dataloader_common_kwargs,
         )
@@ -2452,7 +2254,6 @@ def main() -> None:
             raw_model,
             model_cfg=model_cfg,
             base_init=base_init,
-            distributed=distributed,
             is_main_process=is_main_process,
         )
         if resume_path is None or not is_lora_adapter_dir(resume_path):
@@ -2464,7 +2265,6 @@ def main() -> None:
             raw_model,
             model_cfg=model_cfg,
             base_init=None,
-            distributed=distributed,
             is_main_process=is_main_process,
         )
         if train_config_uses_lora(train_cfg):
@@ -2477,7 +2277,6 @@ def main() -> None:
             raw_model,
             model_cfg=model_cfg,
             base_init=base_init,
-            distributed=distributed,
             is_main_process=is_main_process,
         )
         if train_config_uses_lora(train_cfg) and not lora_wrapped:
@@ -2548,47 +2347,7 @@ def main() -> None:
         if is_main_process:
             print("torch.compile enabled (dynamic=True).")
         train_model = torch.compile(raw_model, dynamic=True)
-    ddp_find_unused_parameters = bool(train_cfg.ddp_find_unused_parameters)
-    ddp_find_unused_parameters_explicit = args.ddp_find_unused_parameters is not None or (
-        isinstance(exp_cfg.get("train"), dict)
-        and "ddp_find_unused_parameters" in exp_cfg.get("train", {})
-    )
-    if distributed:
-        # Auto-enable for common configs where conditional branches can be fully
-        # masked in a step. Without this, DDP can hang after step 1 due to
-        # unreduced gradients in ranks where a branch is entirely unused.
-        if not ddp_find_unused_parameters and not ddp_find_unused_parameters_explicit:
-            speaker_labeled_count = train_dataset.speaker_labeled_count
-            has_partial_or_no_speaker_labels = speaker_labeled_count < len(train_dataset)
-            caption_labeled_count = train_dataset.caption_labeled_count
-            has_partial_or_no_caption_labels = (
-                model_cfg.use_caption_condition and caption_labeled_count < len(train_dataset)
-            )
-            has_stochastic_cond_drop = (
-                train_cfg.text_condition_dropout > 0.0
-                or train_cfg.speaker_condition_dropout > 0.0
-                or (model_cfg.use_caption_condition and train_cfg.caption_condition_dropout > 0.0)
-            )
-            if (
-                has_partial_or_no_speaker_labels
-                or has_partial_or_no_caption_labels
-                or has_stochastic_cond_drop
-            ):
-                ddp_find_unused_parameters = True
-                if is_main_process:
-                    print(
-                        "DDP find_unused_parameters auto-enabled "
-                        "(conditional branches may be fully masked in some steps)."
-                    )
-        model = DDP(
-            train_model,
-            device_ids=[local_rank],
-            output_device=local_rank,
-            find_unused_parameters=ddp_find_unused_parameters,
-            broadcast_buffers=False,
-        )
-    else:
-        model = train_model
+    model = train_model
     optimizer = build_optimizer(raw_model, train_cfg)
     scheduler = build_scheduler(optimizer, train_cfg)
     if is_main_process:
@@ -2597,7 +2356,7 @@ def main() -> None:
         )
         if train_cfg.gradient_accumulation_steps > 1:
             print(
-                f"Gradient accumulation enabled: steps={train_cfg.gradient_accumulation_steps} (effective global batch={train_cfg.batch_size * world_size * train_cfg.gradient_accumulation_steps})."
+                f"Gradient accumulation enabled: steps={train_cfg.gradient_accumulation_steps} (effective global batch={train_cfg.batch_size * train_cfg.gradient_accumulation_steps})."
             )
 
     step = 0
@@ -2620,14 +2379,14 @@ def main() -> None:
     progress = TrainProgress(
         max_steps=train_cfg.max_steps,
         start_step=step,
-        rank=rank,
-        world_size=world_size,
+        rank=0,
+        world_size=1,
         enabled=train_cfg.progress,
-        show_all_ranks=train_cfg.progress_all_ranks,
+        show_all_ranks=False,
         description="Train Duration" if train_cfg.train_mode == "duration_only" else "Train RF",
     )
     accum_steps = int(train_cfg.gradient_accumulation_steps)
-    global_batch_size = train_cfg.batch_size * world_size * accum_steps
+    global_batch_size = train_cfg.batch_size * accum_steps
     duration_only = train_cfg.train_mode == "duration_only"
     caption_warmup_active = bool(
         train_cfg.caption_warmup
@@ -2659,8 +2418,6 @@ def main() -> None:
         )
         epoch = 0
         while step < train_cfg.max_steps:
-            if train_sampler is not None:
-                train_sampler.set_epoch(epoch)
             epoch += 1
             for epoch_step, batch in enumerate(loader, start=1):
                 accum_micro_steps += 1
@@ -2773,66 +2530,64 @@ def main() -> None:
                         ref_latent = ref_latent * use_speaker[:, None, None].to(ref_latent.dtype)
 
                 should_step = (accum_micro_steps % accum_steps) == 0
-                sync_context = model.no_sync() if distributed and not should_step else nullcontext()
-                with sync_context:
-                    with (
-                        torch.autocast(device_type="cuda", dtype=torch.bfloat16)
-                        if use_bf16
-                        else nullcontext()
-                    ):
-                        if duration_only:
-                            duration_pred = model(
-                                x_t=None,
-                                t=None,
-                                text_input_ids=text_ids,
-                                text_mask=text_mask,
-                                ref_latent=ref_latent,
-                                ref_mask=ref_mask,
-                                caption_input_ids=caption_ids,
-                                caption_mask=caption_mask,
-                                latent_mask=None,
-                                duration_features=duration_features,
-                                duration_has_speaker=duration_has_speaker,
-                                duration_has_caption=duration_has_caption,
-                                duration_only=True,
-                            )
-                            v_pred = None
-                        elif raw_model.cfg.use_duration_predictor:
-                            v_pred, duration_pred = model(
-                                x_t=x_t,
-                                t=t,
-                                text_input_ids=text_ids,
-                                text_mask=text_mask,
-                                ref_latent=ref_latent,
-                                ref_mask=ref_mask,
-                                caption_input_ids=caption_ids,
-                                caption_mask=caption_mask,
-                                latent_mask=x_mask,
-                                text_condition_dropout=text_cond_drop,
-                                speaker_condition_dropout=speaker_drop_for_model,
-                                caption_condition_dropout=caption_drop_for_model,
-                                duration_features=duration_features,
-                                duration_has_speaker=duration_has_speaker,
-                                duration_has_caption=duration_has_caption,
-                            )
-                        else:
-                            v_pred = model(
-                                x_t=x_t,
-                                t=t,
-                                text_input_ids=text_ids,
-                                text_mask=text_mask,
-                                ref_latent=ref_latent,
-                                ref_mask=ref_mask,
-                                caption_input_ids=caption_ids,
-                                caption_mask=caption_mask,
-                                latent_mask=x_mask,
-                                text_condition_dropout=None,
-                                speaker_condition_dropout=speaker_drop_for_model
-                                if train_cfg.speaker_inversion_enabled
-                                else None,
-                                caption_condition_dropout=None,
-                            )
-                            duration_pred = None
+                with (
+                    torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+                    if use_bf16
+                    else nullcontext()
+                ):
+                    if duration_only:
+                        duration_pred = model(
+                            x_t=None,
+                            t=None,
+                            text_input_ids=text_ids,
+                            text_mask=text_mask,
+                            ref_latent=ref_latent,
+                            ref_mask=ref_mask,
+                            caption_input_ids=caption_ids,
+                            caption_mask=caption_mask,
+                            latent_mask=None,
+                            duration_features=duration_features,
+                            duration_has_speaker=duration_has_speaker,
+                            duration_has_caption=duration_has_caption,
+                            duration_only=True,
+                        )
+                        v_pred = None
+                    elif raw_model.cfg.use_duration_predictor:
+                        v_pred, duration_pred = model(
+                            x_t=x_t,
+                            t=t,
+                            text_input_ids=text_ids,
+                            text_mask=text_mask,
+                            ref_latent=ref_latent,
+                            ref_mask=ref_mask,
+                            caption_input_ids=caption_ids,
+                            caption_mask=caption_mask,
+                            latent_mask=x_mask,
+                            text_condition_dropout=text_cond_drop,
+                            speaker_condition_dropout=speaker_drop_for_model,
+                            caption_condition_dropout=caption_drop_for_model,
+                            duration_features=duration_features,
+                            duration_has_speaker=duration_has_speaker,
+                            duration_has_caption=duration_has_caption,
+                        )
+                    else:
+                        v_pred = model(
+                            x_t=x_t,
+                            t=t,
+                            text_input_ids=text_ids,
+                            text_mask=text_mask,
+                            ref_latent=ref_latent,
+                            ref_mask=ref_mask,
+                            caption_input_ids=caption_ids,
+                            caption_mask=caption_mask,
+                            latent_mask=x_mask,
+                            text_condition_dropout=None,
+                            speaker_condition_dropout=speaker_drop_for_model
+                            if train_cfg.speaker_inversion_enabled
+                            else None,
+                            caption_condition_dropout=None,
+                        )
+                        duration_pred = None
 
                     rf_loss = torch.zeros((), device=device, dtype=torch.float32)
                     if not duration_only:
@@ -2921,22 +2676,14 @@ def main() -> None:
                         progress.write("caption warmup complete; all parameters are now updating.")
 
                 if step % train_cfg.log_every == 0:
-                    loss_value = reduce_mean(step_loss, world_size, distributed).item()
-                    rf_loss_value = reduce_mean(step_rf_loss, world_size, distributed).item()
-                    duration_loss_value = reduce_mean(
-                        step_duration_loss, world_size, distributed
-                    ).item()
-                    duration_mae_frames_value = reduce_mean(
-                        step_duration_mae_frames, world_size, distributed
-                    ).item()
+                    loss_value = step_loss.detach().item()
+                    rf_loss_value = step_rf_loss.detach().item()
+                    duration_loss_value = step_duration_loss.detach().item()
+                    duration_mae_frames_value = step_duration_mae_frames.detach().item()
                     duration_group_metrics: dict[str, float] = {}
                     if duration_only:
-                        duration_group_totals = reduce_sum(
-                            step_duration_group_totals,
-                            distributed,
-                        )
                         duration_group_metrics = duration_condition_group_metrics(
-                            duration_group_totals
+                            step_duration_group_totals.detach()
                         )
                     lr_value = current_lr(optimizer)
                     progress_metrics: dict[str, float] = {
@@ -3012,11 +2759,10 @@ def main() -> None:
                     valid_metrics = run_validation(
                         model=model,
                         loader=valid_loader,
-                        train_cfg=train_cfg,
-                        device=device,
-                        use_bf16=use_bf16,
-                        distributed=distributed,
-                    )
+                    train_cfg=train_cfg,
+                    device=device,
+                    use_bf16=use_bf16,
+                )
                     if is_main_process:
                         if raw_model.cfg.use_duration_predictor:
                             message = (
@@ -3082,7 +2828,6 @@ def main() -> None:
                 train_cfg=train_cfg,
                 device=device,
                 use_bf16=use_bf16,
-                distributed=distributed,
             )
             if is_main_process:
                 if raw_model.cfg.use_duration_predictor:
@@ -3150,8 +2895,6 @@ def main() -> None:
     finally:
         if progress is not None:
             progress.close()
-        if distributed and dist.is_initialized():
-            dist.destroy_process_group()
 
 
 if __name__ == "__main__":
