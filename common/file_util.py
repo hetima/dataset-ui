@@ -35,50 +35,13 @@ def audio_files_in_folder(folder_path: str|Path) -> list[Path]:
     return audio_files_in_list(list(folder.iterdir()))
 
 
-def merge_mtdt_data(mtdt_all:dict, key: str, filename: str, data:dict) -> dict:
-    # mtdt_all[key]のリストから("filename") == filenameのdictを探し、そこへdataをマージする
-    items = mtdt_all.get(key, [])
-    found = False
-    for item in items:
-        if item.get("filename") == filename:
-            item.update(data)
-            found = True
-            break
-    if not found:
-        new_item = {"filename": filename}
-        new_item.update(data)
-        items.append(new_item)
-    mtdt_all[key] = items
-    return mtdt_all
-
-def data_in_mtdt(mtdt: Path|None) -> dict|None:
-    if not mtdt or not mtdt.exists():
-        return None
-    result = {}
-    with open(mtdt, "r", encoding="utf-8") as f:
-        result = json.load(f)
-    return result
-
-def file_data_in_mtdt(mtdt: Path|None, filename: str, key: str = "songs") -> dict|None:
-    data = data_in_mtdt(mtdt)
-    if not data:
-        return None
-    result = {}
-    items = data.get(key, [])
-    for item in items:
-        if item.get("filename") == filename:
-            result = item
-            break
-
-    return result
-
 
 class Mtdt:
     def __init__(self, mtdt_path: str|Path|None):
         self.mtdt_path = Path(mtdt_path) if mtdt_path else None
-        # songs / files を {filename: data} の dict として保持
+        # songs / audiofiles を {filename: data} の dict として保持
         self.songs: dict[str, dict] = {}
-        self.files: dict[str, dict] = {}
+        self.audiofiles: dict[str, dict] = {}
         self._load()
 
     def _read_raw(self) -> dict:
@@ -89,9 +52,9 @@ class Mtdt:
             return json.load(f)
 
     def _load(self) -> None:
-        """ファイルを読み込んで songs / files を構築する。"""
+        """ファイルを読み込んで songs / audiofiles を構築する。"""
         raw = self._read_raw()
-        for key in ("songs", "files"):
+        for key in ("songs", "audiofiles"):
             store: dict[str, dict] = {}
             for item in raw.get(key, []):
                 fn = item.get("filename")
@@ -105,13 +68,13 @@ class Mtdt:
 
     def file_data(self, filename: str) -> dict|None:
         """files から filename に一致するエントリを返す。"""
-        return self.files.get(filename)
+        return self.audiofiles.get(filename)
 
     def merge_song(self, filename: str, data: dict) -> None:
         self.merge("songs", filename, data)
 
     def merge_file(self, filename: str, data: dict) -> None:
-        self.merge("files", filename, data)
+        self.merge("audiofiles", filename, data)
 
     def merge(self, key: str, filename: str, data: dict) -> None:
         """key ストアの filename エントリに data をマージする（保存はしない）。"""
@@ -123,13 +86,13 @@ class Mtdt:
 
     def save(self) -> None:
         """ファイルから再読み込みしてインスタンスデータをマージして保存する。
-        songs / files 以外のキーや他プロセスによる変更を保持する。
+        songs / audiofiles 以外のキーや他プロセスによる変更を保持する。
         """
         if not self.mtdt_path:
             return
         # 現在のファイル内容をベースにする
         mtdt_all = self._read_raw()
-        for k in ("songs", "files"):
+        for k in ("songs", "audiofiles"):
             entries: dict[str, dict] = getattr(self, k)
             if not entries:
                 continue
