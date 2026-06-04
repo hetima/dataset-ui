@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
@@ -10,6 +9,7 @@ import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 
@@ -105,11 +105,7 @@ class _PreparedItem:
     error: str | None = None
 
 
-def _prepare_voice_file(
-    idx: int,
-    voice_file: VoiceFile,
-    args: argparse.Namespace,
-) -> _PreparedItem:
+def _prepare_voice_file(idx: int, voice_file: VoiceFile, args: SimpleNamespace) -> _PreparedItem:
     """VoiceFile から irodori-tts 用の前処理アイテムを作る。"""
     try:
         text = _coerce_text(voice_file.transcript)
@@ -173,7 +169,7 @@ def _load_voice_files(paths: list[str]) -> list[VoiceFile]:
 def _iter_voice_files(
     voice_files: list[VoiceFile],
     *,
-    args: argparse.Namespace,
+    args: SimpleNamespace,
 ) -> Iterable[_PreparedItem]:
     """VoiceFile 一覧を PreparedItem として順に返す。"""
     def _iter() -> Iterable[_PreparedItem]:
@@ -183,7 +179,7 @@ def _iter_voice_files(
     return _iter()
 
 
-def _run_worker(args: argparse.Namespace) -> None:
+def _run_worker(args: SimpleNamespace) -> None:
     device = torch.device(_default_device())
     if device.type == "cuda":
         if not torch.cuda.is_available():
@@ -336,34 +332,22 @@ def _run_worker(args: argparse.Namespace) -> None:
         f"skipped_empty={skipped_empty} "
         f"skipped_speaker={skipped_speaker} "
         f"skipped_audio={skipped_audio} manifest={output_manifest}"
-    )
+    , flush=True)
     if skip_counts:
-        print("skip breakdown:")
+        print("skip breakdown:", flush=True)
         for reason, count in sorted(skip_counts.items(), key=lambda x: (-x[1], x[0])):
-            print(f"  {reason}: {count}")
+            print(f"  {reason}: {count}", flush=True)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Precompute DACVAE latents from dataset-ui voice dataset folders."
-        )
+    """stdin の JSON から設定を受け取って latent manifest を作成する。"""
+    data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+    args = SimpleNamespace(
+        paths=data["paths"],
+        output_path=data["output_path"],
+        max_seconds=data.get("max_seconds"),
     )
-    parser.add_argument(
-        "--paths",
-        nargs="+",
-        required=True,
-        help="Dataset folder paths. Each folder may contain mtdt.json.",
-    )
-    parser.add_argument("--output-path", required=True, help="Output directory path.")
-    parser.add_argument(
-        "--max-seconds",
-        type=float,
-        default=None,
-        help="Optional trim duration before encode",
-    )
-    args = parser.parse_args()
-
+    print("トレーニングデータ作成開始", flush=True)
     _run_worker(args)
 
 

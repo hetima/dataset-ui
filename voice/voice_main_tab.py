@@ -216,7 +216,7 @@ def tab_main(ctx: VoiceCtx):
     # Audio analysis
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    with ui.expansion("書き起こし", value=False).classes(
+    with ui.expansion("transcript 書き起こし", value=False).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")

@@ -46,6 +46,11 @@ class XtermView(ui.column):
         """タスク実行中なら True を返す。"""
         return self._is_running
 
+    @property
+    def is_idle(self) -> bool:
+        """タスク実行中なら False を返す。"""
+        return not self._is_running
+
     def run(
         self,
         args: list[str],

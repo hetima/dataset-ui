@@ -12,10 +12,12 @@ def tab_iridori_train(ctx: VoiceCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion("データセット作成", value=True).classes(
+    with ui.expansion("トレーニングデータ作成", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("データセットの検証と作成を行います。「データセットフォルダ/irodori/プロジェクト名」に作成されます。この工程には mtdt.json が必要です。メインタブで生成してください。")
+        ui.label("データセットの検証とトレーニングデータ作成を行います")
+        ui.label("「トレーニングパス/irodori-tts/プロジェクト名」に作成されます。この工程には書き起こし.txt または mtdt.json が必要です。メインタブで生成してください。transcript が必須で capiton と speaker_id はオプションです。").classes("infotxt")
+        ui.label("最大音長（秒数）を指定すると、長いファイルはその秒数で切り詰められます。0にしておけばそのまま使用します").classes("infotxt")
         with ui.row().classes("items-center gap-2"):
             path_input = (
                 ui.textarea(
@@ -27,13 +29,18 @@ def tab_iridori_train(ctx: VoiceCtx):
                 .props('autogrow style="min-width: 500px" outlined clearable')
                 .classes("w-160")
             )
+            validate_dataset_btn = ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value)) # type: ignore
             project_name = ui.input(label="プロジェクト名", placeholder="my_lora", value="").props(
                 "outlined style='width: 200px;'"
             )
-            ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value))  # type: ignore
-            ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value))  # type: ignore
+            max_seconds = ui.input(label="最大音長", placeholder="秒数", value="0").props(
+                "outlined style='width: 80px;'"
+            )
+            create_dataset_btn =ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
 
         xterm = XtermView(title="ターミナル").classes("w-full")
+        validate_dataset_btn.bind_enabled(xterm, "is_idle")
+        create_dataset_btn.bind_enabled(xterm, "is_idle")
 
     def dataset_paths(text:str) -> list[Path]:
         """strを改行で区切ってリストにして返す。エラーがあったらnotifyして空配列を返す"""
@@ -61,7 +68,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             input_json=[str(path) for path in paths],
         )
 
-    def create_dataset(src_path: str, project_name: str):
+    def create_dataset(src_path: str, project_name: str, max_seconds_str: str):
         if not src_path:
             ui.notify("フォルダのパスを入力してください", type="warning")
             return 
@@ -71,3 +78,21 @@ def tab_iridori_train(ctx: VoiceCtx):
         paths = dataset_paths(src_path)
         if len(paths) == 0:
             return
+        output_dir = str(cnfg.train_dir / IRODORI_SUB_DIR / project_name)
+        try:
+            max_seconds = float(max_seconds_str) if max_seconds_str else 0
+        except ValueError:
+            ui.notify("最大音長は数値で入力してください", type="warning")
+            return
+        if max_seconds < 0:
+            max_seconds = 0
+        cli = str(Path(__file__).parent / "cli_task_iridori_prepare.py")
+        input_json = {
+            "paths": [str(path) for path in paths],
+            "output_path": output_dir,
+            "max_seconds": max_seconds if max_seconds > 0 else None,
+        }
+        xterm.run(
+            args=[sys.executable, cli],
+            input_json=input_json,
+        )
