@@ -232,6 +232,13 @@ def list_periodic_checkpoints(output_dir: Path) -> list[tuple[int, Path]]:
     return checkpoints
 
 
+def latest_periodic_checkpoint(output_dir: Path) -> Path | None:
+    checkpoints = list_periodic_checkpoints(output_dir)
+    if not checkpoints:
+        return None
+    return checkpoints[0][1]
+
+
 def enforce_periodic_checkpoint_limit(output_dir: Path, keep_count: int) -> None:
     if keep_count <= 0:
         return
@@ -1423,6 +1430,11 @@ def parse_args() -> argparse.Namespace:
         help="Resume full training state from a training checkpoint (.pt or LoRA checkpoint dir).",
     )
     parser.add_argument(
+        "--auto-resume",
+        action="store_true",
+        help="Resume from the latest periodic checkpoint under output_dir when available.",
+    )
+    parser.add_argument(
         "--init-checkpoint",
         default=None,
         help=(
@@ -1556,6 +1568,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
+    if args.resume is not None and args.auto_resume:
+        raise ValueError("--resume and --auto-resume cannot be used together.")
     if args.resume is not None and Path(args.resume).suffix.lower() == ".safetensors":
         raise ValueError(
             "--resume expects a training checkpoint (.pt or LoRA checkpoint dir). "
@@ -1658,10 +1672,17 @@ def resolve_training_config(
     if cli_provided(raw_argv, "--seed"):
         train_cfg = replace(train_cfg, seed=args.seed)
 
+    output_dir = Path(train_cfg.output_dir).expanduser()
     resume_path = Path(args.resume).expanduser() if args.resume is not None else None
+    if args.auto_resume:
+        resume_path = latest_periodic_checkpoint(output_dir)
+        if resume_path is not None and is_main_process:
+            print(f"Auto-resume checkpoint: {resume_path}")
+        elif resume_path is None and is_main_process:
+            print("Auto-resume: no periodic checkpoint found; starting a new run.")
     resume_train_cfg = None
     resume_base_init = None
-    if args.resume is not None:
+    if resume_path is not None:
         resume_meta = _load_checkpoint_payload(resume_path, map_location="cpu")
         raw_resume_train_cfg = resume_meta.get("train_config")
         if raw_resume_train_cfg is not None and not isinstance(raw_resume_train_cfg, dict):
@@ -1724,7 +1745,7 @@ def main() -> None:
                 "speaker_inversion_enabled=True requires --init-checkpoint so the frozen "
                 "base TTS model is initialized from trained weights."
             )
-        if args.resume is not None:
+        if resume_path is not None:
             raise ValueError(
                 "speaker_inversion_enabled=True saves embedding-only checkpoints; "
                 "--resume full trainer state is not supported. Use "
@@ -1795,7 +1816,7 @@ def main() -> None:
     if (
         train_cfg.train_mode == "duration_only"
         and args.init_checkpoint is None
-        and args.resume is None
+        and resume_path is None
     ):
         raise ValueError(
             "train_mode='duration_only' requires --init-checkpoint or --resume "
@@ -2106,7 +2127,7 @@ def main() -> None:
     if train_cfg.lora_alpha <= 0:
         raise ValueError(f"lora_alpha must be > 0, got {train_cfg.lora_alpha}")
 
-    if args.resume is not None:
+    if resume_path is not None:
         if train_config_uses_lora(train_cfg):
             if resume_path is None or not is_lora_adapter_dir(resume_path):
                 raise ValueError("LoRA resume expects an adapter checkpoint directory.")
@@ -2119,7 +2140,7 @@ def main() -> None:
                 "--resume and --init-checkpoint can only be combined for LoRA adapter resumes."
             )
 
-    if train_config_uses_lora(train_cfg) and args.resume is None and args.init_checkpoint is None:
+    if train_config_uses_lora(train_cfg) and resume_path is None and args.init_checkpoint is None:
         raise ValueError(
             "LoRA fine-tuning requires --init-checkpoint for the base model, "
             "or --resume from a LoRA adapter checkpoint directory."
@@ -2128,7 +2149,7 @@ def main() -> None:
     raw_model: torch.nn.Module = TextToLatentRFDiT(model_cfg).to(device)
     lora_wrapped = False
     base_init: dict | None = None
-    if args.resume is not None and train_config_uses_lora(train_cfg):
+    if resume_path is not None and train_config_uses_lora(train_cfg):
         base_init = resume_base_init
         if args.init_checkpoint is not None:
             override_init_path = _normalize_checkpoint_path(args.init_checkpoint)
@@ -2143,7 +2164,7 @@ def main() -> None:
             raise ValueError("LoRA resume expects an adapter checkpoint directory.")
         raw_model = load_lora_adapter(raw_model, resume_path, is_trainable=True)
         lora_wrapped = True
-    elif args.resume is None and args.init_checkpoint is None:
+    elif resume_path is None and args.init_checkpoint is None:
         _apply_base_initialization(
             raw_model,
             model_cfg=model_cfg,
@@ -2244,7 +2265,7 @@ def main() -> None:
 
     step = 0
     progress: TrainProgress | None = None
-    if args.resume is not None:
+    if resume_path is not None:
         ckpt = _load_checkpoint_payload(resume_path, map_location=device)
         if not train_config_uses_lora(train_cfg):
             raw_model.load_state_dict(ckpt["model"])
