@@ -1294,11 +1294,14 @@ def _load_audio(path: str | Path) -> tuple[torch.Tensor, int]:
         return wav, sr
 
 
-def save_wav(path: str | Path, audio: torch.Tensor, sample_rate: int) -> Path:
+def save_wav(path: str | Path, audio: torch.Tensor, sample_rate: int, format: str | None = None) -> Path:
+    """音声を保存する。format に "wav" または "flac" を指定するとパスの拡張子を上書きする。"""
     out_path = Path(path)
+    if format is not None:
+        out_path = out_path.with_suffix("." + format.lstrip(".").lower())
     out_path.parent.mkdir(parents=True, exist_ok=True)
     audio_cpu = audio.detach().to(device="cpu", dtype=torch.float32)
-    
+
     import soundfile as sf
 
     audio_np = audio_cpu.squeeze(0).numpy() if audio_cpu.shape[0] == 1 else audio_cpu.T.numpy()
