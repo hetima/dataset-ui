@@ -96,12 +96,90 @@ def tab_iridori_train(ctx: VoiceCtx):
             args=[sys.executable, cli],
             input_json=input_json,
         )
+
     # ═══════════════════════════════════════════════════════════════════════════════
-    # トレーニングデータ
+    # トレーニング
     # ═══════════════════════════════════════════════════════════════════════════════
+
+    PRIORITY_MODELS = ["Irodori-TTS-500M-v3/model.safetensors", "Irodori-TTS-600M-v3-VoiceDesign/model.safetensors"]
+
+    def list_safetensors() -> list[str]:
+        """models_dir/irodori-tts 以下の .safetensors をサブパス形式でリストアップ。優先モデルを先頭に並べる。"""
+        base = cnfg.models_dir / "irodori-tts"
+        if not base.exists():
+            return []
+        all_paths = sorted(
+            str(p.relative_to(base)).replace("\\", "/")
+            for p in base.rglob("*.safetensors")
+            if not p.name.endswith(".speaker.safetensors")
+        )
+        priority = [p for p in PRIORITY_MODELS if p in all_paths]
+        rest = [p for p in all_paths if p not in PRIORITY_MODELS]
+        return priority + rest
+
     with ui.expansion("トレーニング実行", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
             "トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
         )
+        with ui.row().classes("items-center gap-4"):
+            model_input = (
+                ui.input(
+                    label="ベースモデル",
+                    placeholder="モデルを選択、または入力",
+                    on_change=lambda e: setattr(e.sender, "value", e.value),
+                )
+                .props('style="min-width: 400px" outlined')
+            )
+            with model_input.add_slot("append"):
+                with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
+                    train_model_menu = ui.menu()
+
+            dataset_input = (
+                ui.input(
+                    label="トレーニングデータ",
+                    placeholder="データセットを選択、または入力",
+                    on_change=lambda e: setattr(e.sender, "value", e.value),
+                )
+                .props('style="min-width: 250px" outlined')
+            )
+            with dataset_input.add_slot("append"):
+                with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
+                    train_dataset_menu = ui.menu()
+
+    def reload_train_model_menu():
+        models = list_safetensors()
+        train_model_menu.clear()
+        with train_model_menu:
+            for m in models:
+                ui.menu_item(
+                    m, lambda v=m: setattr(model_input, "value", v)
+                ).classes("padd8")
+            if models:
+                ui.separator()
+            ui.menu_item("メニューを更新", lambda: reload_train_model_menu()).classes("padd8")
+
+    def list_train_datasets() -> list[str]:
+        """train_dir/irodori-tts 直下のフォルダをリストアップ。"""
+        base = cnfg.train_dir / "irodori-tts"
+        if not base.exists():
+            return []
+        return sorted(p.name for p in base.iterdir() if p.is_dir())
+
+    def reload_train_dataset_menu():
+        datasets = list_train_datasets()
+        train_dataset_menu.clear()
+        with train_dataset_menu:
+            for d in datasets:
+                ui.menu_item(
+                    d, lambda v=d: setattr(dataset_input, "value", v)
+                ).classes("padd8")
+            if datasets:
+                ui.separator()
+            ui.menu_item("メニューを更新", lambda: reload_train_dataset_menu()).classes("padd8")
+
+    reload_train_model_menu()
+    reload_train_dataset_menu()
+
+
