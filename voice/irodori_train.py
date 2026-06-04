@@ -1454,34 +1454,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--weight-decay", type=float, default=0.01)
-    parser.add_argument("--optimizer", choices=["adamw", "muon"], default="muon")
-    parser.add_argument("--adam-beta1", type=float, default=0.9)
-    parser.add_argument("--adam-beta2", type=float, default=0.999)
-    parser.add_argument("--adam-eps", type=float, default=1e-8)
-    parser.add_argument("--muon-momentum", type=float, default=0.95)
     parser.add_argument("--lr-scheduler", choices=["none", "cosine", "wsd"], default="none")
     parser.add_argument("--warmup-steps", type=int, default=0)
-    parser.add_argument(
-        "--caption-warmup",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=(
-            "During the first caption_warmup_steps optimizer steps, update only caption-only parameters "
-            "(caption encoder/norm and caption attention projections)."
-        ),
-    )
-    parser.add_argument(
-        "--caption-warmup-steps",
-        type=int,
-        default=0,
-        help="Number of optimizer steps to run caption-only warmup for when caption_warmup is enabled.",
-    )
     parser.add_argument("--stable-steps", type=int, default=0)
     parser.add_argument("--min-lr-scale", type=float, default=0.1)
-    parser.add_argument("--latent-dim", type=int, default=128)
-    parser.add_argument("--latent-patch-size", type=int, default=1)
-    parser.add_argument("--max-latent-steps", type=int, default=750)
     parser.add_argument(
         "--fixed-target-latent-steps",
         type=int,
@@ -1490,75 +1466,6 @@ def parse_args() -> argparse.Namespace:
             "If set, always train on this fixed target latent length "
             "(short samples are right-padded with zeros, long samples are truncated)."
         ),
-    )
-    parser.add_argument(
-        "--fixed-target-full-mask",
-        action="store_true",
-        help="Use full target mask for fixed-length training (Echo-style includes padded tail in loss).",
-    )
-    parser.add_argument(
-        "--rf-loss-mode",
-        choices=["echo", "utterance_mean"],
-        default=None,
-        help="RF loss normalization mode.",
-    )
-    parser.add_argument("--duration-loss-weight", type=float, default=None)
-    parser.add_argument("--duration-speaker-dropout", type=float, default=None)
-    parser.add_argument("--duration-caption-dropout", type=float, default=None)
-    parser.add_argument("--duration-huber-delta", type=float, default=None)
-    parser.add_argument(
-        "--text-condition-dropout",
-        type=float,
-        default=0.1,
-        help="Probability of dropping text conditioning during training.",
-    )
-    parser.add_argument(
-        "--caption-condition-dropout",
-        type=float,
-        default=0.1,
-        help="Probability of dropping caption conditioning during training.",
-    )
-    parser.add_argument(
-        "--speaker-condition-dropout",
-        type=float,
-        default=0.1,
-        help="Probability of dropping speaker/reference conditioning during training.",
-    )
-    speaker_inversion_group = parser.add_mutually_exclusive_group()
-    speaker_inversion_group.add_argument(
-        "--speaker-inversion",
-        dest="speaker_inversion_enabled",
-        action="store_true",
-        help="Train only learned speaker inversion embedding tokens.",
-    )
-    speaker_inversion_group.add_argument(
-        "--no-speaker-inversion",
-        dest="speaker_inversion_enabled",
-        action="store_false",
-        help="Disable Speaker Inversion training.",
-    )
-    parser.set_defaults(speaker_inversion_enabled=None)
-    parser.add_argument(
-        "--speaker-inversion-tokens",
-        type=int,
-        default=None,
-        help="Number of learned Speaker Inversion tokens.",
-    )
-    parser.add_argument(
-        "--speaker-inversion-init-std",
-        type=float,
-        default=None,
-        help="Stddev for random Speaker Inversion token initialization.",
-    )
-    parser.add_argument(
-        "--speaker-inversion-init-embedding",
-        default=None,
-        help=("Optional existing Speaker Inversion .speaker.safetensors file to continue from."),
-    )
-    parser.add_argument(
-        "--timestep-stratified",
-        action="store_true",
-        help="Use stratified logit-normal timestep sampling (Echo-style).",
     )
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--save-every", type=int, default=1000)
@@ -1692,70 +1599,18 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, num_workers=args.num_workers)
     if cli_provided(raw_argv, "--lr"):
         train_cfg = replace(train_cfg, learning_rate=args.lr)
-    if cli_provided(raw_argv, "--weight-decay"):
-        train_cfg = replace(train_cfg, weight_decay=args.weight_decay)
-    if cli_provided(raw_argv, "--optimizer"):
-        train_cfg = replace(train_cfg, optimizer=args.optimizer)
-    if cli_provided(raw_argv, "--adam-beta1"):
-        train_cfg = replace(train_cfg, adam_beta1=args.adam_beta1)
-    if cli_provided(raw_argv, "--adam-beta2"):
-        train_cfg = replace(train_cfg, adam_beta2=args.adam_beta2)
-    if cli_provided(raw_argv, "--adam-eps"):
-        train_cfg = replace(train_cfg, adam_eps=args.adam_eps)
-    if cli_provided(raw_argv, "--muon-momentum"):
-        train_cfg = replace(train_cfg, muon_momentum=args.muon_momentum)
     if cli_provided(raw_argv, "--lr-scheduler"):
         train_cfg = replace(train_cfg, lr_scheduler=args.lr_scheduler)
     if cli_provided(raw_argv, "--warmup-steps"):
         train_cfg = replace(train_cfg, warmup_steps=args.warmup_steps)
-    if args.caption_warmup is not None:
-        train_cfg = replace(train_cfg, caption_warmup=bool(args.caption_warmup))
-    if cli_provided(raw_argv, "--caption-warmup-steps"):
-        train_cfg = replace(train_cfg, caption_warmup_steps=args.caption_warmup_steps)
     if cli_provided(raw_argv, "--stable-steps"):
         train_cfg = replace(train_cfg, stable_steps=args.stable_steps)
     if cli_provided(raw_argv, "--min-lr-scale"):
         train_cfg = replace(train_cfg, min_lr_scale=args.min_lr_scale)
     if cli_provided(raw_argv, "--max-steps"):
         train_cfg = replace(train_cfg, max_steps=args.max_steps)
-    if cli_provided(raw_argv, "--text-condition-dropout"):
-        train_cfg = replace(train_cfg, text_condition_dropout=args.text_condition_dropout)
-    if cli_provided(raw_argv, "--caption-condition-dropout"):
-        train_cfg = replace(train_cfg, caption_condition_dropout=args.caption_condition_dropout)
-    if cli_provided(raw_argv, "--speaker-condition-dropout"):
-        train_cfg = replace(train_cfg, speaker_condition_dropout=args.speaker_condition_dropout)
-    if args.speaker_inversion_enabled is not None:
-        train_cfg = replace(
-            train_cfg,
-            speaker_inversion_enabled=bool(args.speaker_inversion_enabled),
-        )
-    if cli_provided(raw_argv, "--speaker-inversion-tokens"):
-        train_cfg = replace(train_cfg, speaker_inversion_tokens=args.speaker_inversion_tokens)
-    if cli_provided(raw_argv, "--speaker-inversion-init-std"):
-        train_cfg = replace(train_cfg, speaker_inversion_init_std=args.speaker_inversion_init_std)
-    if cli_provided(raw_argv, "--speaker-inversion-init-embedding"):
-        train_cfg = replace(
-            train_cfg,
-            speaker_inversion_init_embedding=args.speaker_inversion_init_embedding,
-        )
-    if cli_provided(raw_argv, "--timestep-stratified"):
-        train_cfg = replace(train_cfg, timestep_stratified=True)
-    if cli_provided(raw_argv, "--max-latent-steps"):
-        train_cfg = replace(train_cfg, max_latent_steps=args.max_latent_steps)
     if cli_provided(raw_argv, "--fixed-target-latent-steps"):
         train_cfg = replace(train_cfg, fixed_target_latent_steps=args.fixed_target_latent_steps)
-    if cli_provided(raw_argv, "--fixed-target-full-mask"):
-        train_cfg = replace(train_cfg, fixed_target_full_mask=True)
-    if cli_provided(raw_argv, "--rf-loss-mode"):
-        train_cfg = replace(train_cfg, rf_loss_mode=args.rf_loss_mode)
-    if cli_provided(raw_argv, "--duration-loss-weight"):
-        train_cfg = replace(train_cfg, duration_loss_weight=args.duration_loss_weight)
-    if cli_provided(raw_argv, "--duration-speaker-dropout"):
-        train_cfg = replace(train_cfg, duration_speaker_dropout=args.duration_speaker_dropout)
-    if cli_provided(raw_argv, "--duration-caption-dropout"):
-        train_cfg = replace(train_cfg, duration_caption_dropout=args.duration_caption_dropout)
-    if cli_provided(raw_argv, "--duration-huber-delta"):
-        train_cfg = replace(train_cfg, duration_huber_delta=args.duration_huber_delta)
     if cli_provided(raw_argv, "--log-every"):
         train_cfg = replace(train_cfg, log_every=args.log_every)
     if cli_provided(raw_argv, "--save-every"):
@@ -1806,11 +1661,6 @@ def resolve_training_config(
             raw_argv=raw_argv,
             exp_cfg=exp_cfg,
         )
-
-    if cli_provided(raw_argv, "--latent-dim"):
-        model_cfg = replace(model_cfg, latent_dim=args.latent_dim)
-    if cli_provided(raw_argv, "--latent-patch-size"):
-        model_cfg = replace(model_cfg, latent_patch_size=args.latent_patch_size)
 
     return model_cfg, train_cfg, resume_path, resume_train_cfg, resume_base_init, exp_cfg
 
@@ -1878,8 +1728,8 @@ def main() -> None:
                 "speaker_inversion_init_std must be >= 0, "
                 f"got {train_cfg.speaker_inversion_init_std}"
             )
-        optimizer_explicit = cli_provided(raw_argv, "--optimizer") or (
-            isinstance(exp_cfg.get("train"), dict) and "optimizer" in exp_cfg.get("train", {})
+        optimizer_explicit = isinstance(exp_cfg.get("train"), dict) and "optimizer" in exp_cfg.get(
+            "train", {}
         )
         if str(train_cfg.optimizer).strip().lower() == "muon":
             if optimizer_explicit:
