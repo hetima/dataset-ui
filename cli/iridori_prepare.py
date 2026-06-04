@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.file_util import Mtdt, audio_files_in_folder
+from common.setting import cnfg
 from voice.voicefile import VoiceFile
 
 
@@ -355,7 +356,8 @@ def main() -> None:
         required=True,
         help="Dataset folder paths. Each folder may contain mtdt.json.",
     )
-    parser.add_argument("--output-path", required=True, help="Output directory path.")
+    parser.add_argument("--output-path", default="", help="Output directory path.")
+    parser.add_argument("--project", default="", help="Project name. Overrides output path when specified.")
     parser.add_argument(
         "--max-seconds",
         type=float,
@@ -363,6 +365,10 @@ def main() -> None:
         help="Optional trim duration before encode",
     )
     args = parser.parse_args()
+    if args.project:
+        args.output_path = str(cnfg.train_dir / "irodori-tts" / args.project)
+    if not args.output_path:
+        parser.error("--output-path または --project を指定してください")
 
     _run_worker(args)
 
