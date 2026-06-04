@@ -15,8 +15,8 @@ def tab_iridori_train(ctx: VoiceCtx):
     with ui.expansion("トレーニングデータ作成", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("データセットの検証とトレーニングデータ作成を行います")
-        ui.label("「トレーニングパス/irodori-tts/プロジェクト名」に作成されます。この工程には書き起こし.txt または mtdt.json が必要です。メインタブで生成してください。transcript が必須で capiton と speaker_id はオプションです。").classes("infotxt")
+        ui.label("データセットの検証とトレーニングデータ作成を行います。複数のフォルダをまとめてひとつのトレーニングデータを作成できます")
+        ui.label("「トレーニングパス/irodori-tts/プロジェクト名」に作成されます。この工程には 書き起こし.txt または mtdt.json が必要です。メインタブで生成してください。transcript が必須で capiton と speaker_id はオプションです。").classes("infotxt")
         ui.label("最大音長（秒数）を指定すると、長いファイルはその秒数で切り詰められます。0にしておけばそのまま使用します").classes("infotxt")
         with ui.row().classes("items-center gap-2"):
             path_input = (
