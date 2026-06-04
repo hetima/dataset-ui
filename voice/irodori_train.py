@@ -73,7 +73,6 @@ from lib.irodori_tts.speaker_inversion import (
 )
 from lib.irodori_tts.tokenizer import PretrainedTextTokenizer
 
-WANDB_MODES = {"online", "offline", "disabled"}
 TRAIN_MODES = {"rf", "duration_only"}
 CHECKPOINT_STEP_RE = re.compile(
     rf"^checkpoint_(\d+)(?:\.pt|{re.escape(SPEAKER_INVERSION_SAFETENSORS_SUFFIX)})?$"
@@ -1236,21 +1235,6 @@ def duration_condition_group_log_suffix(metrics: dict[str, float]) -> str:
     return " ".join(chunks)
 
 
-def duration_condition_group_wandb_metrics(
-    prefix: str,
-    metrics: dict[str, float],
-) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for group_name in DURATION_CONDITION_GROUPS:
-        for metric_name in (
-            f"duration_loss_{group_name}",
-            f"duration_mae_frames_{group_name}",
-            f"duration_samples_{group_name}",
-        ):
-            out[f"{prefix}/{metric_name}"] = metrics[metric_name]
-    return out
-
-
 def split_train_valid_indices(
     *,
     num_samples: int,
@@ -1723,41 +1707,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Show tqdm progress bars for all ranks in DDP mode (default: rank0 only).",
     )
-    wandb_group = parser.add_mutually_exclusive_group()
-    wandb_group.add_argument(
-        "--wandb",
-        dest="wandb_enabled",
-        action="store_true",
-        help="Enable Weights & Biases logging.",
-    )
-    wandb_group.add_argument(
-        "--no-wandb",
-        dest="wandb_enabled",
-        action="store_false",
-        help="Disable Weights & Biases logging.",
-    )
-    parser.set_defaults(wandb_enabled=None)
-    parser.add_argument(
-        "--wandb-project",
-        default=None,
-        help="Weights & Biases project name.",
-    )
-    parser.add_argument(
-        "--wandb-entity",
-        default=None,
-        help="Weights & Biases entity/team name.",
-    )
-    parser.add_argument(
-        "--wandb-run-name",
-        default=None,
-        help="Weights & Biases run name.",
-    )
-    parser.add_argument(
-        "--wandb-mode",
-        choices=sorted(WANDB_MODES),
-        default=None,
-        help="Weights & Biases mode.",
-    )
     lora_group = parser.add_mutually_exclusive_group()
     lora_group.add_argument(
         "--lora",
@@ -1955,16 +1904,7 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, progress=args.progress)
     if args.progress_all is not None:
         train_cfg = replace(train_cfg, progress_all_ranks=args.progress_all)
-    if args.wandb_enabled is not None:
-        train_cfg = replace(train_cfg, wandb_enabled=args.wandb_enabled)
-    if cli_provided(raw_argv, "--wandb-project"):
-        train_cfg = replace(train_cfg, wandb_project=args.wandb_project)
-    if cli_provided(raw_argv, "--wandb-entity"):
-        train_cfg = replace(train_cfg, wandb_entity=args.wandb_entity)
-    if cli_provided(raw_argv, "--wandb-run-name"):
-        train_cfg = replace(train_cfg, wandb_run_name=args.wandb_run_name)
-    if cli_provided(raw_argv, "--wandb-mode"):
-        train_cfg = replace(train_cfg, wandb_mode=args.wandb_mode)
+    train_cfg = replace(train_cfg, wandb_enabled=False)
     if args.lora_enabled is not None:
         train_cfg = replace(train_cfg, lora_enabled=args.lora_enabled)
     if cli_provided(raw_argv, "--lora-r"):
@@ -2234,10 +2174,6 @@ def main() -> None:
         print("warning: valid_every is set but valid_ratio=0. Validation is disabled.")
     if train_cfg.checkpoint_best_n < 0:
         raise ValueError(f"checkpoint_best_n must be >= 0, got {train_cfg.checkpoint_best_n}")
-    if train_cfg.wandb_mode not in WANDB_MODES:
-        raise ValueError(
-            f"wandb_mode must be one of {sorted(WANDB_MODES)}, got {train_cfg.wandb_mode!r}"
-        )
     precision = str(train_cfg.precision).lower()
     if precision not in {"fp32", "bf16"}:
         raise ValueError(f"precision must be one of ['fp32', 'bf16'], got {train_cfg.precision!r}")
@@ -2270,31 +2206,6 @@ def main() -> None:
         dist.barrier()
     if is_main_process and distributed:
         print(f"DDP enabled: world_size={world_size} (local_rank={local_rank})")
-    wandb_run = None
-    if train_cfg.wandb_enabled and is_main_process:
-        try:
-            import wandb
-        except ImportError as exc:
-            raise RuntimeError(
-                "W&B logging is enabled, but `wandb` is not installed. "
-                "Install it with `pip install wandb`."
-            ) from exc
-        wandb_run = wandb.init(
-            project=train_cfg.wandb_project,
-            entity=train_cfg.wandb_entity,
-            name=train_cfg.wandb_run_name,
-            mode=train_cfg.wandb_mode,
-            dir=str(output_dir),
-            config={
-                "model": asdict(model_cfg),
-                "train": asdict(train_cfg),
-                "script": "train.py",
-            },
-        )
-        print(
-            f"W&B enabled: project={train_cfg.wandb_project} mode={train_cfg.wandb_mode} run={wandb_run.name if wandb_run is not None else train_cfg.wandb_run_name}"
-        )
-
     if distributed:
         local_files_only = not is_main_process
         if is_main_process:
@@ -3076,23 +2987,6 @@ def main() -> None:
                                 f"step={step} loss={loss_value:.6f} rf={rf_loss_value:.6f} "
                                 f"lr={lr_value:.3e}"
                             )
-                        if wandb_run is not None:
-                            metrics = {
-                                "train/loss": loss_value,
-                                "train/rf_loss": rf_loss_value,
-                                "train/lr": lr_value,
-                            }
-                            if raw_model.cfg.use_duration_predictor:
-                                metrics["train/duration_loss"] = duration_loss_value
-                                metrics["train/duration_mae_frames"] = duration_mae_frames_value
-                                if duration_only:
-                                    metrics.update(
-                                        duration_condition_group_wandb_metrics(
-                                            "train",
-                                            duration_group_metrics,
-                                        )
-                                    )
-                            wandb_run.log(metrics, step=step)
 
                 if step % train_cfg.save_every == 0 and is_main_process:
                     save_checkpoint(
@@ -3153,24 +3047,6 @@ def main() -> None:
                                     valid_metrics["num_samples"],
                                 )
                             )
-                        if wandb_run is not None:
-                            metrics = {
-                                "valid/loss": valid_metrics["loss"],
-                                "valid/rf_loss": valid_metrics["rf_loss"],
-                            }
-                            if raw_model.cfg.use_duration_predictor:
-                                metrics["valid/duration_loss"] = valid_metrics["duration_loss"]
-                                metrics["valid/duration_mae_frames"] = valid_metrics[
-                                    "duration_mae_frames"
-                                ]
-                                if duration_only:
-                                    metrics.update(
-                                        duration_condition_group_wandb_metrics(
-                                            "valid",
-                                            valid_metrics,
-                                        )
-                                    )
-                            wandb_run.log(metrics, step=step)
                         best_val_checkpoints, best_path = maybe_save_best_val_loss_checkpoint(
                             output_dir=output_dir,
                             checkpoints=best_val_checkpoints,
@@ -3238,22 +3114,6 @@ def main() -> None:
                             valid_metrics["num_samples"],
                         )
                     )
-                if wandb_run is not None:
-                    metrics = {
-                        "valid/loss": valid_metrics["loss"],
-                        "valid/rf_loss": valid_metrics["rf_loss"],
-                    }
-                    if raw_model.cfg.use_duration_predictor:
-                        metrics["valid/duration_loss"] = valid_metrics["duration_loss"]
-                        metrics["valid/duration_mae_frames"] = valid_metrics["duration_mae_frames"]
-                        if duration_only:
-                            metrics.update(
-                                duration_condition_group_wandb_metrics(
-                                    "valid",
-                                    valid_metrics,
-                                )
-                            )
-                    wandb_run.log(metrics, step=step)
                 best_val_checkpoints, best_path = maybe_save_best_val_loss_checkpoint(
                     output_dir=output_dir,
                     checkpoints=best_val_checkpoints,
@@ -3286,14 +3146,10 @@ def main() -> None:
                 train_cfg,
                 base_init=base_init,
             )
-            if wandb_run is not None:
-                wandb_run.summary["train/final_step"] = step
             progress.write(f"Training finished at step={step}.")
     finally:
         if progress is not None:
             progress.close()
-        if wandb_run is not None:
-            wandb_run.finish()
         if distributed and dist.is_initialized():
             dist.destroy_process_group()
 
