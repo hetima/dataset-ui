@@ -55,6 +55,11 @@ def tab_iridori_train(ctx: VoiceCtx):
         paths = dataset_paths(src_path)
         if len(paths) == 0:
             return
+        cli = str(Path(__file__).parent / "cli_task_irodori_validate.py")
+        xterm.run(
+            args=[sys.executable, cli],
+            input_json=[str(path) for path in paths],
+        )
 
     def create_dataset(src_path: str, project_name: str):
         if not src_path:
