@@ -117,12 +117,22 @@ def tab_iridori_train(ctx: VoiceCtx):
         rest = [p for p in all_paths if p not in PRIORITY_MODELS]
         return priority + rest
 
-    with ui.expansion("トレーニング実行", value=True).classes(
+    def copy_train_command():
+        cmd = build_train_command()
+        if cmd is None:
+            return
+        ui.run_javascript(f"navigator.clipboard.writeText({cmd!r})")
+        ui.notify("コマンドをコピーしました")
+
+    with ui.expansion("トレーニング実行（Speaker Inversion）", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
-            "トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
+            "Speaker Inversion トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
         )
+        ui.label(
+            "とりあえず実行コマンドをコピーできるようにしていますので、PowerShellやcmdで実行してください。venvのpython.exeを指定してるのでアクティベートしなくても実行できます。"
+        ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             model_input = (
                 ui.input(
@@ -147,6 +157,8 @@ def tab_iridori_train(ctx: VoiceCtx):
             with dataset_input.add_slot("append"):
                 with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
                     train_dataset_menu = ui.menu()
+            with ui.row().classes("items-center gap-4 mt-2"):
+                ui.button("トレーニングコマンドをコピー", on_click=copy_train_command)
 
     def reload_train_model_menu():
         models = list_safetensors()
@@ -182,4 +194,26 @@ def tab_iridori_train(ctx: VoiceCtx):
     reload_train_model_menu()
     reload_train_dataset_menu()
 
-
+    def build_train_command() -> str | None:
+        dataset = (dataset_input.value or "").strip()
+        model = (model_input.value or "").strip()
+        if not dataset:
+            ui.notify("トレーニングデータを選択してください", type="warning")
+            return None
+        if not model:
+            ui.notify("ベースモデルを選択してください", type="warning")
+            return None
+        voice_dir = Path(__file__).parent.resolve()
+        repo_root = voice_dir.parent
+        train_script = voice_dir / "irodori_train.py"
+        config_yaml = repo_root / "configs" / "irodoritts" / "train_500m_v3_speaker_inversion.yaml"
+        manifest = cnfg.train_dir / "irodori-tts" / dataset / "train_manifest.jsonl"
+        output_dir = cnfg.models_dir / "irodori-tts" / dataset
+        init_ckpt = cnfg.models_dir / "irodori-tts" / model
+        return (
+            f'{sys.executable} "{train_script}"'
+            f' --manifest "{manifest}"'
+            f' --output-dir "{output_dir}"'
+            f' --config "{config_yaml}"'
+            f' --init-checkpoint "{init_ckpt}"'
+        )
