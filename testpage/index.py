@@ -4,11 +4,7 @@ from testpage.testpage_ctx import TestCtx
 from testpage.testpage_main_tab import tab_main
 from testpage.testpage_02_tab import tab_02
 from music.music_app_ctx import MusicCtx
-from common.wavesurfer import setup_wavesurfer
-
 def main_page():
-    setup_wavesurfer()
-
     ctx = TestCtx()
     mctx = MusicCtx()
 

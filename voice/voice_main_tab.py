@@ -9,7 +9,7 @@ from common.xterm_dialog import XtermDialog
 from common.message_dialog import show_confirm_dialog
 import sys
 from voice.voice_app_ctx import VoiceCtx
-from common.wavesurfer import simple_player
+from common.plyr import simple_plyr_player
 
 def tab_main(ctx: VoiceCtx):
 
@@ -449,10 +449,9 @@ def tab_main(ctx: VoiceCtx):
     #     player.set_source(path)
     #     player.play()
     #     play_info.set_text(Path(path).name)
-    ws = simple_player("ws_02", visible=False, autoplay=True)
     def play_src(path: str):
-        ws.container.set_visibility(True)
-        ws.ws.load(path)
+        plyr.container.set_visibility(True)
+        plyr.plyr.load(path)
 
     ctx.table = ui.table(
         columns=[
@@ -507,6 +506,9 @@ def tab_main(ctx: VoiceCtx):
                                 handler=lambda e: cnfg.add_edit_file_path(e.args),
                             ):
                                 ui.label("エディットプールに追加").classes("padd8")
+    with ctx.table.add_slot("top-left"):
+        plyr = simple_plyr_player("plyr_voice", visible=False, autoplay=True)
+
     with ctx.table.add_slot("top-right"):
         ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
             "w-80"

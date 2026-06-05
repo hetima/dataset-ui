@@ -11,7 +11,7 @@ from common.thread_task_dialog import ThreadTaskDialog
 from music.music_app_ctx import MusicCtx
 from lib.roformer.roformer import list_roformer_models
 from lib.roformer.task_infer import infer_roformer
-from common.wavesurfer import simple_player
+from common.plyr import simple_plyr_player
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
@@ -399,17 +399,9 @@ def tab_main(ctx: MusicCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    # with ui.row().classes("items-center gap-4"):
-    #     player = ui.audio("")
-    #     play_info = ui.label("")
-    # def play_src(path: str):
-    #     player.set_source(path)
-    #     player.play()
-    #     play_info.set_text(Path(path).name)
-    ws = simple_player("ws_01", visible=False, autoplay=True)
     def play_src(path: str):
-        ws.container.set_visibility(True)
-        ws.ws.load(path)
+        plyr.container.set_visibility(True)
+        plyr.plyr.load(path)
 
     ctx.table = ui.table(
         columns=[
@@ -511,6 +503,8 @@ def tab_main(ctx: MusicCtx):
                                 handler=lambda e: cnfg.add_edit_file_path(e.args),
                             ):
                                 ui.label("エディットプールに追加").classes("padd8")
+    with ctx.table.add_slot("top-left"):
+        plyr = simple_plyr_player("plyr_music", visible=False, autoplay=True)
     with ctx.table.add_slot("top-right"):
         ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
             "w-80"

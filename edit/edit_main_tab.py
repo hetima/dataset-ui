@@ -2,7 +2,7 @@ from nicegui import ui
 from common.setting import cnfg
 from edit.edit_app_ctx import EditCtx
 from edit.daw_bridge import create_daw_session, create_daw_session_single_track, get_daw_url
-from common.wavesurfer import simple_player
+from common.plyr import simple_plyr_player
 
 
 def tab_main(ctx: EditCtx):
@@ -47,10 +47,10 @@ def tab_main(ctx: EditCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    ws = simple_player("ws_02", visible=False, autoplay=True)
+    plyr = simple_plyr_player("plyr_edit", visible=False, autoplay=True)
     def play_src(path: str):
-        ws.container.set_visibility(True)
-        ws.ws.load(path)
+        plyr.container.set_visibility(True)
+        plyr.plyr.load(path)
 
     with ui.row().classes("w-full gap-4 items-start"):
         with ui.column().classes("flex-1 gap-1"):

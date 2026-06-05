@@ -1,13 +1,11 @@
 from nicegui import ui
 
-from common.wavesurfer import setup_wavesurfer
 from voice.voice_app_ctx import VoiceCtx
 from voice.voice_main_tab import tab_main
 from voice.voice_setting_tab import tab_setting
 from voice.irodori_train_tab import tab_iridori_train
 
 def main_page():
-    setup_wavesurfer()
     ctx = VoiceCtx()
 
     ui.markdown("""# dataset-ui-voice""")

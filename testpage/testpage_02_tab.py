@@ -6,7 +6,7 @@ from testpage.testpage_ctx import TestCtx
 from common.xterm_dialog import XtermDialog
 from music.music_app_ctx import MusicCtx
 from common.setting import cnfg
-from common.wavesurfer import simple_player
+from common.plyr import simple_plyr_player
 
 def tab_02(tctx: TestCtx, ctx: MusicCtx):
 
@@ -54,10 +54,10 @@ def tab_02(tctx: TestCtx, ctx: MusicCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    ws = simple_player("ws_03", visible=False)
+    plyr = simple_plyr_player("plyr_test", visible=False)
     def play_src(path: str):
-        ws.container.set_visibility(True)
-        ws.ws.load(path)
+        plyr.container.set_visibility(True)
+        plyr.plyr.load(path)
 
     ctx.table = ui.table(
         columns=[

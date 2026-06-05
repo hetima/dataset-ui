@@ -4,10 +4,8 @@ from nicegui import ui
 from music.music_app_ctx import MusicCtx
 from music.music_main_tab import tab_main
 from music.music_setting_tab import tab_setting
-from common.wavesurfer import setup_wavesurfer
 
 def main_page():
-    setup_wavesurfer()
     ctx = MusicCtx()
 
     ui.markdown("""# dataset-ui-music""")
