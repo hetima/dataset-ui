@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import shutil
+import signal
 import time
 from pathlib import Path
 
@@ -2304,6 +2305,27 @@ def main() -> None:
             f"{train_cfg.caption_warmup_steps} optimizer steps."
         )
 
+    interrupt_requested = False
+    interrupt_checkpoint_saved = False
+    previous_sigint_handler = signal.getsignal(signal.SIGINT)
+
+    def handle_sigint(signum, frame) -> None:
+        nonlocal interrupt_requested
+        if interrupt_requested:
+            print(
+                "\nSecond Ctrl+C received. Exiting immediately without saving a new checkpoint.",
+                flush=True,
+            )
+            raise KeyboardInterrupt
+        interrupt_requested = True
+        print(
+            "\nCtrl+C received. Checkpoint will be saved after the current optimizer step, "
+            "then training will exit. Press Ctrl+C again to exit immediately without saving.",
+            flush=True,
+        )
+
+    signal.signal(signal.SIGINT, handle_sigint)
+
     try:
         model.train()
         if scheduler is not None and step == 0:
@@ -2664,6 +2686,28 @@ def main() -> None:
                     )
                     last_periodic_save_monotonic = time.monotonic()
 
+                if interrupt_requested:
+                    interrupt_path = _periodic_checkpoint_path(output_dir, step, train_cfg)
+                    if not should_save_periodic:
+                        save_checkpoint(
+                            interrupt_path,
+                            raw_model,
+                            optimizer,
+                            scheduler,
+                            step,
+                            model_cfg,
+                            train_cfg,
+                            base_init=base_init,
+                        )
+                        enforce_periodic_checkpoint_limit(
+                            output_dir=output_dir,
+                            keep_count=periodic_checkpoint_keep,
+                        )
+                    interrupt_checkpoint_saved = True
+                    if is_main_process:
+                        progress.write(f"Interrupted: saved checkpoint {interrupt_path.name}.")
+                    break
+
                 if (
                     valid_loader is not None
                     and train_cfg.valid_every > 0
@@ -2729,8 +2773,12 @@ def main() -> None:
 
                 if step >= train_cfg.max_steps:
                     break
+            if interrupt_requested:
+                break
 
         if (
+            not interrupt_requested
+            and
             valid_loader is not None
             and train_cfg.valid_every > 0
             and step % train_cfg.valid_every != 0
@@ -2793,7 +2841,7 @@ def main() -> None:
                         )
                     )
 
-        if is_main_process:
+        if is_main_process and not interrupt_requested:
             save_checkpoint(
                 _final_checkpoint_path(output_dir, train_cfg),
                 raw_model,
@@ -2805,7 +2853,10 @@ def main() -> None:
                 base_init=base_init,
             )
             progress.write(f"Training finished at step={step}.")
+        elif is_main_process and interrupt_checkpoint_saved:
+            progress.write(f"Training interrupted after saving checkpoint at step={step}.")
     finally:
+        signal.signal(signal.SIGINT, previous_sigint_handler)
         if progress is not None:
             progress.close()
 
