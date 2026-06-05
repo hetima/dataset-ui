@@ -60,12 +60,6 @@ def tab_main(ctx: EditCtx):
                     {
                         "label": "",
                         "field": "path",
-                        "name": "expand",
-                        "style": "width: 30px",
-                    },
-                    {
-                        "label": "",
-                        "field": "path",
                         "name": "play",
                         "style": "width: 30px",
                     },
@@ -80,6 +74,7 @@ def tab_main(ctx: EditCtx):
                 selection="multiple",
                 row_key="path",
             ).classes("h-120 w-full no-shadow brdr q-pa-none")
+            ctx.table.props(':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms))"')
             with ctx.table.add_slot('body-cell-play'):
                 with ctx.table.cell('play'):
                     ui.button(icon="play_circle").props('flat').on(
@@ -87,6 +82,11 @@ def tab_main(ctx: EditCtx):
                         js_handler='() => emit(props.value)',
                         handler=lambda e: play_src(e.args),
                     ).style('padding: 2px 4px;')
+            with ctx.table.add_slot("top-right"):
+                ui.input(placeholder="フィルタ...").bind_value(
+                    ctx.table, "filter"
+                ).classes("w-80").props("rounded outlined dense clearable")
+
         with ui.column().classes("flex-1 gap-1"):
             ui.label("エディットプール").classes("font-bold")
             ctx.pool_table = ui.table(
@@ -109,6 +109,9 @@ def tab_main(ctx: EditCtx):
                 selection="multiple",
                 row_key="path",
             ).classes("h-120 w-full no-shadow brdr q-pa-none")
+            ctx.pool_table.props(
+                ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms))"'
+            )
             with ctx.pool_table.add_slot("body-cell-play"):
                 with ctx.pool_table.cell("play"):
                     ui.button(icon="play_circle").props('flat').on(
@@ -116,5 +119,10 @@ def tab_main(ctx: EditCtx):
                         js_handler='() => emit(props.value)',
                         handler=lambda e: play_src(e.args),
                     ).style('padding: 2px 4px;')
+            with ctx.pool_table.add_slot("top-right"):
+                ui.input(placeholder="フィルタ...").bind_value(
+                    ctx.pool_table, "filter"
+                ).classes("w-80").props("rounded outlined dense clearable")
+
     ctx.load_files(str(cnfg.outputs_dir))
     ctx.load_pool()
