@@ -476,6 +476,9 @@ def tab_main(ctx: VoiceCtx):
         selection="multiple",
         row_key="name",
     ).classes("h-120 w-full no-shadow brdr q-pa-none")
+    ctx.table.props(
+        ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms) || (r.transcript || \'\').includes(terms))"'
+    )
     with ctx.table.add_slot('body-cell-play'):
         with ctx.table.cell('play'):
             ui.button(icon="play_circle").props('flat').on(
@@ -504,3 +507,7 @@ def tab_main(ctx: VoiceCtx):
                                 handler=lambda e: cnfg.add_edit_file_path(e.args),
                             ):
                                 ui.label("エディットプールに追加").classes("padd8")
+    with ctx.table.add_slot("top-right"):
+        ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
+            "w-80"
+        ).props("rounded outlined dense clearable")
