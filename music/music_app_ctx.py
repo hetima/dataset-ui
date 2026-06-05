@@ -3,6 +3,7 @@ from typing import Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
+from nicegui.functions.refreshable import refreshable
 
 from common.file_util import audio_files_in_folder, Mtdt
 from common.setting import cnfg
@@ -23,6 +24,8 @@ class MusicCtx:
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.client = ui.context.client
+        self.pickup = None
+        self.info_panel: refreshable
 
     def notify(self, text: str, type = None):
         with self.client:
@@ -30,6 +33,9 @@ class MusicCtx:
 
     def load_files(self, path: str | None) -> None:
         folder_path = path
+        self.pickup = None
+        if hasattr(self, "info_panel"):
+            self.info_panel.refresh()
         if not folder_path:
             self.notify("フォルダパスを入力してください", type="warning")
             return
@@ -69,6 +75,14 @@ class MusicCtx:
         if not path:
             return None
         return next((d for d in self.files if d.path == path), None)
+
+    def update_file(self, data: dict) -> None:
+        file = self.music_file_for_path(data.get("path", ""))
+        if file is None:
+            return
+        for key, val in data.items():
+            file[key] = val
+        self.table.update()
 
     def analyzed(self, result_files: list) -> None:
         for music_file in self.files:

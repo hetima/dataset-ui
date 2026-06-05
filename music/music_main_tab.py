@@ -399,113 +399,129 @@ def tab_main(ctx: MusicCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    def play_src(path: str):
-        plyr.container.set_visibility(True)
-        plyr.plyr.load(path)
+    def table_view():
+        def play_src(path: str):
+            plyr.container.set_visibility(True)
+            plyr.plyr.load(path)
 
-    ctx.table = ui.table(
-        columns=[
-            {"label": "", "field": "path", "name": "expand", "style": "width: 30px"},
-            {"label": "", "field": "path", "name": "play", "style": "width: 30px"},
-            {
-                "label": "Name",
-                "field": "name",
-                "name": "name",
-                "align": "left",
-            },
-            {
-                "name": "title",
-                "field": "title",
-                "label": "title",
-                "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
-                "align": "left",
-            },
-            {
-                "name": "artist",
-                "field": "artist",
-                "label": "artist",
-                "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
-                "align": "left",
-            },
-            {
-                "label": "Lang",
-                "field": "language",
-                "editable": True,
-                "style": "width: 80px",
-                "name": "language",
-                "align": "left",
-            },
-            {
-                "label": "BPM",
-                "field": "bpm",
-                "editable": True,
-                "name": "bpm",
-                "style": "width: 80px",
-                "align": "left",
-            },
-            {
-                "label": "KEY",
-                "field": "keyscale",
-                "editable": True,
-                "name": "keyscale",
-                "style": "width: 80px",
-                "align": "left",
-            },
-            {
-                "label": "Timesig",
-                "field": "timesignature",
-                "editable": True,
-                "name": "timesignature",
-                "style": "width: 80px",
-                "align": "left",
-            },
-            {
-                "label": "Duration",
-                "field": "duration",
-                "editable": True,
-                "name": "duration",
-                "style": "width: 80px",
-                "align": "left",
-            },
-        ],
-        rows=[],
-        selection="multiple",
-        row_key="name",
-    ).classes("h-120 w-full no-shadow brdr q-pa-none")
-    ctx.table.props(
-        ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms) || (r.transcript || \'\').includes(terms))"'
-    )
-    with ctx.table.add_slot('body-cell-play'):
-        with ctx.table.cell('play'):
-            ui.button(icon="play_circle").props('flat').on(
-                'click',
-                js_handler='() => emit(props.value)',
-                handler=lambda e: play_src(e.args),
-            ).style('padding: 2px 4px;')
-    with ctx.table.add_slot("body-cell-expand"):
-        with ctx.table.cell("expand"):
-            with ui.row().classes("items-center no-wrap gap-0"):
-                # ui.button().props(
-                #     "flat"
-                #     " :icon=\"props.expand ? 'expand_less' : 'expand_more'\""
-                #     " :style=\"props.row.is_expandable ? 'padding: 2px 4px' : 'padding: 2px 4px; display: none'\""
-                # ).on(
-                #     "click",
-                #     js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
-                #     handler=lambda e: print(e.args),
-                # )
-                with ui.button(icon="more_horiz").props('flat').style('padding: 2px 4px;'):
-                    with ui.element("q-menu").props("auto-close"):
-                        with ui.element("q-list"):
-                            with ui.element("q-item").props('clickable').on(
-                                "click",
-                                js_handler="() => emit(props.row.path)",
-                                handler=lambda e: cnfg.add_edit_file_path(e.args),
-                            ):
-                                ui.label("エディットプールに追加").classes("padd8")
-    with ctx.table.add_slot("top-left"):
-        plyr = simple_plyr_player("plyr_music", visible=False, autoplay=True)
-    with ctx.table.add_slot("top-right"):
-        ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
-            "w-80"
-        ).props("rounded outlined dense clearable")
+        ctx.table = ui.table(
+            columns=[
+                {"label": "", "field": "path", "name": "expand", "style": "width: 30px"},
+                {"label": "", "field": "path", "name": "play", "style": "width: 30px"},
+                {
+                    "label": "Name",
+                    "field": "name",
+                    "name": "name",
+                    "align": "left",
+                },
+                {
+                    "name": "title",
+                    "field": "title",
+                    "label": "title",
+                    "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
+                    "align": "left",
+                },
+                {
+                    "name": "artist",
+                    "field": "artist",
+                    "label": "artist",
+                    "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:160px",
+                    "align": "left",
+                },
+                {
+                    "label": "Lang",
+                    "field": "language",
+                    "editable": True,
+                    "style": "width: 80px",
+                    "name": "language",
+                    "align": "left",
+                },
+            ],
+            rows=[],
+            selection="multiple",
+            row_key="name",
+        ).classes("no-shadow brdr q-pa-none h-full w-full")
+        ctx.table.props(
+            ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms) || (r.transcript || \'\').includes(terms))"'
+        )
+
+        with ctx.table.add_slot("body-cell-play"):
+            with ctx.table.cell("play"):
+                ui.button(icon="play_circle").props("flat").on(
+                    "click",
+                    js_handler="() => emit(props.value)",
+                    handler=lambda e: play_src(e.args),
+                ).style("padding: 2px 4px;")
+        with ctx.table.add_slot("body-cell-expand"):
+            with ctx.table.cell("expand"):
+                with ui.row().classes("items-center no-wrap gap-0"):
+                    # ui.button().props(
+                    #     "flat"
+                    #     " :icon=\"props.expand ? 'expand_less' : 'expand_more'\""
+                    #     " :style=\"props.row.is_expandable ? 'padding: 2px 4px' : 'padding: 2px 4px; display: none'\""
+                    # ).on(
+                    #     "click",
+                    #     js_handler="() => { props.expand = !props.expand; emit({ value: props.value, expand: props.expand }) }",
+                    #     handler=lambda e: print(e.args),
+                    # )
+                    with ui.button(icon="more_horiz").props("flat").style(
+                        "padding: 2px 4px;"
+                    ):
+                        with ui.element("q-menu").props("auto-close"):
+                            with ui.element("q-list"):
+                                with ui.element("q-item").props("clickable").on(
+                                    "click",
+                                    js_handler="() => emit(props.row.path)",
+                                    handler=lambda e: cnfg.add_edit_file_path(e.args),
+                                ):
+                                    ui.label("エディットプールに追加").classes("padd8")
+        with ctx.table.add_slot("top-left"):
+            plyr = simple_plyr_player("plyr_music", visible=False, autoplay=True)
+        with ctx.table.add_slot("top-right"):
+            ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
+                "w-80"
+            ).props("rounded outlined dense clearable")
+
+    @ui.refreshable
+    def info_panel():
+        with ui.card().classes("h-full w-full gap-4").props("flat"):
+            ui.markdown("### ファイル情報")
+            if ctx.pickup is None:
+                ui.label("ファイルを選択してください").classes("text-grey")
+                return
+            with ui.column().classes("w-full gap-0"):
+                ui.item_label("name:").props("caption")
+                ui.item_label(ctx.pickup.get("name", ""))
+                ui.item_label("path:").props("caption")
+                ui.item_label(ctx.pickup.get("path", ""))
+            with ui.row().classes("items-center gap-2"):
+                sel_lang = ui.select(
+                    options=LANGUAGE_LIST,
+                    with_input=True,
+                    new_value_mode="add",
+                    label="language",
+                    value=ctx.pickup.get("language") or None,
+                ).classes("w-20").props("outlined dense")
+                inp_caption = ui.input(
+                    placeholder="captionを入力",
+                    label="caption",
+                    value=ctx.pickup.get("caption", ""),
+                ).classes("w-70").props("outlined dense")
+
+            def update_pickup():
+                p = cast(dict, ctx.pickup)
+                p["language"] = sel_lang.value
+                p["caption"] = inp_caption.value
+                ctx.update_file(p)
+
+            with ui.row().classes("items-center gap-2 justify-end"):
+                ui.button("更新", on_click=update_pickup)
+
+    # with ui.row().classes("items-start gap-4 flex-nowrap").style("height: 70vh"):
+    with ui.splitter(value=60).classes("w-full").props('separator-class="q-mx-md"').style("height: 70vh") as segment_splitter:
+        with segment_splitter.before:
+            table_view()
+        with segment_splitter.after:
+            info_panel()
+    ctx.info_panel = info_panel
+    ctx.table.on("rowClick", lambda e: (setattr(ctx, "pickup", e.args[1]), ctx.info_panel.refresh()))

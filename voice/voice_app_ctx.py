@@ -3,6 +3,7 @@ from typing import Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
+from nicegui.functions.refreshable import refreshable
 
 from common.file_util import audio_files_in_folder, Mtdt
 from common.setting import cnfg
@@ -15,6 +16,7 @@ class VoiceCtx:
         self.folder = None
         self.files = []
         self.table: Table
+        self.info_panel: refreshable
         self.save_json: bool = False
         self.save_txt: bool = True
         self.save_mtdt: bool = True
@@ -22,6 +24,7 @@ class VoiceCtx:
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.client = ui.context.client
+        self.pickup = None
 
     def notify(self, text: str, type = None):
         with self.client:
@@ -29,6 +32,9 @@ class VoiceCtx:
 
     def load_files(self, path: str | None) -> None:
         folder_path = path
+        self.pickup = None
+        if hasattr(self, "info_panel"):
+            self.info_panel.refresh()
         if not folder_path:
             self.notify("フォルダパスを入力してください", type="warning")
             return
@@ -68,6 +74,14 @@ class VoiceCtx:
         if not path:
             return None
         return next((d for d in self.files if d.path == path), None)
+
+    def update_file(self, data: dict) -> None:
+        file = self.voice_file_for_path(data.get("path", ""))
+        if file is None:
+            return
+        for key, val in data.items():
+            file[key] = val
+        self.table.update()
 
     def save_metadata(self) -> None:
         files = self.files
