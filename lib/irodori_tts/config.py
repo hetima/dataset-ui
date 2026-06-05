@@ -148,8 +148,7 @@ class TrainConfig:
     max_steps: int = 200000
     log_every: int = 100
     save_every: int = 1000
-    save_by_time: bool = False
-    save_interval_minutes: int = 30
+    save_interval_minutes: int = 0
     checkpoint_best_n: int = 0
     valid_ratio: float = 0.0
     valid_every: int = 0

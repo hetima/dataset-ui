@@ -1484,16 +1484,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--save-every", type=int, default=1000)
     parser.add_argument(
-        "--save-by-time",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="Save periodic checkpoints by elapsed time instead of step interval.",
-    )
-    parser.add_argument(
         "--save-interval-minutes",
         type=int,
         default=None,
-        help="Elapsed minutes between periodic checkpoints when save_by_time is enabled.",
+        help="Elapsed minutes between periodic checkpoints. 0 uses save_every step interval.",
     )
     parser.add_argument(
         "--checkpoint-best-n",
@@ -1643,8 +1637,6 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, log_every=args.log_every)
     if cli_provided(raw_argv, "--save-every"):
         train_cfg = replace(train_cfg, save_every=args.save_every)
-    if args.save_by_time is not None:
-        train_cfg = replace(train_cfg, save_by_time=bool(args.save_by_time))
     if cli_provided(raw_argv, "--save-interval-minutes"):
         train_cfg = replace(train_cfg, save_interval_minutes=args.save_interval_minutes)
     if cli_provided(raw_argv, "--checkpoint-best-n"):
@@ -1910,10 +1902,9 @@ def main() -> None:
         raise ValueError(f"caption_warmup_steps must be >= 0, got {train_cfg.caption_warmup_steps}")
     if train_cfg.save_every <= 0:
         raise ValueError(f"save_every must be > 0, got {train_cfg.save_every}")
-    if train_cfg.save_by_time and train_cfg.save_interval_minutes <= 0:
+    if train_cfg.save_interval_minutes < 0:
         raise ValueError(
-            "save_interval_minutes must be > 0 when save_by_time=True, "
-            f"got {train_cfg.save_interval_minutes}"
+            f"save_interval_minutes must be >= 0, got {train_cfg.save_interval_minutes}"
         )
     if train_cfg.dataloader_prefetch_factor <= 0:
         raise ValueError(
@@ -2098,10 +2089,11 @@ def main() -> None:
     if checkpoint_retention_enabled:
         periodic_checkpoint_keep = 1 if has_validation else int(train_cfg.checkpoint_best_n) + 1
     best_val_checkpoints: list[tuple[float, int, Path]] = []
+    save_by_time = train_cfg.save_interval_minutes > 0
     save_interval_seconds = float(train_cfg.save_interval_minutes) * 60.0
     last_periodic_save_monotonic = time.monotonic()
     if is_main_process:
-        if train_cfg.save_by_time:
+        if save_by_time:
             print(
                 "Periodic checkpoint saving: "
                 f"time-based every {train_cfg.save_interval_minutes} minute(s)."
@@ -2663,7 +2655,7 @@ def main() -> None:
 
                 should_save_periodic = False
                 if is_main_process:
-                    if train_cfg.save_by_time:
+                    if save_by_time:
                         should_save_periodic = (
                             time.monotonic() - last_periodic_save_monotonic
                         ) >= save_interval_seconds
