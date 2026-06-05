@@ -1443,6 +1443,11 @@ def parse_args() -> argparse.Namespace:
             "with fresh optimizer / scheduler state."
         ),
     )
+    parser.add_argument(
+        "--init-checkpoint-dir",
+        default=None,
+        help="Use the latest periodic checkpoint under this directory as --init-checkpoint.",
+    )
     parser.add_argument("--max-steps", type=int, default=80000)
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument(
@@ -1664,6 +1669,17 @@ def resolve_training_config(
         train_cfg = replace(train_cfg, lora_modules_to_save=args.lora_modules_to_save)
     if cli_provided(raw_argv, "--seed"):
         train_cfg = replace(train_cfg, seed=args.seed)
+
+    if args.init_checkpoint_dir is not None:
+        init_checkpoint_dir = Path(args.init_checkpoint_dir).expanduser()
+        init_checkpoint_path = latest_periodic_checkpoint(init_checkpoint_dir)
+        if init_checkpoint_path is None:
+            raise ValueError(
+                f"--init-checkpoint-dir has no periodic checkpoint: {init_checkpoint_dir}"
+            )
+        args.init_checkpoint = str(init_checkpoint_path)
+        if is_main_process:
+            print(f"Init checkpoint from directory: {init_checkpoint_path}")
 
     output_dir = Path(train_cfg.output_dir).expanduser()
     resume_path = Path(args.resume).expanduser() if args.resume is not None else None

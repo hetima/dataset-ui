@@ -84,7 +84,7 @@ train:
   duration_huber_delta: 0.1
 
   log_every: 20
-  save_every: 250
+  save_every: 500
   checkpoint_best_n: 0
   valid_ratio: 0.0
   valid_every: 0
