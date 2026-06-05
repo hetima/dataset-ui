@@ -110,7 +110,6 @@ def tab_setting(ctx: VoiceCtx):
                 ui.input(
                     label="irodori-tts model",
                     placeholder="モデルを選択、または入力",
-                    on_change=lambda e: setattr(e.sender, "value", e.value),
                 )
                 .props('style="min-width: 300px" outlined')
                 .bind_value(cnfg.voice, "irodori_tts_model")

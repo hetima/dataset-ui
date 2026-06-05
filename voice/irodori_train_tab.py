@@ -29,7 +29,6 @@ def tab_iridori_train(ctx: VoiceCtx):
                     value="",
                     label="dataset paths",
                     placeholder="フォルダのパスを入力。複数のフォルダに対応しています。改行で区切ってください",
-                    on_change=lambda e: setattr(e.sender, "value", e.value),
                 )
                 .props('autogrow style="min-width: 500px" outlined clearable')
                 .classes("w-160")
@@ -108,7 +107,7 @@ def tab_iridori_train(ctx: VoiceCtx):
 
     PRIORITY_MODELS = ["Irodori-TTS-500M-v3/model.safetensors", "Irodori-TTS-600M-v3-VoiceDesign/model.safetensors"]
 
-    def list_safetensors() -> list[str]:
+    def list_safetensors(official_only: bool = True) -> list[str]:
         """models_dir/irodori-tts 以下の .safetensors をサブパス形式でリストアップ。優先モデルを先頭に並べる。"""
         base = cnfg.models_dir / "irodori-tts"
         if not base.exists():
@@ -118,6 +117,8 @@ def tab_iridori_train(ctx: VoiceCtx):
             for p in base.rglob("*.safetensors")
             if not p.name.endswith(".speaker.safetensors")
         )
+        if official_only:
+            return [p for p in PRIORITY_MODELS if p in all_paths]
         priority = [p for p in PRIORITY_MODELS if p in all_paths]
         rest = [p for p in all_paths if p not in PRIORITY_MODELS]
         return priority + rest
@@ -139,14 +140,11 @@ def tab_iridori_train(ctx: VoiceCtx):
             "とりあえず実行コマンドをコピーできるようにしていますので、PowerShellやcmdで実行してください。venvのpython.exeを指定してるのでアクティベートしなくても実行できます。"
         ).classes("infotxt")
         with ui.row().classes("items-center gap-4"):
-            model_input = (
-                ui.input(
-                    label="ベースモデル",
-                    placeholder="モデルを選択、または入力",
-                    on_change=lambda e: setattr(e.sender, "value", e.value),
-                )
-                .props('style="min-width: 400px" outlined')
-            )
+            model_input = ui.input(
+                label="ベースモデル",
+                placeholder="モデルを選択、または入力",
+                value="Irodori-TTS-500M-v3/model.safetensors",
+            ).props('style="min-width: 400px" outlined')
             with model_input.add_slot("append"):
                 with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
                     train_model_menu = ui.menu()
@@ -155,9 +153,8 @@ def tab_iridori_train(ctx: VoiceCtx):
                 ui.input(
                     label="トレーニングデータ",
                     placeholder="データセットを選択、または入力",
-                    on_change=lambda e: setattr(e.sender, "value", e.value),
                 )
-                .props('style="min-width: 250px" outlined')
+                .props('style="width: 250px" outlined')
             )
             config_select = ui.select(
                 label="トレーニングの種類",
@@ -171,6 +168,43 @@ def tab_iridori_train(ctx: VoiceCtx):
             with dataset_input.add_slot("append"):
                 with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
                     train_dataset_menu = ui.menu()
+        with ui.row().classes("items-center gap-4"):
+            auto_resume_check = ui.checkbox("--auto-resume").classes("ml-0")
+            auto_resume_check.tooltip(
+                "前回のチェックポイントがあれば自動で再開します。Speaker Inversionでは使えません"
+            )
+            auto_resume_check.set_enabled(False)
+            config_select.on_value_change(lambda e: auto_resume_check.set_enabled(e.value != "train_500m_v3_speaker_inversion.yaml"))
+
+            max_steps_input = ui.input(label="--max-steps", placeholder="").props(
+                "outlined style='width: 120px;'"
+            ).tooltip("空白にすればデフォルト値を使用します")
+            batch_size_input = (
+                ui.input(label="--batch-size", placeholder="")
+                .props("outlined style='width: 120px;'")
+                .tooltip("空白にすればデフォルト値を使用します")
+            )
+
+            config_save_method = ui.select(
+                label="保存間隔",
+                options={
+                    "default": "指定なし（1000ステップ）",
+                    "step": "ステップ数",
+                    "min": "時間（分）",
+                },
+                value="default",
+            ).props("outlined style='width: 220px;'")
+            config_save_interval = (
+                ui.input(label="ステップ数", placeholder="")
+                .props("outlined style='width: 120px;'")
+                .tooltip("左のセレクトに従いステップ数か時間間隔（単位：分）を入力")
+            )
+            config_save_method.on_value_change(
+                lambda e: config_save_interval.set_label(
+                    config_save_method.options[e.value]
+                )
+            )
+
         with ui.row().classes("items-center gap-4 mt-2"):
             ui.button("トレーニングコマンドをコピー", on_click=copy_train_command)
 
@@ -221,6 +255,19 @@ def tab_iridori_train(ctx: VoiceCtx):
         if not config:
             ui.notify("トレーニングの種類を選択してください", type="warning")
             return None
+        save_method = config_save_method.value
+        save_interval = config_save_interval.value
+        save_method_str = ""
+        if not save_method or save_method == "default":
+            save_method_str = ""
+        elif not save_interval:
+            ui.notify("保存間隔を入力してください" + save_method, type="warning")
+            return None
+        if save_method == "step" and save_interval:
+            save_method_str = " --save-every " + save_interval
+        elif save_method == "min" and save_interval:
+            save_method_str = " --save-interval-minutes " + save_interval
+
         voice_dir = Path(__file__).parent.resolve()
         repo_root = voice_dir.parent
 
@@ -229,10 +276,14 @@ def tab_iridori_train(ctx: VoiceCtx):
         manifest = cnfg.train_dir / "irodori-tts" / dataset / "train_manifest.jsonl"
         output_dir = cnfg.models_dir / "irodori-tts" / dataset
         init_ckpt = cnfg.models_dir / "irodori-tts" / model
+        auto_resume = " --auto-resume" if auto_resume_check.value else ""
+        max_steps = " --max-steps " + max_steps_input.value.strip() if max_steps_input.value else ""
+        batch_size = " --batch-size " + batch_size_input.value.strip() if batch_size_input.value else ""
         return (
             f'{sys.executable} "{train_script}"'
             f' --manifest "{manifest}"'
             f' --output-dir "{output_dir}"'
             f' --config "{config_yaml}"'
             f' --init-checkpoint "{init_ckpt}"'
+            f"{auto_resume}{max_steps}{batch_size}{save_method_str}"
         )

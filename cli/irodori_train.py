@@ -1443,8 +1443,8 @@ def parse_args() -> argparse.Namespace:
             "with fresh optimizer / scheduler state."
         ),
     )
-    parser.add_argument("--max-steps", type=int, default=200000)
-    parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--max-steps", type=int, default=80000)
+    parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument(
         "--gradient-accumulation-steps",
         type=int,

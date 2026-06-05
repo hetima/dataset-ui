@@ -235,7 +235,6 @@ def tab_main(ctx: VoiceCtx):
                 ui.input(
                     label="transcriber model",
                     placeholder="モデルを選択、または入力",
-                    on_change=lambda e: setattr(e.sender, "value", e.value),
                 )
                 .props('style="min-width: 300px" outlined')
                 .bind_value(cnfg.voice, "asr_model")
