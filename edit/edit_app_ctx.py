@@ -44,13 +44,18 @@ class EditCtx:
             self.notify(f"フォルダが見つかりません: {folder_path}", type="negative")
             return
 
-        cnfg.voice.last_dataset_path = folder_path
-        cnfg.save()
-
         self.files = []
+        # 直下のファイル
         for file in audio_files_in_folder(folder_path):
-            editfile = EditFile.from_audio_file(file)
-            self.files.append(editfile)
+            self.files.append(EditFile.from_audio_file(file))
+        # サブフォルダ（1階層）のファイル
+        for subdir in sorted(folder.iterdir()):
+            if not subdir.is_dir():
+                continue
+            for file in audio_files_in_folder(subdir):
+                editfile = EditFile.from_audio_file(file)
+                editfile.name = f"{subdir.name}/{file.name}"
+                self.files.append(editfile)
 
         self.table.rows = self.files
         self.table.selected = []
