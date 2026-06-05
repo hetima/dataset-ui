@@ -71,7 +71,7 @@ from lib.irodori_tts.tokenizer import PretrainedTextTokenizer
 
 TRAIN_MODES = {"rf", "duration_only"}
 CHECKPOINT_STEP_RE = re.compile(
-    rf"^checkpoint_(\d+)(?:\.pt|{re.escape(SPEAKER_INVERSION_SAFETENSORS_SUFFIX)})?$"
+    r"^checkpoint_(\d+)(?:\.pt)?$"
 )
 CHECKPOINT_BEST_VAL_LOSS_RE = re.compile(
     rf"^checkpoint_best_val_loss_(\d+)_(-?\d+(?:\.\d+)?)"

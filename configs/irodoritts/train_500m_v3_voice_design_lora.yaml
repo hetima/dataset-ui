@@ -41,9 +41,9 @@ model:
 
 train:
   train_mode: rf
-  batch_size: 80
+  batch_size: 8
   gradient_accumulation_steps: 1
-  num_workers: 16
+  num_workers: 2
   dataloader_persistent_workers: true
   dataloader_prefetch_factor: 4
   allow_tf32: true

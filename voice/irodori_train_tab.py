@@ -9,6 +9,11 @@ IRODORI_SUB_DIR = "irodori-tts"
 
 def tab_iridori_train(ctx: VoiceCtx):
 
+    ui.markdown(
+        f"**トレーニングデータ保存パス** → `{cnfg.train_dir.as_posix()}/irodori-tts/プロジェクト名`<br>"
+        f"**トレーニング結果保存パス** → `{cnfg.models_dir.as_posix()}/irodori-tts/プロジェクト名`"
+    )
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # トレーニングデータ作成
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -154,11 +159,20 @@ def tab_iridori_train(ctx: VoiceCtx):
                 )
                 .props('style="min-width: 250px" outlined')
             )
+            config_select = ui.select(
+                label="トレーニングの種類",
+                options={
+                    "train_500m_v3_speaker_inversion.yaml": "Speaker Inversion",
+                    "train_500m_v3_lora.yaml": "Lora",
+                },
+                value="train_500m_v3_speaker_inversion.yaml",
+            ).props("outlined style='width: 220px;'")
+
             with dataset_input.add_slot("append"):
                 with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
                     train_dataset_menu = ui.menu()
-            with ui.row().classes("items-center gap-4 mt-2"):
-                ui.button("トレーニングコマンドをコピー", on_click=copy_train_command)
+        with ui.row().classes("items-center gap-4 mt-2"):
+            ui.button("トレーニングコマンドをコピー", on_click=copy_train_command)
 
     def reload_train_model_menu():
         models = list_safetensors()
@@ -197,16 +211,21 @@ def tab_iridori_train(ctx: VoiceCtx):
     def build_train_command() -> str | None:
         dataset = (dataset_input.value or "").strip()
         model = (model_input.value or "").strip()
+        config = config_select.value or ""
         if not dataset:
             ui.notify("トレーニングデータを選択してください", type="warning")
             return None
         if not model:
             ui.notify("ベースモデルを選択してください", type="warning")
             return None
+        if not config:
+            ui.notify("トレーニングの種類を選択してください", type="warning")
+            return None
         voice_dir = Path(__file__).parent.resolve()
         repo_root = voice_dir.parent
+
         train_script = repo_root / "cli" / "irodori_train.py"
-        config_yaml = repo_root / "configs" / "irodoritts" / "train_500m_v3_speaker_inversion.yaml"
+        config_yaml = repo_root / "configs" / "irodoritts" / config
         manifest = cnfg.train_dir / "irodori-tts" / dataset / "train_manifest.jsonl"
         output_dir = cnfg.models_dir / "irodori-tts" / dataset
         init_ckpt = cnfg.models_dir / "irodori-tts" / model
