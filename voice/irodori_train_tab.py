@@ -34,16 +34,17 @@ def tab_iridori_train(ctx: VoiceCtx):
                     placeholder="フォルダのパスを入力。複数のフォルダに対応しています。改行で区切ってください",
                 )
                 .props('autogrow style="min-width: 500px" outlined dense clearable')
-                .classes("w-160")
+                .classes("w-120")
             )
             validate_dataset_btn = ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value)) # type: ignore
+            ui.space()
             project_name = ui.input(
                 label="プロジェクト名", placeholder="my_lora", value=""
-            ).props("outlined dense style='width: 200px;'")
+            ).props("outlined dense style='width: 120px;'")
             max_seconds = ui.input(
                 label="最大音長", placeholder="秒数", value="0"
             ).props("outlined dense style='width: 80px;'")
-            create_dataset_btn =ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
+            create_dataset_btn =ui.button("トレーニングデータ生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
 
         xterm = XtermView(title="ターミナル", rows=10).classes("w-full")
         validate_dataset_btn.bind_enabled(xterm, "is_idle")

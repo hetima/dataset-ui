@@ -123,6 +123,7 @@ class Setting:
     outputs_dir: Path = OUTPUTS_DIR
     train_dir: Path = TRAIN_DIR
     output_prefix: str = ""
+    hf_token: str = ""
     edit_file_paths: list[str] = dataclasses.field(default_factory=list)
 
     music: MusicSubSetting = dataclasses.field(default_factory=MusicSubSetting)

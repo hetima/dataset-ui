@@ -101,67 +101,37 @@ def tab_setting(ctx: VoiceCtx):
             "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
             "ダウンロードが途中で止まる場合は、hf-xetをアンインストールすると改善する場合があります（pip uninstall hf-xet）。それでも駄目な場合は手動でダウンロードして配置してください。「モデルフォルダ/irodori-tts/Irodori-TTS-500M-v3/model.safetensors」と配置してください。"
         ).classes("infotxt")
-        with ui.row().classes("items-center gap-4"):
-            opt = irodori_tts_models()
-            val = cnfg.voice.irodori_tts_model
-            if not val in opt:
-                val = opt[0] if len(opt) > 0 else ""
-            irodoti_tts_model_input = (
-                ui.input(
-                    label="irodori-tts model",
-                    placeholder="モデルを選択、または入力",
-                )
-                .props('style="min-width: 300px" outlined')
-                .bind_value(cnfg.voice, "irodori_tts_model")
-            )
-            with irodoti_tts_model_input.add_slot("append"):
-                with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
-                    ace_models_menu = ui.menu()
+        HF_IRODORI_MODELS = [
+            "Aratako/Irodori-TTS-500M-v3",
+            "Aratako/Irodori-TTS-600M-v3-VoiceDesign",
+        ]
+
+        irodori_tts_list = ui.list().props('bordered separator')
 
     def reload_irodori_tts_model():
-        def hf_menu_item(models: list, repo_id: str):
-            rid = repo_id.split("/")[-1]
-            if rid not in models:
-                with ui.item(
-                    on_click=lambda: [
-                        setattr(irodoti_tts_model_input, "value", repo_id),
-                        ace_models_menu.close(),
-                    ]
-                ).classes("padd8 items-center"):
-                    ui.item_section(repo_id)
-                    ui.button(
-                        "ダウンロード",
-                        on_click=lambda: irodori_tts_download(repo_id),
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    repo_id,
-                    lambda: setattr(irodoti_tts_model_input, "value", repo_id),
-                ).classes("padd8")
-
         models = irodori_tts_models()
-        ace_models_menu.clear()
-        local_added = False
-        with ace_models_menu:
-            for model in models:
-                ui.menu_item(
-                    model, lambda m=model: setattr(irodoti_tts_model_input, "value", m)
-                ).classes("padd8")
-                local_added = True
-            if local_added:
-                ui.separator()
-            ui.menu_item("from huggingface").classes("padd8").enabled = False
-            # ACE-Step/acestep-transcriber
-            hf_menu_item(models, "Aratako/Irodori-TTS-500M-v3")
-            hf_menu_item(models, "Aratako/Irodori-TTS-600M-v3-VoiceDesign")
-            ui.separator()
-            ui.menu_item("メニューを更新", lambda: reload_irodori_tts_model()).classes(
-                "padd8"
-            )
+
+        # リストを更新
+        irodori_tts_list.clear()
+        with irodori_tts_list:
+            for repo_id in HF_IRODORI_MODELS:
+                rid = repo_id.split("/")[-1]
+                downloaded = rid in models
+                with ui.item().classes("padd8"):
+                    with ui.item_section():
+                        ui.item_label(repo_id)
+                    with ui.item_section().props("side"):
+                        if downloaded:
+                            ui.label("ダウンロード済み").classes("text-positive text-caption")
+                        else:
+                            ui.button(
+                                "ダウンロード",
+                                on_click=lambda _, r=repo_id: irodori_tts_download(r),
+                            ).props("flat dense color=primary")
 
     reload_irodori_tts_model()
+
+    
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # dataset_dirs

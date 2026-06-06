@@ -1,8 +1,10 @@
 import json
+import os
 import subprocess
 from typing import Any, Callable
 from nicegui import ui, background_tasks, helpers
 import asyncio
+from common.setting import cnfg
 
 INITIAL_RESULT_START = "[[[initial_result_start]]]"
 INITIAL_RESULT_END = "[[[initial_result_end]]]"
@@ -49,6 +51,7 @@ class XtermDialog(ui.dialog):
         title: str = "",
         cd: str = ".",
         input_json: Any = None,
+        env: dict[str, str] | None = None,
         initial_callback: Callable[[int], None] | None = None,
         part_callback: Callable[[dict], None] | None = None,
         finish_callback: Callable[[bool], None] | None = None,
@@ -61,6 +64,7 @@ class XtermDialog(ui.dialog):
         self._cancelled = False
         self.cd = cd
         self._input_json = input_json
+        self._env = env
         self._initial_callback = initial_callback
         self._part_callback = part_callback
         self._finish_callback = finish_callback
@@ -106,12 +110,19 @@ class XtermDialog(ui.dialog):
 
         try:
             stdin_data = json.dumps(self._input_json).encode() if self._input_json is not None else None
+            extra_env: dict[str, str] = {}
+            if cnfg.hf_token:
+                extra_env["HF_TOKEN"] = cnfg.hf_token
+            if self._env:
+                extra_env.update(self._env)
+            env = {**os.environ, **extra_env} if extra_env else None
             self._process = subprocess.Popen(
                 self.args,
                 cwd=self.cd,
                 stdin=subprocess.PIPE if stdin_data is not None else None,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env=env,
             )
             if stdin_data is not None:
                 await asyncio.to_thread(self._process.stdin.write, stdin_data)  # type: ignore[union-attr]

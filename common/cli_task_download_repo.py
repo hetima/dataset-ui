@@ -52,8 +52,13 @@ def hf_download(
 ) -> None:
     """HuggingFace からファイルをダウンロードする。"""
     from huggingface_hub import snapshot_download
-
-    snapshot_download(repo_id=repo_id, local_dir=str(output_dir))
+    
+    token = os.environ.get("HF_TOKEN", "")
+    if not token:
+        token = False
+    else:
+        print("HF_TOKEN detected", flush=True)
+    snapshot_download(repo_id=repo_id, local_dir=str(output_dir), token=token)
 
 
 def main():

@@ -121,3 +121,29 @@ def tab_setting():
                 "保存",
                 on_click=lambda: set_train_dir(train_path_input.value or ""),
             )
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # HuggingFace Token
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with (
+        ui.expansion("HuggingFace Token", value=True)
+        .classes("rounded-borders brdr overflow-hidden w-full")
+        .props('header-class="bg-grey-2 text-black"')
+    ):
+        ui.label("ゲートモデルのダウンロードに必要な場合に設定してください。設定するとダウンロード処理に HF_TOKEN として渡されます")
+        with ui.row().classes("items-center gap-4").classes("w-full"):
+            hf_token_input = ui.input(
+                value=cnfg.hf_token,
+                label="HuggingFace token",
+                placeholder="hf_...",
+                password=True,
+                password_toggle_button=True,
+            ).props('style="min-width: 400px" outlined dense')
+            ui.button(
+                "保存",
+                on_click=lambda: [
+                    setattr(cnfg, "hf_token", hf_token_input.value),
+                    cnfg.save(),
+                    ui.notify("HuggingFace Token を保存しました"),
+                ],
+            )
