@@ -223,6 +223,43 @@ def pad_to_length(ch: AudioSegment, target_ms: int):
 ########################################
 # メイン処理: 1ファイル単位
 ########################################
+def split_one_file(
+    path_str: str, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100
+) -> list[AudioSegment]:
+    """process_one_file と同じ分割処理を行い、ファイルに書き出さず AudioSegment のリストを返す。"""
+    path = Path(path_str)
+    audio = AudioSegment.from_file(path)
+
+    phrases = split_into_phrases(audio, min_silence_len, silence_thresh)
+
+    splitted = []
+    for ph in phrases:
+        if len(ph) > max_sec * 1000:
+            sublist = split_by_low_volume(ph, max_sec, fade_ms)
+            splitted.extend(sublist)
+        else:
+            splitted.append(ph)
+
+    final_chunks = merge_chunks(
+        splitted,
+        min_sec=min_sec,
+        max_sec=max_sec,
+        ideal_pad_sec=4,
+        fade_ms=fade_ms,
+        gap_ms=gap_ms,
+    )
+
+    # max_sec を超えるチャンクを等間隔で強制分割
+    max_ms = max_sec * 1000
+    enforced = []
+    for ch in final_chunks:
+        if len(ch) > max_ms:
+            enforced.extend(_split_chunk_evenly(ch, max_ms))
+        else:
+            enforced.append(ch)
+    return enforced
+
+
 def process_one_file(
     path_str: str, output_dir_str: str | None = None, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100, output_format="wav"
 ) -> list[str]:

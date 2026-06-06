@@ -1,5 +1,5 @@
 """
-Qwen3-ASR 音声認識 CLI タスク。
+LFM2.5-Audio ASR CLI タスク。
 stdin から JSON を受け取り、音声ファイルを文字起こしする。
 
 入力例:
@@ -18,54 +18,51 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from voice.cli_task_segment_silence import split_one_file
 
-TARGET_SAMPLE_RATE = 16000
 
-class QwenASRPipeline:
-    def __init__(self, model):
+class LFMASRPipeline:
+    def __init__(self, model, processor):
         self.model = model
+        self.processor = processor
 
-    def run_qwen_audio(self, audio_data, sr):
-        """Qwen3-ASR モデルで音声を文字起こしする"""
-        import logging
-        logging.disable(logging.WARNING)
+    def transcribe(self, audio_data, sr):
+        """LFM2.5-Audio モデルで音声を文字起こしする"""
+        import torch
+        from liquid_audio import ChatState
 
-        results = self.model.transcribe(
-            audio=(audio_data, sr),
-            language="Japanese",
-        )
-        return results[0].text.strip()
+        chat = ChatState(self.processor)
+
+        chat.new_turn("system")
+        chat.add_text("Perform ASR in japanese.")
+        chat.end_turn()
+
+        chat.new_turn("user")
+        wav = torch.from_numpy(audio_data).unsqueeze(0)
+        chat.add_audio(wav, sr)
+        chat.end_turn()
+
+        chat.new_turn("assistant")
+
+        tokens = []
+        for t in self.model.generate_sequential(**chat, max_new_tokens=512):
+            if t.numel() == 1:
+                tokens.append(self.processor.text.decode(t))
+        return "".join(tokens).strip()
 
     @classmethod
-    def from_pretrained(cls, model_path: str, device, dtype):
-        import torch
-        from lib.qwen_asr import Qwen3ASRModel
+    def from_pretrained(cls, model_path: str|Path):
+        from liquid_audio import LFM2AudioModel, LFM2AudioProcessor
 
-        local_files_only = True
-        if not os.path.exists(model_path):
-            if model_path.find("/") >= 1:
-                local_files_only = False
+        if type(model_path) == str and not os.path.exists(model_path):
+            if "/" in model_path:
+                pass  # HuggingFace Hub からダウンロード
             else:
                 raise FileNotFoundError(f"「{model_path}」が存在しません")
+        else:
+            model_path = Path(model_path)
         print(f"model path: {model_path}", flush=True)
-        model = Qwen3ASRModel.from_pretrained(
-            model_path,
-            dtype=torch.bfloat16,
-            device_map="cuda:0",
-            max_inference_batch_size=1,
-            max_new_tokens=256,
-        )
-        return cls(model=model)
-
-
-def load_audio_mono_16k_torchaudio(audio_path: str):
-    import torchaudio
-
-    waveform, sr = torchaudio.load(audio_path)
-    if waveform.shape[0] > 1:
-        waveform = waveform.mean(dim=0, keepdim=True)
-    if sr != TARGET_SAMPLE_RATE:
-        waveform = torchaudio.functional.resample(waveform, sr, TARGET_SAMPLE_RATE)
-    return waveform.squeeze(0).numpy(), TARGET_SAMPLE_RATE
+        processor = LFM2AudioProcessor.from_pretrained(model_path).eval()
+        model = LFM2AudioModel.from_pretrained(model_path).eval()
+        return cls(model=model, processor=processor)
 
 
 def load_audio_mono_16k_librosa(audio_path: str):
@@ -74,27 +71,13 @@ def load_audio_mono_16k_librosa(audio_path: str):
     return waveform, 16000
 
 
-def load_audio_mono_16k_pydub(audio_path: str):
-    import numpy as np
-    from pydub import AudioSegment
-
-    audio = AudioSegment.from_file(audio_path).set_channels(1).set_frame_rate(16000)
-    samples = np.array(audio.get_array_of_samples())
-    if audio.sample_width == 2:
-        samples = samples.astype(np.float32) / 32768.0
-    elif audio.sample_width == 4:
-        samples = samples.astype(np.float32) / 2147483648.0
-    return samples
-
-
 def analyze_audio(pipe, audio_path: str) -> dict:
-    import torch
     import numpy as np
-
-    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=15, max_sec=30, fade_ms=10, gap_ms=100)
+    
+    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=20, max_sec=30, fade_ms=10, gap_ms=100)
     if len(chunks) > 1:
         print(f"divided into {len(chunks)} chunks", flush=True)
-
+    
     transcripts = []
     for i, chunk in enumerate(chunks):
         try:
@@ -103,16 +86,16 @@ def analyze_audio(pipe, audio_path: str) -> dict:
                 samples /= 32768.0
             elif chunk.sample_width == 4:
                 samples /= 2147483648.0
+            # ステレオの場合はモノラルに変換
             channels = chunk.channels or 1
             if channels > 1:
                 samples = samples.reshape(-1, channels).mean(axis=1)
             sr = chunk.frame_rate
-            transcript = pipe.run_qwen_audio(samples, sr)
+            transcript = pipe.transcribe(samples, sr)
         except Exception as e:
             print(f"\n  Error transcribing chunk {i+1} of {os.path.basename(audio_path)}: {e}", flush=True)
             transcript = ""
-        transcripts.append(transcript)
-        torch.cuda.empty_cache()
+        transcripts.append(transcript.strip().strip("<|im_end|>"))
 
     return {
         "path": audio_path,
@@ -121,8 +104,6 @@ def analyze_audio(pipe, audio_path: str) -> dict:
 
 
 def main():
-    import torch
-
     data = json.loads(sys.stdin.read())
     model_path: str = data["model_path"]
     files: list[str] = data.get("files", [])
@@ -138,16 +119,9 @@ def main():
 
     print("モデルを読み込んでいます...", flush=True)
     try:
-        pipe = QwenASRPipeline.from_pretrained(
-            model_path,
-            device=torch.device("cuda"),
-            dtype=torch.float16,
-        )
+        pipe = LFMASRPipeline.from_pretrained(model_path)
     except FileNotFoundError as e:
         print(f"エラー: {e}", flush=True)
-        return
-    if pipe.model is None:
-        print("エラー: モデルを読み込めませんでした", flush=True)
         return
 
     try:
@@ -163,7 +137,6 @@ def main():
     finally:
         del pipe
         gc.collect()
-        torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

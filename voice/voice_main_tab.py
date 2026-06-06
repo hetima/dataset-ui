@@ -14,16 +14,18 @@ from common.plyr import simple_plyr_player
 def tab_main(ctx: VoiceCtx):
 
     def asr_download_finished(success: bool) -> None:
-        reload_asr_model()
+        pass
+        # reload_asr_model()
+        # reload_lfm_model()
 
-    def asr_download(repo_id: str) -> None:
+    def asr_download(repo_id: str, sub_dir: str) -> None:
         cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
         dlg = XtermDialog(
             args=[sys.executable, cli],
             title="ダウンロード",
             input_json={
                 "repo_id": repo_id,
-                "output_dir": str(cnfg.models_dir / "qwen_asr"),
+                "output_dir": str(cnfg.models_dir / sub_dir),
             },
             finish_callback=asr_download_finished,
         )
@@ -152,18 +154,6 @@ def tab_main(ctx: VoiceCtx):
             path_input.value = result[0]
             ctx.load_files(path_input.value)
 
-    def asr_models() -> list[str]:
-        models_dir = cnfg.models_dir / "qwen_asr"
-        if not models_dir.exists():
-            return []
-        return [
-            p.name
-            for p in models_dir.iterdir()
-            if p.is_dir()
-            # and "asr" in p.name.lower()
-            # and "qwen" in p.name.lower()
-        ]
-
     # ═══════════════════════════════════════════════════════════════════════════════
     # Load files
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -212,20 +202,24 @@ def tab_main(ctx: VoiceCtx):
             ui.checkbox("mtdt.json").bind_value(ctx, "save_mtdt")
             ui.button("保存", on_click=lambda: ctx.save_metadata())
 
+
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Audio analysis
+    # ASR
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    with ui.expansion("transcript 書き起こし", value=False).classes(
-        "rounded-borders brdr overflow-hidden w-full"
-    ).props('header-class="bg-grey-2 text-black"'):
-        ui.label("処理対象ファイルを Qwen3-ASR で音声認識します。")
-        ui.label(
-            "モデルフォルダの中にある Qwen3-ASR のフォルダ名を入力してください。"
-            "リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
-            "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
-            "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
-        ).classes("infotxt")
+    def asr_models() -> list[str]:
+        models_dir = cnfg.models_dir / "qwen_asr"
+        if not models_dir.exists():
+            return []
+        return [
+            p.name
+            for p in models_dir.iterdir()
+            if p.is_dir()
+            # and "asr" in p.name.lower()
+            # and "qwen" in p.name.lower()
+        ]
+
+    def qwen_asr_section():
         with ui.row().classes("items-center gap-4"):
             opt = asr_models()
             val = cnfg.voice.asr_model
@@ -244,6 +238,172 @@ def tab_main(ctx: VoiceCtx):
                     qwen_models_menu = ui.menu()
 
             ui.button("解析する", on_click=transcript_qwen_asr)
+            
+                
+        def reload_asr_model():
+            def hf_menu_item(models: list, repo_id: str):
+                rid = repo_id.split("/")[-1]
+                if rid not in models:
+                    with ui.item(
+                        on_click=lambda: [
+                            setattr(qwen_model_input, "value", repo_id),
+                            qwen_models_menu.close(),
+                        ]
+                    ).classes("padd8 items-center"):
+                        ui.item_section(repo_id)
+                        ui.button(
+                            "ダウンロード",
+                            on_click=lambda: asr_download(repo_id, "qwen_asr"),
+                        ).props("flat dense color=primary").style("margin-left: 8px").on(
+                            "click", js_handler="(e) => e.stopPropagation()"
+                        )
+                else:
+                    ui.menu_item(
+                        repo_id,
+                        lambda: setattr(qwen_model_input, "value", repo_id),
+                    ).classes("padd8")
+            models = asr_models()
+            qwen_models_menu.clear()
+            local_added = False
+            with qwen_models_menu:
+                for model in models:
+                    ui.menu_item(model, lambda m=model: setattr(qwen_model_input, "value", m)).classes("padd8")
+                    local_added = True
+                if local_added:
+                    ui.separator()
+                ui.menu_item("from huggingface").classes("padd8").enabled=False
+                hf_menu_item(models, "Qwen/Qwen3-ASR-1.7B")
+                hf_menu_item(models, "Qwen/Qwen3-ASR-0.6B")
+                ui.separator()
+                ui.menu_item("メニューを更新", lambda: reload_asr_model()).classes("padd8")
+
+        reload_asr_model()
+        ctx.model_refresh_func.append(reload_asr_model)
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Audio analysis lfm
+    # ═══════════════════════════════════════════════════════════════════════════════
+    def lfm_models() -> list[str]:
+        models_dir = cnfg.models_dir / "lfm"
+        if not models_dir.exists():
+            return []
+        return [
+            p.name
+            for p in models_dir.iterdir()
+            if p.is_dir()
+        ]
+
+    def transcript_lfm_asr() -> None:
+        """処理対象のファイルを LFM2.5-Audio で音声認識するタスクを実行"""
+        if not cnfg.voice.lfm_model:
+            ui.notify("モデルを選択してください")
+            return
+        model_path = cnfg.models_dir / "lfm" / cnfg.voice.lfm_model
+        if not model_path.exists():
+            if cnfg.voice.lfm_model.find("/") < 1:
+                ui.notify(
+                    f"モデルパス「  {str(cnfg.models_dir / 'lfm')}」 に「{cnfg.voice.lfm_model}」フォルダが存在しません。"
+                )
+                return
+            model_path_str = cnfg.voice.lfm_model
+        else:
+            model_path_str = str(model_path)
+        files = ctx.target_files()
+        if not files:
+            ui.notify("処理対象がありません")
+            return
+        paths = [f["path"] for f in files]  # type: ignore
+        cnfg.save()
+        cli = str(Path(__file__).parent / "cli_task_lfm_asr.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="書き起こし",
+            input_json={"model_path": model_path_str, "files": paths},
+            part_callback=progress_transcript,
+        )
+        dlg.open()
+
+    def lfm_asr_section():
+        with ui.row().classes("items-center gap-4"):
+            opt = lfm_models()
+            val = cnfg.voice.lfm_model
+            if not val in opt:
+                val = opt[0] if len(opt) > 0 else ""
+            lfm_model_input = (
+                ui.input(
+                    label="transcriber model",
+                    placeholder="モデルを選択、または入力",
+                )
+                .props('style="min-width: 300px" outlined dense')
+                .bind_value(cnfg.voice, "lfm_model")
+            )
+            with lfm_model_input.add_slot('append'):
+                with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
+                    lfm_models_menu = ui.menu()
+
+            ui.button("解析する", on_click=transcript_lfm_asr)
+
+        def reload_lfm_model():
+            def hf_menu_item(models: list, repo_id: str):
+                rid = repo_id.split("/")[-1]
+                if rid not in models:
+                    with ui.item(
+                        on_click=lambda: [
+                            setattr(lfm_model_input, "value", repo_id),
+                            lfm_models_menu.close(),
+                        ]
+                    ).classes("padd8 items-center"):
+                        ui.item_section(repo_id)
+                        ui.button(
+                            "ダウンロード",
+                            on_click=lambda: asr_download(repo_id, "lfm"),
+                        ).props("flat dense color=primary").style("margin-left: 8px").on(
+                            "click", js_handler="(e) => e.stopPropagation()"
+                        )
+                else:
+                    ui.menu_item(
+                        repo_id,
+                        lambda: setattr(lfm_model_input, "value", repo_id),
+                    ).classes("padd8")
+            models = lfm_models()
+            lfm_models_menu.clear()
+            local_added = False
+            with lfm_models_menu:
+                for model in models:
+                    ui.menu_item(model, lambda m=model: setattr(lfm_model_input, "value", m)).classes("padd8")
+                    local_added = True
+                if local_added:
+                    ui.separator()
+                ui.menu_item("from huggingface").classes("padd8").enabled=False
+                hf_menu_item(models, "LiquidAI/LFM2.5-Audio-1.5B-JP")
+                ui.separator()
+                ui.menu_item("メニューを更新", lambda: reload_lfm_model()).classes("padd8")
+
+        reload_lfm_model()
+        ctx.model_refresh_func.append(reload_lfm_model)
+        
+    with ui.expansion("ASR", value=False).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"'):
+        ui.label(
+            "モデルフォルダの中にある LFM2.5-Audio のフォルダ名を入力してください。"
+            "リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします"
+            "（デフォルトのキャッシュにダウンロードされ再利用されます）。"
+            "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
+        ).classes("infotxt")
+        with ui.grid(columns=2).classes("w-full gap-4"):
+            with ui.column().classes("w-full"):
+                ui.label("処理対象ファイルを LFM2.5-Audio で音声認識します")
+                ui.label(
+                    "Qwen-ASRより速くて正確でオススメです。でもたまに文字化けします"
+                ).classes("infotxt")
+            with ui.column().classes("w-full"):
+                ui.label("処理対象ファイルを Qwen3-ASR で音声認識します")
+        with ui.grid(columns=2).classes("w-full gap-4"):
+            with ui.column().classes("w-full"):
+                lfm_asr_section()
+            with ui.column().classes("w-full"):
+                qwen_asr_section()
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 音声分割
@@ -299,46 +459,6 @@ def tab_main(ctx: VoiceCtx):
                             output_format=input_format2.value,
                         )
                     )
-
-    def reload_asr_model():
-        def hf_menu_item(models: list, repo_id: str):
-            rid = repo_id.split("/")[-1]
-            if rid not in models:
-                with ui.item(
-                    on_click=lambda: [
-                        setattr(qwen_model_input, "value", repo_id),
-                        qwen_models_menu.close(),
-                    ]
-                ).classes("padd8 items-center"):
-                    ui.item_section(repo_id)
-                    ui.button(
-                        "ダウンロード",
-                        on_click=lambda: asr_download(repo_id),
-                    ).props("flat dense color=primary").style("margin-left: 8px").on(
-                        "click", js_handler="(e) => e.stopPropagation()"
-                    )
-            else:
-                ui.menu_item(
-                    repo_id,
-                    lambda: setattr(qwen_model_input, "value", repo_id),
-                ).classes("padd8")
-        models = asr_models()
-        qwen_models_menu.clear()
-        local_added = False
-        with qwen_models_menu:
-            for model in models:
-                ui.menu_item(model, lambda m=model: setattr(qwen_model_input, "value", m)).classes("padd8")
-                local_added = True
-            if local_added:
-                ui.separator()
-            ui.menu_item("from huggingface").classes("padd8").enabled=False
-            hf_menu_item(models, "Qwen/Qwen3-ASR-1.7B")
-            hf_menu_item(models, "Qwen/Qwen3-ASR-0.6B")
-            ui.separator()
-            ui.menu_item("メニューを更新", lambda: reload_asr_model()).classes("padd8")
-
-    reload_asr_model()
-    ctx.model_refresh_func.append(reload_asr_model)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 速度を変更（タイムストレッチ）

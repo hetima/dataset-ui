@@ -67,8 +67,9 @@ class VoiceSubSetting:
     """voice 固有の設定。Setting._root 経由で save/load する。"""
 
     _root: "Setting" = dataclasses.field(default=None, init=False, repr=False) # type: ignore
-
+    
     asr_model: str = ""
+    lfm_model: str = ""
     last_dataset_path: str = ""
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
     irodori_tts_model: str = ""
@@ -84,6 +85,11 @@ class VoiceSubSetting:
     def set_asr_model(self, name: str | None):
         if name and name != self.asr_model:
             self.asr_model = name
+            self.save()
+
+    def set_lfm_model(self, name: str | None):
+        if name and name != self.lfm_model:
+            self.lfm_model = name
             self.save()
 
     def add_dataset_dir(self, path: str) -> bool:

@@ -29,5 +29,8 @@ pyaaf2
 dacvae @ git+https://github.com/facebookresearch/dacvae
 peft
 
+#LFM
+liquid-audio
+
 # ckpt ダウンロードしたときの安全性スキャン
 # picklescan 

@@ -69,29 +69,13 @@ def tab_setting(ctx: VoiceCtx):
     # ═══════════════════════════════════════════════════════════════════════════════
     # モデル選択
     # ═══════════════════════════════════════════════════════════════════════════════
-    def irodori_tts_download_finished(success: bool) -> None:
-        reload_irodori_tts_model()
-
-    def irodori_tts_download(repo_id: str) -> None:
-        cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
-        dlg = XtermDialog(
-            args=[sys.executable, cli],
-            title="ダウンロード",
-            input_json={
-                "repo_id": repo_id,
-                "output_dir": str(cnfg.models_dir / "irodori-tts"),
-            },
-            finish_callback=irodori_tts_download_finished,
-        )
-        dlg.open()
-
-    def irodori_tts_models() -> list[str]:
-        models_dir = cnfg.models_dir / "irodori-tts"
+    def list_downloaded_models(sub_dir: str) -> list[str]:
+        models_dir = cnfg.models_dir / sub_dir
         if not models_dir.exists():
             return []
         return [p.name for p in models_dir.iterdir() if p.is_dir()]
 
-    with ui.expansion("Irodori-TTS モデルダウンロード", value=True).classes(
+    with ui.expansion("モデルダウンロード", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
@@ -99,37 +83,59 @@ def tab_setting(ctx: VoiceCtx):
         )
         ui.label(
             "「ダウンロード」を押すとモデルフォルダにダウンロードされます。"
-            "ダウンロードが途中で止まる場合は、hf-xetをアンインストールすると改善する場合があります（pip uninstall hf-xet）。それでも駄目な場合は手動でダウンロードして配置してください。「モデルフォルダ/irodori-tts/Irodori-TTS-500M-v3/model.safetensors」と配置してください。"
+            "ダウンロードが途中で止まる場合は、hf-xetをアンインストールすると改善する場合があります（pip uninstall hf-xet）。それでも駄目な場合は手動でダウンロードして配置してください。"
         ).classes("infotxt")
         HF_IRODORI_MODELS = [
             "Aratako/Irodori-TTS-500M-v3",
             "Aratako/Irodori-TTS-600M-v3-VoiceDesign",
         ]
-
+        ui.html("<h4>Irodori-TTS</h4>")
+        ui.label("手動でダウンロードする場合は「モデルフォルダ/irodori-tts/Irodori-TTS-500M-v3」などと配置してください。").classes("infotxt")
         irodori_tts_list = ui.list().props('bordered separator')
 
-    def reload_irodori_tts_model():
-        models = irodori_tts_models()
+        HF_LFM_MODELS = [
+            "LiquidAI/LFM2.5-Audio-1.5B-JP",
+        ]
+        ui.html("<h4>LFM</h4>")
+        ui.label("手動でダウンロードする場合は「モデルフォルダ/lfm/LFM2.5-Audio-1.5B-JP」と配置してください。").classes("infotxt")
+        lfm_list = ui.list().props('bordered separator')
 
-        # リストを更新
-        irodori_tts_list.clear()
-        with irodori_tts_list:
-            for repo_id in HF_IRODORI_MODELS:
+    def reload_model_list(list_el: ui.list, repo_ids: list[str], sub_dir: str):
+        downloaded = list_downloaded_models(sub_dir)
+        list_el.clear()
+        with list_el:
+            for repo_id in repo_ids:
                 rid = repo_id.split("/")[-1]
-                downloaded = rid in models
                 with ui.item().classes("padd8"):
                     with ui.item_section():
                         ui.item_label(repo_id)
                     with ui.item_section().props("side"):
-                        if downloaded:
+                        if rid in downloaded:
                             ui.label("ダウンロード済み").classes("text-positive text-caption")
                         else:
                             ui.button(
                                 "ダウンロード",
-                                on_click=lambda _, r=repo_id: irodori_tts_download(r),
+                                on_click=lambda _, r=repo_id, d=sub_dir: _download_model(r, d),
                             ).props("flat dense color=primary")
 
-    reload_irodori_tts_model()
+    def _download_model(repo_id: str, sub_dir: str) -> None:
+        cli = str(Path(__file__).parent.parent / "common" / "cli_task_download_repo.py")
+        dlg = XtermDialog(
+            args=[sys.executable, cli],
+            title="ダウンロード",
+            input_json={
+                "repo_id": repo_id,
+                "output_dir": str(cnfg.models_dir / sub_dir),
+            },
+            finish_callback=lambda _: reload_all_model_lists(),
+        )
+        dlg.open()
+
+    def reload_all_model_lists():
+        reload_model_list(irodori_tts_list, HF_IRODORI_MODELS, "irodori-tts")
+        reload_model_list(lfm_list, HF_LFM_MODELS, "lfm")
+
+    reload_all_model_lists()
 
     
 

@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import time
 from typing import Any, Callable
 from nicegui import ui, background_tasks, helpers
 import asyncio
@@ -107,6 +108,7 @@ class XtermDialog(ui.dialog):
         self._cancelled = False
         self._stop_btn.set_enabled(True)
         success = False
+        start_time = time.monotonic()
 
         try:
             stdin_data = json.dumps(self._input_json).encode() if self._input_json is not None else None
@@ -121,7 +123,7 @@ class XtermDialog(ui.dialog):
                 cwd=self.cd,
                 stdin=subprocess.PIPE if stdin_data is not None else None,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 env=env,
             )
             if stdin_data is not None:
@@ -171,23 +173,18 @@ class XtermDialog(ui.dialog):
                     else:
                         self._terminal.write((line + '\r\n').encode())
 
-            async def read_stderr() -> None:
-                while True:
-                    chunk = await asyncio.to_thread(self._process.stderr.read, 128)  # type: ignore[union-attr]
-                    if not chunk:
-                        break
-                    self._terminal.write(chunk)
-
             await asyncio.gather(
                 read_stdout(),
-                read_stderr(),
                 asyncio.to_thread(self._process.wait),
             )
 
+            elapsed = time.monotonic() - start_time
+            m, s = divmod(int(elapsed), 60)
+            elapsed_str = f"{m}:{s:02d}" if m else f"{s}秒"
             if self._cancelled:
-                self._terminal.write("\r\n[キャンセルされました]\r\n".encode())
+                self._terminal.write(f"\r\n[キャンセルされました {elapsed_str}]\r\n".encode())
             else:
-                self._terminal.write("\r\n[完了]\r\n".encode())
+                self._terminal.write(f"\r\n[完了 {elapsed_str}]\r\n".encode())
                 success = True
 
         except asyncio.CancelledError:
