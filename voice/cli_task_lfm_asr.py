@@ -74,7 +74,7 @@ def load_audio_mono_16k_librosa(audio_path: str):
 def analyze_audio(pipe, audio_path: str) -> dict:
     import numpy as np
     
-    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=20, max_sec=30, fade_ms=10, gap_ms=100)
+    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=15, max_sec=20, fade_ms=10, gap_ms=100)
     if len(chunks) > 1:
         print(f"divided into {len(chunks)} chunks", flush=True)
     
