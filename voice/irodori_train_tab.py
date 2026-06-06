@@ -14,7 +14,7 @@ def tab_iridori_train(ctx: VoiceCtx):
 
     ui.markdown(
         f"**トレーニングデータ保存パス** → `{cnfg.train_dir.as_posix()}/irodori-tts/プロジェクト名`<br>"
-        f"**トレーニング結果保存パス** → `{cnfg.models_dir.as_posix()}/irodori-tts/プロジェクト名`"
+        # f"**トレーニング結果保存パス** → `{cnfg.models_dir.as_posix()}/irodori-tts/プロジェクト名`"
     )
 
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -33,16 +33,16 @@ def tab_iridori_train(ctx: VoiceCtx):
                     label="dataset paths",
                     placeholder="フォルダのパスを入力。複数のフォルダに対応しています。改行で区切ってください",
                 )
-                .props('autogrow style="min-width: 500px" outlined clearable')
+                .props('autogrow style="min-width: 500px" outlined dense clearable')
                 .classes("w-160")
             )
             validate_dataset_btn = ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value)) # type: ignore
-            project_name = ui.input(label="プロジェクト名", placeholder="my_lora", value="").props(
-                "outlined style='width: 200px;'"
-            )
-            max_seconds = ui.input(label="最大音長", placeholder="秒数", value="0").props(
-                "outlined style='width: 80px;'"
-            )
+            project_name = ui.input(
+                label="プロジェクト名", placeholder="my_lora", value=""
+            ).props("outlined dense style='width: 200px;'")
+            max_seconds = ui.input(
+                label="最大音長", placeholder="秒数", value="0"
+            ).props("outlined dense style='width: 80px;'")
             create_dataset_btn =ui.button("データセット生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
 
         xterm = XtermView(title="ターミナル", rows=10).classes("w-full")
@@ -155,27 +155,24 @@ def tab_iridori_train(ctx: VoiceCtx):
                     # "train_500m_v3_voice_design_phase2_duration.yaml": "VD phase2 duration",
                 },
                 value="train_500m_v3_speaker_inversion.yaml",
-            ).props("outlined style='width: 220px;'")
+            ).props("outlined dense options-dense style='width: 220px;'")
 
             model_input = ui.input(
                 label="ベースモデル",
                 placeholder="モデルを選択、または入力",
                 value="Irodori-TTS-500M-v3/model.safetensors",
-            ).props('style="min-width: 400px" outlined')
+            ).props('style="min-width: 400px" outlined dense')
             with model_input.add_slot("append"):
                 with ui.button(icon="arrow_drop_down").props("flat").classes("padd4"):
                     train_model_menu = ui.menu()
 
-            dataset_input = (
-                ui.input(
-                    label="トレーニングデータ",
-                    placeholder="データセットを選択、または入力",
-                )
-                .props('style="width: 250px" outlined')
-            )
+            dataset_input = ui.input(
+                label="トレーニングデータ",
+                placeholder="データセットを選択、または入力",
+            ).props('style="width: 250px" outlined dense')
             custom_putput_name = (
                 ui.input(label="カスタム出力名", placeholder="")
-                .props("outlined style='width: 120px;'")
+                .props("outlined dense style='width: 120px;'")
                 .tooltip("空白にすればトレーニングデータ名を使用します")
             )
             with dataset_input.add_slot("append"):
@@ -195,12 +192,14 @@ def tab_iridori_train(ctx: VoiceCtx):
                     model_input.set_value("Irodori-TTS-500M-v3/model.safetensors")
             config_select.on_value_change(on_config_select_change)
 
-            max_steps_input = ui.input(label="--max-steps", placeholder="").props(
-                "outlined style='width: 120px;'"
-            ).tooltip("空白にすればデフォルト値を使用します")
+            max_steps_input = (
+                ui.input(label="--max-steps", placeholder="")
+                .props("outlined dense style='width: 120px;'")
+                .tooltip("空白にすればデフォルト値を使用します")
+            )
             batch_size_input = (
                 ui.input(label="--batch-size", placeholder="")
-                .props("outlined style='width: 120px;'")
+                .props("outlined dense style='width: 120px;'")
                 .tooltip("空白にすればデフォルト値を使用します")
             )
 
@@ -212,10 +211,10 @@ def tab_iridori_train(ctx: VoiceCtx):
                     "min": "時間（分）",
                 },
                 value="default",
-            ).props("outlined style='width: 150px;'")
+            ).props("outlined dense options-dense style='width: 150px;'")
             config_save_interval = (
                 ui.input(label="ステップ数", placeholder="")
-                .props("outlined style='width: 120px;'")
+                .props("outlined dense style='width: 120px;'")
                 .tooltip("左のセレクトに従いステップ数か時間間隔（単位：分）を入力")
             )
             config_save_method.on_value_change(
@@ -324,4 +323,3 @@ def tab_iridori_train(ctx: VoiceCtx):
             f' --config "{config_yaml}"'
             f"{init_ckpt}{auto_resume}{max_steps}{batch_size}{save_method_str}"
         )
-

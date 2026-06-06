@@ -192,7 +192,7 @@ def tab_main(ctx: MusicCtx):
                 label="transcriber model",
                 placeholder="モデルを選択、または入力",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
-            ).props('style="min-width: 300px" outlined').bind_value(cnfg.music, "acestep_transcriber_model")
+            ).props('style="min-width: 300px" outlined dense').bind_value(cnfg.music, "acestep_transcriber_model")
             with ace_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     ace_models_menu = ui.menu()
@@ -246,10 +246,10 @@ def tab_main(ctx: MusicCtx):
     with ui.expansion('手動変更', value=False).classes('rounded-borders brdr overflow-hidden w-full').props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
         with ui.row().classes("items-center gap-4"):
-            lang = ui.select(options=LANGUAGE_LIST, with_input=True, new_value_mode="add", label="language").classes('w-30').props("outlined")
+            lang = ui.select(options=LANGUAGE_LIST, with_input=True, new_value_mode="add", label="language").classes('w-30').props("outlined dense options-dense options-dense")
             ui.button("languageを設定", on_click=lambda e: ctx.set_lang(cast(str, lang.value)))
             ui.space()
-            capt = ui.input(placeholder="captionを入力", label="caption").classes('w-100').props("outlined")
+            capt = ui.input(placeholder="captionを入力", label="caption").classes('w-100').props("outlined dense")
             ui.button("captionを設定", on_click=lambda e: ctx.set_caption(cast(str, capt.value)))
 
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -266,7 +266,7 @@ def tab_main(ctx: MusicCtx):
             roformer_model_input = ui.input(
                 label="roformer model",
                 placeholder="モデルを選択",
-            ).props('style="min-width: 380px" outlined')
+            ).props('style="min-width: 380px" outlined dense')
             with roformer_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     roformer_menu = ui.menu()
@@ -287,7 +287,7 @@ def tab_main(ctx: MusicCtx):
                     max=16,
                     step=1,
                 )
-                .props('style="min-width: 80px" outlined')
+                .props('style="min-width: 80px" outlined dense')
                 .tooltip(
                     "増やすと品質が上がりますが時間がかかります。チャンクを何分割ずつずらすかの分割数"
                 )
@@ -302,7 +302,7 @@ def tab_main(ctx: MusicCtx):
                     max=30,
                     step=1,
                 )
-                .props('style="min-width: 80px" outlined')
+                .props('style="min-width: 80px" outlined dense')
                 .tooltip(
                     "一度に処理する秒数。大きくするとVRAMを多く使います。2倍にすれば2倍速くなるというわけではありません。"
                 )
@@ -313,10 +313,16 @@ def tab_main(ctx: MusicCtx):
             ).tooltip("出力フォルダをスキャンして連番プレフィクス（例: 04_）をファイル名に付けます")
 
             ui.label("ファイル名サフィックス: ")
-            roformer_suffix_input = ui.input(
-                label="suffix",
-                value="",
-            ).props('style="min-width: 150px" outlined').tooltip("「ファイル名suffix_Vocals.flac」となります。モデル固有のサフィックス設定を上書きします")
+            roformer_suffix_input = (
+                ui.input(
+                    label="suffix",
+                    value="",
+                )
+                .props('style="min-width: 150px" outlined dense')
+                .tooltip(
+                    "「ファイル名suffix_Vocals.flac」となります。モデル固有のサフィックス設定を上書きします"
+                )
+            )
 
             ui.label("フォーマット: ")
             roformer_format = ui.toggle(
@@ -501,7 +507,7 @@ def tab_main(ctx: MusicCtx):
                     new_value_mode="add",
                     label="language",
                     value=ctx.pickup.get("language") or None,
-                ).classes("w-20").props("outlined dense")
+                ).classes("w-20").props("outlined dense options-dense")
                 inp_caption = ui.input(
                     placeholder="captionを入力",
                     label="caption",

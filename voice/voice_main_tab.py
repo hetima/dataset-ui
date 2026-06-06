@@ -236,7 +236,7 @@ def tab_main(ctx: VoiceCtx):
                     label="transcriber model",
                     placeholder="モデルを選択、または入力",
                 )
-                .props('style="min-width: 300px" outlined')
+                .props('style="min-width: 300px" outlined dense')
                 .bind_value(cnfg.voice, "asr_model")
             )
             with qwen_model_input.add_slot('append'):
@@ -259,14 +259,14 @@ def tab_main(ctx: VoiceCtx):
                     "分割したファイルは元のファイルと同じ階層にフォルダを作成し、「ファイル名/ファイル名_part001.wav」という名前で保存されます。"
                 ).classes("infotxt")
                 with ui.row().classes("items-center gap-4"):
-                    input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined style='width: 100px;'")
-                    input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined style='width: 100px;'")
-                    input_thresh = ui.input(label="無音閾値(dB)", placeholder="例: -60", value="-60").props("outlined style='width: 100px;'")
+                    input_min_sec = ui.input(label="最小秒数", placeholder="例: 2", value="2").props("outlined dense style='width: 100px;'")
+                    input_max_sec = ui.input(label="最大秒数", placeholder="例: 5", value="5").props("outlined dense style='width: 100px;'")
+                    input_thresh = ui.input(label="無音閾値(dB)", placeholder="例: -60", value="-60").props("outlined dense style='width: 100px;'")
                     input_format = ui.select(
                         label="出力",
                         options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                         value="wav",
-                    ).props("outlined style='width: 120px;'")
+                    ).props("outlined dense options-dense style='width: 120px;'")
                     ui.button("分割する").on_click(
                         lambda: segment_silence(
                             min_sec=input_min_sec.value,  # type: ignore
@@ -285,13 +285,13 @@ def tab_main(ctx: VoiceCtx):
                 with ui.row().classes("items-center gap-4"):
                     input_parts = ui.input(
                         label="フレーム数", placeholder="例: 5", value="5"
-                    ).props("outlined style='width: 100px;'")
-                    input_fps = ui.input(label="FPS", placeholder="例: 24", value="1").props("outlined style='width: 100px;'")
+                    ).props("outlined dense style='width: 100px;'")
+                    input_fps = ui.input(label="FPS", placeholder="例: 24", value="1").props("outlined dense style='width: 100px;'")
                     input_format2 = ui.select(
                         label="出力",
                         options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                         value="wav",
-                    ).props("outlined style='width: 120px;'")
+                    ).props("outlined dense options-dense style='width: 120px;'")
                     ui.button("分割する").on_click(
                         lambda: segment_equally(
                             frame_count=input_parts.value,  # type: ignore
@@ -359,22 +359,22 @@ def tab_main(ctx: VoiceCtx):
         ui.label("ファイルは書き出しフォルダに保存されます。").classes("infotxt")
         with ui.row().classes("items-center gap-4"):
             to_fps = ui.input(label="FPS", placeholder="例: 25", value="").props(
-                "outlined style='width: 100px;'"
+                "outlined dense style='width: 100px;'"
             )
             ui.label(" / ")
             from_fps = ui.input(label="FPS", placeholder="例: 15", value="").props(
-                "outlined style='width: 100px;'"
+                "outlined dense style='width: 100px;'"
             )
             method = ui.select(
                 label="変換方法",
                 options={"librosa": "librosa", "rubberband": "rubberband"},
                 value="librosa",
-            ).props("outlined style='width: 170px;'")
+            ).props("outlined dense options-dense style='width: 170px;'")
             input_format = ui.select(
                 label="出力",
                 options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                 value="wav",
-            ).props("outlined style='width: 120px;'")
+            ).props("outlined dense options-dense style='width: 120px;'")
             ui.button("速度変更する").on_click(
                 lambda: change_speed(
                     from_fps=from_fps.value,  # type: ignore
@@ -430,7 +430,7 @@ def tab_main(ctx: VoiceCtx):
             capt = (
                 ui.input(placeholder="speaker_idを入力", label="speaker_id")
                 .classes("w-100")
-                .props("outlined")
+                .props("outlined dense")
             )
             ui.button(
                 "speaker_idを設定",
