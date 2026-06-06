@@ -42,11 +42,11 @@ class LFMASRPipeline:
 
         chat.new_turn("assistant")
 
-        tokens = []
+        token_ids = []
         for t in self.model.generate_sequential(**chat, max_new_tokens=512):
             if t.numel() == 1:
-                tokens.append(self.processor.text.decode(t))
-        return "".join(tokens).strip()
+                token_ids.append(int(t.item()))
+        return self.processor.text.decode(token_ids, skip_special_tokens=True).strip()
 
     @classmethod
     def from_pretrained(cls, model_path: str|Path):
