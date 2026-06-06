@@ -45,6 +45,7 @@ class VoiceCtx:
             return
 
         cnfg.voice.last_dataset_path = folder_path
+        cnfg.voice.add_recent_dir(folder_path)
         cnfg.save()
 
         mtdt_path = self.folder / "mtdt.json"

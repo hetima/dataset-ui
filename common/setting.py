@@ -34,9 +34,16 @@ class MusicSubSetting:
     acestep_transcriber_model: str = ""
     last_dataset_path: str = ""
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
+    recent_dirs: list[str] = dataclasses.field(default_factory=list)
 
     def save(self):
         self._root.save()
+
+    def add_recent_dir(self, path: str) -> None:
+        """最近使ったフォルダを先頭に追加し、最大8件に絞る。"""
+        dirs = [d for d in self.recent_dirs if d != path]
+        self.recent_dirs = [path] + dirs[:15]
+        self.save()
 
     def set_acestep_transcriber_model(self, name: str | None):
         if name and name != self.acestep_transcriber_model:
@@ -72,6 +79,7 @@ class VoiceSubSetting:
     lfm_model: str = ""
     last_dataset_path: str = ""
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
+    recent_dirs: list[str] = dataclasses.field(default_factory=list)
     irodori_tts_model: str = ""
     
     def set_irodori_tts_model(self, name: str | None):
@@ -81,6 +89,12 @@ class VoiceSubSetting:
 
     def save(self):
         self._root.save()
+
+    def add_recent_dir(self, path: str) -> None:
+        """最近使ったフォルダを先頭に追加し、最大16件に絞る。"""
+        dirs = [d for d in self.recent_dirs if d != path]
+        self.recent_dirs = [path] + dirs[:15]
+        self.save()
 
     def set_asr_model(self, name: str | None):
         if name and name != self.asr_model:

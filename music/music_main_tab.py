@@ -115,9 +115,10 @@ def tab_main(ctx: MusicCtx):
                 label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
+                autocomplete=cnfg.music.recent_dirs,
             )
             .props('style="min-width: 500px" outlined clearable')
-            .classes("w-140")
+            .classes("w-170")
         )
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value))
 
@@ -126,6 +127,11 @@ def tab_main(ctx: MusicCtx):
         with dataset_dropdown:
             for path in cnfg.music.dataset_dirs:
                 ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
+            if cnfg.music.recent_dirs:
+                if cnfg.music.dataset_dirs:
+                    ui.separator()
+                for path in cnfg.music.recent_dirs:
+                    ui.item(path, on_click=lambda _, p=path: setattr(path_input, "value", p)).classes("padd8")
 
     update_dataset_dropdown()
     ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)

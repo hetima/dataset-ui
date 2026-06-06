@@ -46,6 +46,7 @@ class MusicCtx:
             return
 
         cnfg.music.last_dataset_path = folder_path
+        cnfg.music.add_recent_dir(folder_path)
         cnfg.save()
 
         mtdt_path = self.folder / "mtdt.json"

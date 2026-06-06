@@ -166,12 +166,13 @@ def tab_main(ctx: VoiceCtx):
         )
         path_input = (
             ui.input(
-                value = cnfg.voice.last_dataset_path,
+                value=cnfg.voice.last_dataset_path,
                 label="dataset path",
                 placeholder="フォルダのパスを入力...",
                 on_change=lambda e: setattr(e.sender, "value", e.value),
+                autocomplete=cnfg.voice.recent_dirs,
             )
-            .props('style="min-width: 500px" outlined clearable').classes("w-140")
+            .props('style="min-width: 500px" outlined clearable').classes("w-170")
         )
         ui.button("読み込み", on_click=lambda: ctx.load_files(path_input.value))
 
@@ -180,6 +181,11 @@ def tab_main(ctx: VoiceCtx):
         with dataset_dropdown:
             for path in cnfg.voice.dataset_dirs:
                 ui.item(path, on_click=partial(pick_folder, path)).classes("padd8")
+            if cnfg.voice.recent_dirs:
+                if cnfg.voice.dataset_dirs:
+                    ui.separator()
+                for path in cnfg.voice.recent_dirs:
+                    ui.item(path, on_click=lambda _, p=path: setattr(path_input, "value", p)).classes("padd8")
 
     update_dataset_dropdown()
     ctx.dataset_dirs_refresh_func.append(update_dataset_dropdown)
@@ -395,7 +401,7 @@ def tab_main(ctx: VoiceCtx):
             with ui.column().classes("w-full"):
                 ui.label("処理対象ファイルを LFM2.5-Audio で音声認識します")
                 ui.label(
-                    "Qwen-ASRより速くて正確でオススメです。でもたまに文字化けします"
+                    "Qwen-ASRより速くて正確でオススメです"
                 ).classes("infotxt")
             with ui.column().classes("w-full"):
                 ui.label("処理対象ファイルを Qwen3-ASR で音声認識します")
