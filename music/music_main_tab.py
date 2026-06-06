@@ -435,11 +435,10 @@ def tab_main(ctx: MusicCtx):
                     "align": "left",
                 },
                 {
-                    "label": "Lang",
-                    "field": "language",
-                    "editable": True,
-                    "style": "width: 80px",
-                    "name": "language",
+                    "label": "歌詞",
+                    "field": "lyrics",
+                    "style": "width: 40px;  max-width:40px",
+                    "name": "lyrics",
                     "align": "left",
                 },
             ],
@@ -458,6 +457,14 @@ def tab_main(ctx: MusicCtx):
                     js_handler="() => emit(props.value)",
                     handler=lambda e: play_src(e.args),
                 ).style("padding: 2px 4px;")
+        ctx.table.add_slot(
+            "body-cell-lyrics",
+            """
+            <q-td :props="props">
+                <span v-if="props.row.lyrics">[L]</span>
+            </q-td>
+            """,
+        )
         with ctx.table.add_slot("body-cell-expand"):
             with ctx.table.cell("expand"):
                 with ui.row().classes("items-center no-wrap gap-0"):
@@ -513,15 +520,50 @@ def tab_main(ctx: MusicCtx):
                     label="caption",
                     value=ctx.pickup.get("caption", ""),
                 ).classes("w-70").props("outlined dense")
+            with ui.row().classes("items-center gap-2"):
+                inp_bpm = (
+                    ui.input(
+                        placeholder="bpmを入力",
+                        label="bpm",
+                        value=ctx.pickup.get("bpm", ""),
+                    ).classes("w-20").props("outlined dense")
+                )
+                inp_keyscale = (
+                    ui.input(
+                        placeholder="keyscaleを入力",
+                        label="keyscale",
+                        value=ctx.pickup.get("keyscale", ""),
+                    ).classes("w-20").props("outlined dense")
+                )
+                inp_timesignature = (
+                    ui.input(
+                        placeholder="拍子を入力",
+                        label="拍子",
+                        value=ctx.pickup.get("timesignature", ""),
+                    ).classes("w-20").props("outlined dense")
+                )
+            with ui.column().classes("w-full gap-0"):
+                ui.item_label("歌詞:").props("caption")
+                lyrics = ctx.pickup.get("lyrics", "")
+                if lyrics:
+                    lyrics_html = "<br>".join(lyrics.split("\n")[:10]) + " ...(" + str(len(lyrics)) + "文字)"
+                    ui.html(lyrics_html)
+                else:
+                    ui.item_label("なし").props("caption")
+                    
 
             def update_pickup():
                 p = cast(dict, ctx.pickup)
                 p["language"] = sel_lang.value
                 p["caption"] = inp_caption.value
+                p["bpm"] = inp_bpm.value
+                p["keyscale"] = inp_keyscale.value
+                p["timesignature"] = inp_timesignature.value
                 ctx.update_file(p)
+                ui.notify("データを更新しました。ファイルに書き出すには「保存」を実行してください")
 
             with ui.row().classes("items-center gap-2 justify-end"):
-                ui.button("更新", on_click=update_pickup)
+                ui.button("適用", on_click=update_pickup).tooltip("ページ内のデータを更新します。保存を実行しないとファイルに保存はされません。")
 
     # with ui.row().classes("items-start gap-4 flex-nowrap").style("height: 70vh"):
     with ui.splitter(value=60).classes("w-full").props('separator-class="q-mx-md"').style("height: 70vh") as segment_splitter:

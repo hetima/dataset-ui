@@ -427,16 +427,24 @@ def tab_main(ctx: VoiceCtx):
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルのメタデータを手動で変更します")
         with ui.row().classes("items-center gap-4"):
-            capt = (
+            spkid = (
                 ui.input(placeholder="speaker_idを入力", label="speaker_id")
-                .classes("w-100")
+                .classes("w-40")
                 .props("outlined dense")
             )
             ui.button(
                 "speaker_idを設定",
-                on_click=lambda e: ctx.set_speaker_id(cast(str, capt.value)),
+                on_click=lambda e: ctx.set_speaker_id(cast(str, spkid.value))
             )
-
+            capt = (
+                ui.input(placeholder="captionを入力", label="caption")
+                .classes("w-120")
+                .props("outlined dense")
+            )
+            ui.button(
+                "captionを設定",
+                on_click=lambda e: ctx.set_caption(cast(str, capt.value))
+            )
     # ═══════════════════════════════════════════════════════════════════════════════
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -478,7 +486,7 @@ def tab_main(ctx: VoiceCtx):
                         "name": "transcript",
                         "field": "transcript",
                         "label": "Transcript",
-                        "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px;",
+                        "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:300px;",
                         "align": "left",
                     },
                 ],
@@ -530,13 +538,38 @@ def tab_main(ctx: VoiceCtx):
                 ui.item_label("path:").props("caption")
                 ui.item_label(ctx.pickup.get("path", ""))
 
+            with ui.row().classes("items-center gap-2"):
+                inp_caption = (
+                    ui.input(
+                        placeholder="caption を入力",
+                        label="caption",
+                        value=ctx.pickup.get("caption", ""),
+                    ).classes("w-80").props("outlined dense")
+                )
+                inp_speaker_id = (
+                    ui.input(
+                        placeholder="speaker_id を入力",
+                        label="speaker_id",
+                        value=ctx.pickup.get("speaker_id", ""),
+                    ).classes("w-40").props("outlined dense")
+                )
+
+            inp_transcript = ui.textarea(value=ctx.pickup.get("transcript", ""),
+                    label="transcript",
+                    placeholder="transcript",
+                ).props('autogrow outlined').classes("w-full")
+            
             def update_pickup():
                 p = cast(dict, ctx.pickup)
-                # p["val"] = sel_val.value
+                p["speaker_id"] = inp_speaker_id.value
+                p["caption"] = inp_caption.value
+                p["transcript"] = inp_transcript.value
                 ctx.update_file(p)
+                ui.notify("データを更新しました。ファイルに書き出すには「保存」を実行してください")
 
             with ui.row().classes("items-center gap-2 justify-end"):
-                ui.button("更新", on_click=update_pickup)
+                ui.button("適用", on_click=update_pickup).tooltip("ページ内のデータを更新します。保存を実行しないとファイルに保存はされません。")
+
 
     with ui.splitter(value=60).classes("w-full").props('separator-class="q-mx-md"').style("height: 70vh") as splitter:
         with splitter.before:

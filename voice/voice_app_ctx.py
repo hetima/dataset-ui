@@ -122,6 +122,12 @@ class VoiceCtx:
     def set_transcript(self, val: str) -> None:
         self.set_metadata_all("transcript", val)
 
+    def set_speaker_id(self, val: str) -> None:
+        self.set_metadata_all("speaker_id", val)
+
+    def set_caption(self, val: str) -> None:
+        self.set_metadata_all("caption", val)
+
     def set_models_root(self, path: str | None):
         if path and cnfg.set_models_dir(path):
             for func in self.model_refresh_func:
@@ -191,5 +197,3 @@ class VoiceCtx:
                     parent_file.add_child(voicefile)
         self.table.update()
 
-    def set_speaker_id(self, val: str) -> None:
-        self.set_metadata_all("caption", val)
