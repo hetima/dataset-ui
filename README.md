@@ -5,9 +5,10 @@
 
 ## voice
 主に音声データを扱うページ
-- Qwen3-ASR での書き起こし
+- LFM2.5-Audio-1.5B-JP、Qwen3-ASR での書き起こし
 - 無音区間で分割、均等に分割
 - タイムストレッチ
+- Irodori-TTS のトレーニング
 
 
 ## music
@@ -81,9 +82,17 @@ pnpm deploy
 ## 使用したライブラリなど
 
 - [zauberzeug/nicegui](https://github.com/zauberzeug/nicegui/)
+- [Aratako/Irodori-TTS](https://github.com/Aratako/Irodori-TTS)
 - [naomiaro/waveform-playlist](https://github.com/naomiaro/waveform-playlist)
+- [sampotts/plyr](https://github.com/sampotts/plyr)
 - [Qwen3-ASR support-transformers-v5.4](https://github.com/One-sixth/Qwen3-ASR/tree/support-transformers-v5.4)
 
 
+## モデルライセンス
+- Irodori-TTS: MIT License
+- LFM2.5-Audio-1.5B-JP: [LFM Open License v1.0](https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-JP/blob/main/LICENSE)
+- Qwen3-ASR: Apache License 2.0
+- acestep-transcriber: MIT License
+
 ## ライセンス
-MIT
+MIT License
