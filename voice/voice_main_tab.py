@@ -677,7 +677,7 @@ def tab_main(ctx: VoiceCtx):
             inp_transcript = ui.textarea(value=ctx.pickup.get("transcript", ""),
                     label="transcript",
                     placeholder="transcript",
-                ).props('autogrow outlined').classes("w-full")
+                ).props('autogrow outlined').classes("w-full").style("max-height:300px; overflow-y: auto; box-sizing: border-box;")
             
             def update_pickup():
                 p = cast(dict, ctx.pickup)
