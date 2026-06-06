@@ -13,7 +13,7 @@ def main_page():
     with ui.tabs().classes("w-full").classes("text-dark").props(
         'inline-label align="left"'
     ) as ctx.tabs:
-        main_Tab = ui.tab("main", label="メイン", icon="home")
+        main_Tab = ui.tab("main", label="メイン", icon="apps")
         daw_tab = ui.tab("daw", label="DAW", icon="graphic_eq")
         setting_tab = ui.tab("setting", label="設定", icon="settings")
     with ui.tab_panels(ctx.tabs, animated=False, value=main_Tab).classes("w-full").props("keep-alive"):

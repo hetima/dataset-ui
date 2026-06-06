@@ -9,6 +9,7 @@ import argparse
 from nicegui import ui, app
 from common.model_cache import model_cache
 from common.setting import cnfg
+from common.index import main_page as page_start
 from music.index import main_page as page_music
 from voice.index import main_page as page_voice
 from edit.index import main_page as page_edit
@@ -130,38 +131,7 @@ def efit_file_footer():
 @ui.page("/", title="dataset-ui")
 def main_page():
     header()
-    ui.markdown("""# dataset-ui
-音声データセットに様々な処理を施すWeb UIです。
-
-### 説明書
-各ページの設定タブで書き出しフォルダとモデルフォルダとトレーニングフォルダは必ず確認することをお勧めします。初期設定ではレポジトリの中に作成されます。この3つの設定はすべてのページで共有されます。
-
-自動保存されない操作が多いので保存ボタンを押し忘れないように注意してください。
-
-モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
-        """).classes("items-start w-180")
-    with ui.column().classes("items-start gap-0"):
-
-        ui.link("voice", "/voice").style(
-            'text-decoration: none; font-size: 3em; margin-top:16px;'
-        )
-        ui.label("音声データを編集")
-        ui.label("音声の分割や書き起こしなどができます")
-
-        ui.link("music", "/music").style(
-            "text-decoration: none; font-size: 3em; margin-top:16px;"
-        )
-        ui.label("主に ACE-Step 向けのメタデータを編集")
-        ui.label("楽曲のBPM、キーなどを解析します。歌詞の解析、編集などもできます")
-
-        ui.link("audio-edit", "/edit").style(
-            "text-decoration: none; font-size: 3em; margin-top:16px;"
-        )
-        ui.label("書き出した音声データを編集")
-        ui.label("")
-    if runtime_flags.develop_mode:
-        ui.link("test", "/test").style("text-decoration: none; font-size: 1.8em;")
-
+    page_start()
     footer()
 
 
