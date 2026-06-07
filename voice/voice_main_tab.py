@@ -587,41 +587,40 @@ def tab_main(ctx: VoiceCtx):
             plyr.container.set_visibility(True)
             plyr.plyr.load(path)
 
-        ctx.table = (
-            ui.table(
-                columns=[
-                    {
-                        "label": "",
-                        "field": "path",
-                        "name": "expand",
-                        "style": "width: 30px",
-                    },
-                    {
-                        "label": "",
-                        "field": "path",
-                        "name": "play",
-                        "style": "width: 30px",
-                    },
-                    {
-                        "label": "Name",
-                        "field": "name",
-                        "name": "name",
-                        "align": "left",
-                    },
-                    {
-                        "name": "transcript",
-                        "field": "transcript",
-                        "label": "Transcript",
-                        "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:300px;",
-                        "align": "left",
-                    },
-                ],
-                rows=[],
-                selection="multiple",
-                row_key="name",
-            )
-            .classes("no-shadow brdr q-pa-none h-full w-full")
-        )
+        ctx.table = ui.table(
+            columns=[
+                {
+                    "label": "",
+                    "field": "path",
+                    "name": "expand",
+                    "style": "width: 30px",
+                },
+                {
+                    "label": "",
+                    "field": "path",
+                    "name": "play",
+                    "style": "width: 30px",
+                },
+                {
+                    "label": "Name",
+                    "field": "name",
+                    "name": "name",
+                    "align": "left",
+                },
+                {
+                    "name": "transcript",
+                    "field": "transcript",
+                    "label": "Transcript",
+                    "style": "white-space: nowrap; overflow: hidden;text-overflow: ellipsis; min-width:100px; max-width:300px;",
+                    "align": "left",
+                },
+            ],
+            rows=[],
+            selection="multiple",
+            row_key="name",
+            pagination=100,
+        ).classes("no-shadow brdr q-pa-none h-full w-full")
+
         ctx.table.props(
             ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms) || (r.transcript || \'\').includes(terms))"'
         )

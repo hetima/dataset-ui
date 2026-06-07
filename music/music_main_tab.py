@@ -451,6 +451,7 @@ def tab_main(ctx: MusicCtx):
             rows=[],
             selection="multiple",
             row_key="name",
+            pagination=100,
         ).classes("no-shadow brdr q-pa-none h-full w-full")
         ctx.table.props(
             ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms) || (r.transcript || \'\').includes(terms))"'

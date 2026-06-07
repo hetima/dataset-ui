@@ -73,6 +73,7 @@ def tab_main(ctx: EditCtx):
                 rows=[],
                 selection="multiple",
                 row_key="path",
+                pagination=100,
             ).classes("h-120 w-full no-shadow brdr q-pa-none")
             ctx.table.props(':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms))"')
             with ctx.table.add_slot('body-cell-play'):
@@ -108,6 +109,7 @@ def tab_main(ctx: EditCtx):
                 rows=[],
                 selection="multiple",
                 row_key="path",
+                pagination=100,
             ).classes("h-120 w-full no-shadow brdr q-pa-none")
             ctx.pool_table.props(
                 ':filter-method="(rows, terms) => rows.filter(r => r.name.includes(terms))"'
