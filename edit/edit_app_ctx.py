@@ -7,6 +7,7 @@ from nicegui.elements.tabs import Tabs
 from common.file_util import audio_files_in_folder
 from common.setting import cnfg
 from edit.editfile import EditFile
+import send2trash
 
 @binding.bindable_dataclass
 class EditCtx:
@@ -14,7 +15,6 @@ class EditCtx:
         self.name = "dataset-ui-music"
         self.files = []
         self.pool_files = []
-        self.conpi_files = []
         self.table: Table
         self.pool_table: Table
         self.target = "selected"
@@ -110,5 +110,47 @@ class EditCtx:
     
     def update_compi(self):
         files = self.target_files()
+
+    def delete_selected(self, permanent=False):
+        rows = self.table.selected
+        deleted_paths: set[str] = set()
+
+        for row in rows:
+            path = row.get("path")
+            if not path:
+                continue
+            p = Path(path)
+            try:
+                if permanent:
+                    if p.exists():
+                        p.unlink()
+                    for ext in (".txt", ".json"):
+                        side = p.with_suffix(ext)
+                        if side.exists():
+                            side.unlink()
+                else:
+                    if p.exists():
+                        send2trash.send2trash(path)
+                    for ext in (".txt", ".json"):
+                        side = p.with_suffix(ext)
+                        if side.exists():
+                            send2trash.send2trash(str(side))
+                deleted_paths.add(path)
+            except Exception as e:
+                self.notify(f"ファイル「{path}」の削除に失敗しました: {e}", type="negative")
+
+        if not deleted_paths:
+            return
+
+        deleted_names: set[str] = set()
+        for f in self.files:
+            if f.path in deleted_paths:
+                deleted_names.add(f.name)
+
+        self.files = [f for f in self.files if f.path not in deleted_paths]
+
+        self.table.rows = self.files
+        self.table.selected = []
+        self.table.update()
 
 

@@ -4,6 +4,7 @@ from typing import Callable
 from nicegui import binding, ui
 from nicegui.elements.table import Table
 from nicegui.functions.refreshable import refreshable
+import send2trash
 
 from common.file_util import audio_files_in_folder, Mtdt
 from common.setting import cnfg
@@ -198,3 +199,54 @@ class VoiceCtx:
                     parent_file.add_child(voicefile)
         self.table.update()
 
+    def delete_selected(self, permanent=False):
+        rows = self.table.selected
+        deleted_paths: set[str] = set()
+
+        for row in rows:
+            path = row.get("path")
+            if not path:
+                continue
+            p = Path(path)
+            try:
+                if permanent:
+                    if p.exists():
+                        p.unlink()
+                    for ext in (".txt", ".json"):
+                        side = p.with_suffix(ext)
+                        if side.exists():
+                            side.unlink()
+                else:
+                    if p.exists():
+                        send2trash.send2trash(path)
+                    for ext in (".txt", ".json"):
+                        side = p.with_suffix(ext)
+                        if side.exists():
+                            send2trash.send2trash(str(side))
+                deleted_paths.add(path)
+            except Exception as e:
+                self.notify(f"ファイル「{path}」の削除に失敗しました: {e}", type="negative")
+
+        if not deleted_paths:
+            return
+
+
+        deleted_names: set[str] = set()
+        for f in self.files:
+            if f.path in deleted_paths:
+                deleted_names.add(f.name)
+
+        self.files = [f for f in self.files if f.path not in deleted_paths]
+        
+        if self.folder:
+            mtdt_path = self.folder / "mtdt.json"
+            mtdt = Mtdt(mtdt_path) if mtdt_path.exists() else None
+            if mtdt:
+                for name in deleted_names:
+                    mtdt.remove_file(name)
+                    mtdt.remove_song(name)
+                mtdt.save()
+
+        self.table.rows = self.files
+        self.table.selected = []
+        self.table.update()

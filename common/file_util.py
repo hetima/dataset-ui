@@ -42,6 +42,8 @@ class Mtdt:
         # songs / audiofiles を {filename: data} の dict として保持
         self.songs: dict[str, dict] = {}
         self.audiofiles: dict[str, dict] = {}
+        # save() 時にファイルから削除するエントリを追跡
+        self._removed: dict[str, set[str]] = {"songs": set(), "audiofiles": set()}
         self._load()
 
     def _read_raw(self) -> dict:
@@ -84,6 +86,18 @@ class Mtdt:
         else:
             store[filename] = {"filename": filename, **data}
 
+    def remove_song(self, filename: str) -> None:
+        self.remove("songs", filename)
+
+    def remove_file(self, filename: str) -> None:
+        self.remove("audiofiles", filename)
+
+    def remove(self, key: str, filename: str) -> None:
+        """key ストアから filename エントリを削除する（保存はしない）。"""
+        store: dict[str, dict] = getattr(self, key, {})
+        store.pop(filename, None)
+        self._removed[key].add(filename)
+
     def save(self) -> None:
         """ファイルから再読み込みしてインスタンスデータをマージして保存する。
         songs / audiofiles 以外のキーや他プロセスによる変更を保持する。
@@ -98,6 +112,9 @@ class Mtdt:
                 continue
             # ファイル上のリストを {filename: data} に変換
             on_disk = {item["filename"]: item for item in mtdt_all.get(k, []) if "filename" in item}
+            # 削除対象を除外
+            for filename in self._removed.get(k, set()):
+                on_disk.pop(filename, None)
             # インスタンスの変更をマージ
             for filename, data in entries.items():
                 if filename in on_disk:

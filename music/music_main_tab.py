@@ -12,6 +12,7 @@ from music.music_app_ctx import MusicCtx
 from lib.roformer.roformer import list_roformer_models
 from lib.roformer.task_infer import infer_roformer
 from common.plyr import simple_plyr_player
+from common.message_dialog import show_confirm_dialog
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
 
@@ -580,3 +581,15 @@ def tab_main(ctx: MusicCtx):
             info_panel()
     ctx.info_panel = info_panel
     ctx.table.on("rowClick", lambda e: (setattr(ctx, "pickup", e.args[1]), ctx.info_panel.refresh()))
+
+    async def delete_selected(permanent=False):
+        if len(ctx.table.selected) == 0:
+            ui.notify("処理対象がありません")
+            return
+        trash = "（ゴミ箱に移動します）" if not permanent else ""
+        if not await show_confirm_dialog(f"選択項目を削除しますか？{trash}"):
+            return
+        ctx.delete_selected(permanent)
+    with ui.dropdown_button('選択項目を削除', color='red'):
+        ui.item('ゴミ箱に移動...', on_click=lambda: delete_selected(False))
+        ui.item('完全に削除...', on_click=lambda: delete_selected(True))

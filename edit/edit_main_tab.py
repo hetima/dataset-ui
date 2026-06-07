@@ -3,6 +3,7 @@ from common.setting import cnfg
 from edit.edit_app_ctx import EditCtx
 from edit.daw_bridge import create_daw_session, create_daw_session_single_track, get_daw_url
 from common.plyr import simple_plyr_player
+from common.message_dialog import show_confirm_dialog
 
 
 def tab_main(ctx: EditCtx):
@@ -128,3 +129,15 @@ def tab_main(ctx: EditCtx):
 
     ctx.load_files(str(cnfg.outputs_dir))
     ctx.load_pool()
+    
+    async def delete_selected(permanent=False):
+        if len(ctx.table.selected) == 0:
+            ui.notify("処理対象がありません")
+            return
+        trash = "（ゴミ箱に移動します）" if not permanent else ""
+        if not await show_confirm_dialog(f"選択項目を削除しますか？{trash}"):
+            return
+        ctx.delete_selected(permanent)
+    with ui.dropdown_button('選択項目を削除', color='red'):
+        ui.item('ゴミ箱に移動...', on_click=lambda: delete_selected(False))
+        ui.item('完全に削除...', on_click=lambda: delete_selected(True))
