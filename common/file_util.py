@@ -54,14 +54,20 @@ class Mtdt:
             return json.load(f)
 
     def _load(self) -> None:
-        """ファイルを読み込んで songs / audiofiles を構築する。"""
+        """ファイルを読み込んで songs / audiofiles を構築する。list/dict どちらの形式も読み込める。"""
         raw = self._read_raw()
         for key in ("songs", "audiofiles"):
             store: dict[str, dict] = {}
-            for item in raw.get(key, []):
-                fn = item.get("filename")
-                if fn:
-                    store[fn] = item
+            value = raw.get(key, [])
+            if isinstance(value, list):
+                # 旧仕様: list 形式
+                for item in value:
+                    fn = item.get("filename")
+                    if fn:
+                        store[fn] = item
+            elif isinstance(value, dict):
+                # 新仕様: dict 形式
+                store = value
             setattr(self, key, store)
 
     def song_data(self, filename: str) -> dict|None:
@@ -110,8 +116,12 @@ class Mtdt:
             entries: dict[str, dict] = getattr(self, k)
             if not entries:
                 continue
-            # ファイル上のリストを {filename: data} に変換
-            on_disk = {item["filename"]: item for item in mtdt_all.get(k, []) if "filename" in item}
+            # ファイル上の既存データを dict 形式に統一して読み込む
+            existing = mtdt_all.get(k, [])
+            if isinstance(existing, list):
+                on_disk = {item["filename"]: item for item in existing if "filename" in item}
+            else:
+                on_disk = dict(existing)
             # 削除対象を除外
             for filename in self._removed.get(k, set()):
                 on_disk.pop(filename, None)
@@ -121,6 +131,7 @@ class Mtdt:
                     on_disk[filename].update(data)
                 else:
                     on_disk[filename] = data
-            mtdt_all[k] = list(on_disk.values())
+            # 新仕様: dict 形式で保存
+            mtdt_all[k] = on_disk
         with open(self.mtdt_path, "w", encoding="utf-8") as f:
             json.dump(mtdt_all, f, ensure_ascii=False, indent=2)
