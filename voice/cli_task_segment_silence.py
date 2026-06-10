@@ -223,13 +223,10 @@ def pad_to_length(ch: AudioSegment, target_ms: int):
 ########################################
 # メイン処理: 1ファイル単位
 ########################################
-def split_one_file(
-    path_str: str, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100
+def split_audio_segment(
+    audio: AudioSegment, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100
 ) -> list[AudioSegment]:
-    """process_one_file と同じ分割処理を行い、ファイルに書き出さず AudioSegment のリストを返す。"""
-    path = Path(path_str)
-    audio = AudioSegment.from_file(path)
-
+    """AudioSegment を分割処理し、AudioSegment のリストを返す。"""
     phrases = split_into_phrases(audio, min_silence_len, silence_thresh)
 
     splitted = []
@@ -258,6 +255,14 @@ def split_one_file(
         else:
             enforced.append(ch)
     return enforced
+
+
+def split_one_file(
+    path_str: str, min_silence_len=300, silence_thresh=-60, min_sec=2, max_sec=5, fade_ms=10, gap_ms=100
+) -> list[AudioSegment]:
+    """ファイルを読み込んで分割処理を行い、AudioSegment のリストを返す。"""
+    audio = AudioSegment.from_file(Path(path_str))
+    return split_audio_segment(audio, min_silence_len, silence_thresh, min_sec, max_sec, fade_ms, gap_ms)
 
 
 def process_one_file(

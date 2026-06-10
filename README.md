@@ -26,6 +26,15 @@
 コンピングとかも一応できます。編集結果を書き出すことができます。\
 編集状態は保存できませんが、AAFに書き出せます。コンピングのリージョンはそれぞれのオーディオイベントに変換されます。
 
+## cli/lfm_server.py
+LFM2.5-Audio-1.5B-JPでASRを行うOpenAI互換APIサーバです。姉妹品の [dataset-ui-app](https://github.com/hetima/dataset-ui-app) から利用できます。ベースURLは `http://localhost:7868/v1` です。APIキーは不要です。モデル名も不要ですが、`/models` は `auto` を返します。
+
+```sh
+# 起動方法
+# venvを有効するか .venv/Scripts/python.exe で
+python cli/lfm_server.py --port 7868 --model-dir LFM2.5-Audio-1.5B-JPのフォルダのパス
+```
+
 
 ## インストール
 ```

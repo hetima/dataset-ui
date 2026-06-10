@@ -71,13 +71,13 @@ def load_audio_mono_16k_librosa(audio_path: str):
     return waveform, 16000
 
 
-def analyze_audio(pipe, audio_path: str) -> dict:
+def analyze_chunks(pipe, chunks, label: str = "") -> str:
+    """無音分割済みのチャンク列を文字起こしして連結した文字列を返す。"""
     import numpy as np
-    
-    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=15, max_sec=20, fade_ms=10, gap_ms=100)
+
     if len(chunks) > 1:
         print(f"divided into {len(chunks)} chunks", flush=True)
-    
+
     transcripts = []
     for i, chunk in enumerate(chunks):
         try:
@@ -93,14 +93,36 @@ def analyze_audio(pipe, audio_path: str) -> dict:
             sr = chunk.frame_rate
             transcript = pipe.transcribe(samples, sr)
         except Exception as e:
-            print(f"\n  Error transcribing chunk {i+1} of {os.path.basename(audio_path)}: {e}", flush=True)
+            print(f"\n  Error transcribing chunk {i+1} of {label}: {e}", flush=True)
             transcript = ""
         transcripts.append(transcript.strip().strip("<|im_end|>"))
 
+    return " ".join(t for t in transcripts if t)
+
+
+def analyze_audio(pipe, audio_path: str) -> dict:
+    """ファイルパスを受け取り、無音分割 → 文字起こしする。"""
+    chunks = split_one_file(audio_path, min_silence_len=300, silence_thresh=-40, min_sec=15, max_sec=20, fade_ms=10, gap_ms=100)
+    transcript = analyze_chunks(pipe, chunks, label=os.path.basename(audio_path))
     return {
         "path": audio_path,
-        "transcript": " ".join(t for t in transcripts if t),
+        "transcript": transcript,
     }
+
+
+def analyze_audio_data(pipe, audio_file) -> str:
+    """音声データ（bytes / ファイルライクオブジェクト）を受け取り、無音分割 → 文字起こしする。"""
+    import io
+
+    from pydub import AudioSegment
+
+    from voice.cli_task_segment_silence import split_audio_segment
+
+    if isinstance(audio_file, (bytes, bytearray)):
+        audio_file = io.BytesIO(audio_file)
+    audio = AudioSegment.from_file(audio_file)
+    chunks = split_audio_segment(audio, min_silence_len=300, silence_thresh=-40, min_sec=15, max_sec=20, fade_ms=10, gap_ms=100)
+    return analyze_chunks(pipe, chunks, label="audio_data")
 
 
 def main():
