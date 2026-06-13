@@ -50,6 +50,7 @@ class CpuTaskDialog(ui.dialog):
         self._cancel_requested = False
         self._result: Any = None
         self._success = False
+        self._closed = False  # _safe_close の多重呼び出し・削除済み状態をガード
 
         self._manager: multiprocessing.Manager | None = None  # type: ignore[type-arg]
         self._queue: multiprocessing.queues.Queue | None = None  # type: ignore[type-arg]
@@ -181,6 +182,13 @@ class CpuTaskDialog(ui.dialog):
             self._executor.shutdown(wait=False, cancel_futures=True)
 
     def _safe_close(self):
+        if self._closed:
+            return
+        self._closed = True
         if self._finish_callback:
             self._finish_callback(self._success, self._result)
-        self.delete()
+        # 親スロットが既に破棄されている場合は delete() が ValueError を投げるためガード
+        try:
+            self.delete()
+        except (ValueError, RuntimeError):
+            pass
