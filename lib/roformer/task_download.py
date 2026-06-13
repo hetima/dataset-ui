@@ -28,8 +28,6 @@ def do_download(repo_id, filename, local_dir):
         download_bucket_files(bucket_name, files=[(filename, local_file_path)])
     else:
         hf_hub_download(repo_id=repo_id, filename=filename, local_dir=local_dir)
-    # or
-    download_bucket_files("username/my-bucket", files=[],)
 
 def download_roformer_model(data: dict, queue: multiprocessing.queues.Queue, stop_event) -> dict | None:  # type: ignore[type-arg]
     """
