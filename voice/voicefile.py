@@ -11,6 +11,8 @@ class VoiceFile:
     transcript: Optional[str]
     caption: Optional[str]
     speaker_id: Optional[str]
+    good: bool = False
+    bad: bool = False
     default: Optional["VoiceFile"] = None
     is_expandable: bool = False
     children: Optional[list["VoiceFile"]] = None
@@ -42,6 +44,8 @@ class VoiceFile:
             "transcript": self.transcript,
             "caption": self.caption,
             "speaker_id": self.speaker_id,
+            "good": self.good,
+            "bad": self.bad,
         }
 
     def to_dict(self) -> dict:
@@ -53,6 +57,8 @@ class VoiceFile:
             "transcript": self.transcript,
             "caption": self.caption,
             "speaker_id": self.speaker_id,
+            "good": self.good,
+            "bad": self.bad,
         }
 
     def add_child(self, child: "VoiceFile") -> None:
@@ -72,6 +78,8 @@ class VoiceFile:
             transcript=data.get("transcript", ""),
             caption=data.get("caption", ""),
             speaker_id=data.get("speaker_id", ""),
+            good=data.get("good", False),
+            bad=data.get("bad", False),
         )
 
     def save_to_json(self) -> None:
@@ -94,6 +102,8 @@ class VoiceFile:
         caption = ""
         transcript = ""
         speaker_id = ""
+        good = False
+        bad = False
 
         # txtが存在する場合は読み込み
         if txt_path.exists():
@@ -106,6 +116,8 @@ class VoiceFile:
             transcript = mtdt_data.get("transcript", transcript)
             caption = mtdt_data.get("caption", caption)
             speaker_id = mtdt_data.get("speaker_id", speaker_id)
+            good = mtdt_data.get("good", good)
+            bad = mtdt_data.get("bad", bad)
 
         default = cls(
             name=name,
@@ -114,6 +126,8 @@ class VoiceFile:
             transcript=transcript,
             caption=caption,
             speaker_id=speaker_id,
+            good=good,
+            bad=bad,
         )
 
         return cls(
@@ -124,4 +138,6 @@ class VoiceFile:
             default=default,
             caption=caption,
             speaker_id=speaker_id,
+            good=good,
+            bad=bad,
         )
