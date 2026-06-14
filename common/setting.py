@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import sys
 from pathlib import Path
 from nicegui import binding
 
@@ -134,11 +135,13 @@ class Setting:
         "base_dir",
         "repo_dir",
         "setting_path",
+        "python_path",
     })
 
     repo_dir: Path = REPO_DIR
     base_dir: Path = BASE_DIR
     setting_path: Path = REPO_DIR / SETTING_FILE
+    python_path: str = dataclasses.field(default_factory=lambda: sys.executable)
     models_dir: Path = MODELS_DIR
     outputs_dir: Path = OUTPUTS_DIR
     train_dir: Path = TRAIN_DIR
@@ -178,15 +181,21 @@ class Setting:
             else:
                 data[f.name] = _serialize(value)
 
+        data["python_path"] = sys.executable
+
         self.setting_path.write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
 
     def load(self):
         if not self.setting_path.exists():
+            self.save()
             return
         data = json.loads(self.setting_path.read_text(encoding="utf-8"))
-
+        needs_save = False
+        prev_python_path = data.get("python_path", "")
+        if self.python_path != prev_python_path:
+            needs_save = True
         # ルート直下フィールド
         for f in dataclasses.fields(self):
             if f.name in self._EXCLUDED_SETTINGS or f.name.startswith("_"):
@@ -222,6 +231,9 @@ class Setting:
             self.models_dir = MODELS_DIR
         if not self.train_dir:
             self.train_dir = TRAIN_DIR
+        if needs_save:
+            self.save()
+
 
     # ── setter ──────────────────────────────────────────────────────────────
 
