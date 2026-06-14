@@ -27,6 +27,8 @@ def tab_iridori_train(ctx: VoiceCtx):
         ui.label("「トレーニングパス/irodori-tts/プロジェクト名」に作成されます。この工程には 書き起こし.txt または mtdt.json が必要です。メインタブで生成してください。transcript が必須で capiton と speaker_id はオプションです。").classes("infotxt")
         ui.label("最大音長（秒数）を指定すると、長いファイルはその秒数で切り詰められます。0にしておけばそのまま使用します").classes("infotxt")
         with ui.row().classes("items-center gap-2"):
+            good_only_check = ui.checkbox("Goodファイルのみを対象", value=False).tooltip("dataset-ui-app で Good フラグを付けたファイルだけを対象にします。mtdt.json から読み取ります")
+        with ui.row().classes("items-center gap-2"):
             path_input = (
                 ui.textarea(
                     value="",
@@ -36,7 +38,7 @@ def tab_iridori_train(ctx: VoiceCtx):
                 .props('autogrow style="min-width: 500px" outlined dense clearable')
                 .classes("w-120")
             )
-            validate_dataset_btn = ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value)) # type: ignore
+            validate_dataset_btn = ui.button("データ検証", on_click=lambda: validate_dataset(path_input.value, good_only_check.value)) # type: ignore
             ui.space()
             project_name = ui.input(
                 label="プロジェクト名", placeholder="my_lora", value=""
@@ -44,7 +46,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             max_seconds = ui.input(
                 label="最大音長", placeholder="秒数", value="0"
             ).props("outlined dense style='width: 80px;'")
-            create_dataset_btn =ui.button("トレーニングデータ生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value)) # type: ignore
+            create_dataset_btn =ui.button("トレーニングデータ生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value, good_only_check.value)) # type: ignore
 
         xterm = XtermView(title="ターミナル", rows=10).classes("w-full")
         validate_dataset_btn.bind_enabled(xterm, "is_idle")
@@ -63,20 +65,20 @@ def tab_iridori_train(ctx: VoiceCtx):
                 return []
         return paths
 
-    def validate_dataset(src_path: str):
+    def validate_dataset(src_path: str, good_only: bool = False):
         if not src_path:
             ui.notify("フォルダのパスを入力してください", type="warning")
-            return 
+            return
         paths = dataset_paths(src_path)
         if len(paths) == 0:
             return
         cli = str(Path(__file__).parent / "cli_task_irodori_validate.py")
         xterm.run(
             args=[sys.executable, cli],
-            input_json=[str(path) for path in paths],
+            input_json={"paths": [str(path) for path in paths], "good_only": good_only},
         )
 
-    def create_dataset(src_path: str, project_name: str, max_seconds_str: str):
+    def create_dataset(src_path: str, project_name: str, max_seconds_str: str, good_only: bool = False):
         if not src_path:
             ui.notify("フォルダのパスを入力してください", type="warning")
             return 
@@ -99,6 +101,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             "paths": [str(path) for path in paths],
             "output_path": output_dir,
             "max_seconds": max_seconds if max_seconds > 0 else None,
+            "good_only": good_only,
         }
         xterm.run(
             args=[sys.executable, cli],
