@@ -9,7 +9,7 @@
 - 無音区間で分割、均等に分割
 - タイムストレッチ
 - Irodori-TTS のトレーニング
-
+- Irodori-TTS の推論
 
 ## music
 主に音楽データを扱うページ
@@ -25,6 +25,7 @@
 書き出しフォルダのファイルをDAW風のUIでマルチトラック編集できます。\
 コンピングとかも一応できます。編集結果を書き出すことができます。\
 編集状態は保存できませんが、AAFに書き出せます。コンピングのリージョンはそれぞれのオーディオイベントに変換されます。
+
 
 ## cli/lfm_server.py
 LFM2.5-Audio-1.5B-JPでASRを行うOpenAI互換APIサーバです。姉妹品の [dataset-ui-app](https://github.com/hetima/dataset-ui-app) から利用できます。ベースURLは `http://localhost:7868/v1` です。APIキーは不要です。モデル名も不要ですが、`/models` は `auto` を返します。
@@ -63,10 +64,13 @@ pip install -r requirements.txt
 pip uninstall hf-xet
 ```
 
+
+## スクリーンショット
+
 voice
 ![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/01.jpg)
 
-music
+Irodori-TTS
 ![Screenshot](https://raw.githubusercontent.com/hetima/dataset-ui/main/assets/02.jpg)
 
 audio-edit
@@ -92,6 +96,7 @@ pnpm deploy
 
 - [zauberzeug/nicegui](https://github.com/zauberzeug/nicegui/)
 - [Aratako/Irodori-TTS](https://github.com/Aratako/Irodori-TTS)
+- [Aratako/Irodori-TTS-Server](https://github.com/Aratako/Irodori-TTS-Server)
 - [naomiaro/waveform-playlist](https://github.com/naomiaro/waveform-playlist)
 - [sampotts/plyr](https://github.com/sampotts/plyr)
 - [Qwen3-ASR support-transformers-v5.4](https://github.com/One-sixth/Qwen3-ASR/tree/support-transformers-v5.4)

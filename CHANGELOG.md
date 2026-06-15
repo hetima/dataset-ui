@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-06-16
+- Irodori-TTS 推論
+
 ## 2026-06-10
 - `cli/lfm_server.py` 実装
 - `mtdt.json` の `audiofiles` キーを廃止し、すべて `songs` キーに統一されます。しばらくは互換性のため読み込みはサポートされます
