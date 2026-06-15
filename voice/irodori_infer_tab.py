@@ -5,6 +5,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 import httpx
+from mutagen.flac import FLAC
+from mutagen.id3 import COMM, USLT
+from mutagen.wave import WAVE
 from nicegui import background_tasks, helpers, ui
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
@@ -232,6 +235,34 @@ def tab_iridori_infer(ctx: VoiceCtx):
             payload["voice"] = job.voice
         return payload
 
+    def save_audio_metadata(path: Path, job: InferJob, seed: str | None) -> None:
+        """生成音声に入力テキストと推論パラメータを書き込む。"""
+        description = (
+            f"cfg_scale_text:{job.cfg_scale_text}, "
+            f"cfg_scale_speaker:{job.cfg_scale_speaker}, "
+            f"seed:{seed or ''}"
+        )
+        if job.lora_adapter:
+            lora_path = Path(job.lora_adapter)
+            lora_label = "/".join(lora_path.parts[-2:])
+            description += f" ,lora:{lora_label}"
+        if job.response_format == "flac":
+            audio = FLAC(path)
+            audio["lyrics"] = job.text
+            audio["description"] = description
+            audio.save()
+            return
+        if job.response_format == "wav":
+            audio = WAVE(path)
+            if audio.tags is None:
+                audio.add_tags()
+            if audio.tags is not None:
+                audio.tags.delall("USLT")
+                audio.tags.delall("COMM")
+                audio.tags.add(USLT(encoding=3, lang="jpn", desc="", text=job.text))
+                audio.tags.add(COMM(encoding=3, lang="jpn", desc="", text=description))
+                audio.save()
+
     async def worker():
         """推論キューを順番に処理し、返ってきた音声をファイルに保存する。"""
         while True:
@@ -251,6 +282,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 out_path = unique_output_path(job.out_path)
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 out_path.write_bytes(res.content)
+                save_audio_metadata(out_path, job, res.headers.get("X-Irodori-Seed"))
                 ui.notify(f"推論結果を書き出しました: {out_path.name}")
             except Exception as exc:
                 ui.notify(f"推論に失敗しました: {exc}", type="negative")
