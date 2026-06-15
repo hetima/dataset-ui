@@ -28,6 +28,12 @@ pyaaf2
 # Irodori-TTS
 dacvae @ git+https://github.com/facebookresearch/dacvae
 peft
+# Irodori-TTS Server
+pydantic-settings
+# python-dotenv #niceguiが依存しているので明示不要
+# python-multipart #niceguiが依存しているので明示不要
+# fastapi #niceguiが依存しているので明示不要
+# uvicorn #niceguiが依存しているので明示不要
 
 #LFM
 liquid-audio
