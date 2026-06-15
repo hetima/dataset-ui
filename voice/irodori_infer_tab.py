@@ -242,28 +242,39 @@ def tab_iridori_infer(ctx: VoiceCtx):
         voice_select = voice_select_holder["value"]
         selected_voice = voice_select.value if voice_select else VOICE_NONE
         lora_select = lora_select_holder["value"]
-        selected_lora = lora_select.value if lora_select else LORA_NONE
-        if selected_lora and not is_lora_compatible(selected_lora):
-            ui.notify(
-                "選択した LoRA は起動中のベースモデルと違うモデルで作成されています。"
-                "対応するモデルでサーバーを起動し直してください。",
-                type="warning",
+        selected_loras: list[str] = lora_select.value if lora_select else []
+        # 有効なLoRAだけ残す（空リストの場合はLoRAなし1件として扱う）
+        valid_loras: list[str | None] = [v for v in selected_loras if v and v not in (LORA_NONE, LORA_RELOAD)]
+        lora_list: list[str | None] = valid_loras if valid_loras else [None]
+        for lora in lora_list:
+            if lora and not is_lora_compatible(lora):
+                lora_path = Path(lora)
+                lora_label = "/".join(lora_path.parts[-2:])
+                ui.notify(
+                    f"LoRA「{lora_label}」は起動中のベースモデルと違うモデルで作成されています。"
+                    "対応するモデルでサーバーを起動し直してください。",
+                    type="warning",
+                )
+                return
+        voice_val = selected_voice if selected_voice and selected_voice != VOICE_RELOAD else None
+        for lora in lora_list:
+            job_out_path = unique_output_path(out_path) if len(lora_list) > 1 else out_path
+            job = InferJob(
+                text=text,
+                voice=voice_val,
+                lora_adapter=lora,
+                cfg_scale_text=float(cfg_scale_text_slider.value or 0),
+                cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
+                num_steps=num_steps,
+                response_format=fmt,
+                out_path=job_out_path,
             )
-            return
-        job = InferJob(
-            text=text,
-            voice=selected_voice if selected_voice and selected_voice != VOICE_RELOAD else None,
-            lora_adapter=selected_lora if selected_lora and selected_lora != LORA_RELOAD else None,
-            cfg_scale_text=float(cfg_scale_text_slider.value or 0),
-            cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
-            num_steps=num_steps,
-            response_format=fmt,
-            out_path=out_path,
-        )
-        queue.put_nowait(job)
+            queue.put_nowait(job)
         start_worker()
         queue_status.refresh()
-        ui.notify(f"推論キューに追加しました: {out_path.name}", position="bottom-right")
+        count = len(lora_list)
+        msg = f"推論キューに{count}件追加しました" if count > 1 else f"推論キューに追加しました: {out_path.name}"
+        ui.notify(msg, position="bottom-right")
 
     def clear_queue():
         """待機中の推論ジョブだけをキューから削除する。"""
@@ -406,24 +417,28 @@ def tab_iridori_infer(ctx: VoiceCtx):
     with ui.expansion("推論", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
-        ui.label("推論サーバーで生成処理を行います。上記のステータスで、サーバーが起動していることを確認してください。").classes("infotxt")
+        ui.label("推論サーバーで生成処理を行います。上記のステータスで、サーバーが起動していることを確認してください。LoRAを複数選択すると、同じパラメータのキューを複数実行します。").classes("infotxt")
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
 
         @ui.refreshable
         def lora_select_view():
             def on_lora_change(e):
-                if e.value == LORA_RELOAD:
-                    lora_select = lora_select_holder["value"]
-                    if lora_select is None:
-                        return
-                    lora_select.set_value(LORA_NONE)
+                lora_select = lora_select_holder["value"]
+                if lora_select is None:
+                    return
+                values: list = e.value if isinstance(e.value, list) else []
+                if LORA_NONE in values:
+                    lora_select.set_value([])
+                elif LORA_RELOAD in values:
+                    lora_select.set_value([])
                     lora_select_view.refresh()
 
             lora_select = ui.select(
                 options=list_lora_adapters(),
-                value=LORA_NONE,
+                value=[],
                 label="LoRA選択",
-            ).props("outlined dense options-dense").classes("w-full")
+                multiple=True,
+            ).props("outlined dense options-dense use-chips").classes("w-full")
             lora_select_holder["value"] = lora_select # type: ignore
             lora_select.on_value_change(on_lora_change)
 
@@ -474,9 +489,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 "outlined dense style='width: 120px;'"
             )
             prefix_input = ui.input(
-                label="プレフィクス",
+                label="ファイル名",
                 value=cnfg.voice.irodori_tts_output_prefix,
-            ).props("outlined dense style='width: 260px;'")
+            ).props("outlined dense style='width: 260px;'").tooltip("%Y-%m-%dなどの日付時刻フォーマットが使えます。/でサブフォルダを作成できます")
             prefix_input.bind_value(cnfg.voice, "irodori_tts_output_prefix")
             format_select = ui.select(
                 options=["wav", "flac"],

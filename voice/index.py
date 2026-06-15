@@ -15,10 +15,10 @@ def main_page():
     ) as tabs:
         main_Tab = ui.tab("main", label="メイン", icon="apps")
         iridori_infer_Tab =ui.tab(
-            "iridori_infer", label="Irodori TTS", icon="speaker"
+            "iridori_infer", label="Irodori-TTS", icon="speaker"
         )
         iridori_train_Tab = ui.tab(
-            "iridori_train", label="Irodori Train", icon="terminal"
+            "iridori_train", label="Irodori-TTS Train", icon="terminal"
         )
         setting_tab = ui.tab("setting", label="設定", icon="settings")
     with ui.tab_panels(tabs, animated=False, value=main_Tab).classes("w-full"):
