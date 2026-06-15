@@ -1280,18 +1280,18 @@ def clear_cached_runtime() -> None:
 
 
 def _load_audio(path: str | Path) -> tuple[torch.Tensor, int]:
-    try:
-        return torchaudio.load(str(path))
-    except RuntimeError:
-        import soundfile as sf
+    # try:
+    #     return torchaudio.load(str(path))
+    # except RuntimeError:
+    import soundfile as sf
 
-        data, sr = sf.read(str(path), dtype="float32")
-        wav = torch.from_numpy(data)
-        if wav.ndim == 1:
-            wav = wav.unsqueeze(0)
-        else:
-            wav = wav.T
-        return wav, sr
+    data, sr = sf.read(str(path), dtype="float32")
+    wav = torch.from_numpy(data)
+    if wav.ndim == 1:
+        wav = wav.unsqueeze(0)
+    else:
+        wav = wav.T
+    return wav, sr
 
 
 def save_wav(path: str | Path, audio: torch.Tensor, sample_rate: int, format: str | None = None) -> Path:

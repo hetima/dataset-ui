@@ -14,6 +14,8 @@ KNOWN_MODELS = ["Irodori-TTS-500M-v3", "Irodori-TTS-600M-v3-VoiceDesign"]
 IRODORI_LORA_SUB_DIR = "irodori-tts_lora"
 LORA_NONE = ""
 LORA_RELOAD = "__reload__"
+VOICE_NONE = ""
+VOICE_RELOAD = "__reload__"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -21,6 +23,7 @@ class InferJob:
     """Irodori-TTS 推論キューに積む設定一式。"""
 
     text: str
+    voice: str | None
     lora_adapter: str | None
     cfg_scale_text: float
     cfg_scale_speaker: float
@@ -33,9 +36,10 @@ def tab_iridori_infer(ctx: VoiceCtx):
     queue: asyncio.Queue[InferJob] = asyncio.Queue()
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
+    voice_select_holder = {"value": None}
 
     def check_health() -> tuple[bool, str | None]:
-        """サーバの /health を叩いて (起動中か, model.checkpoint) を返す。"""
+        """サーバーの /health を叩いて (起動中か, model.checkpoint) を返す。"""
         try:
             res = httpx.get(f"{SERVER_URL}/health", timeout=2.0)
             if res.status_code != 200:
@@ -48,7 +52,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             return False, None
 
     def build_launch_command(model_name: str) -> str:
-        """サーバ起動コマンドの文字列を組み立てる。"""
+        """サーバー起動コマンドの文字列を組み立てる。"""
         cli = Path(__file__).parent.parent / "cli" / "irodori_server.py"
         return f'{sys.executable} "{cli}" --model-path {model_name}'
 
@@ -56,6 +60,22 @@ def tab_iridori_infer(ctx: VoiceCtx):
         cmd = build_launch_command(model_name)
         ui.run_javascript(f"navigator.clipboard.writeText({cmd!r})")
         ui.notify("コマンドをコピーしました")
+
+    def list_server_voices() -> dict[str, str]:
+        """Irodori-TTS サーバーの voice 一覧を選択肢として返す。"""
+        options = {VOICE_NONE: "なし"}
+        try:
+            res = httpx.get(f"{SERVER_URL}/v1/audio/voices", timeout=3.0)
+            res.raise_for_status()
+            data = res.json()
+            for item in data.get("data", []):
+                voice_id = item.get("id")
+                if isinstance(voice_id, str) and voice_id:
+                    options[voice_id] = voice_id
+        except Exception:
+            pass
+        options[VOICE_RELOAD] = "メニューを更新"
+        return options
 
     def list_lora_adapters() -> dict[str, str]:
         """models_dir/irodori-tts_lora/*/checkpoint_* を選択肢として返す。"""
@@ -99,7 +119,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
         return checkpoint_path if isinstance(checkpoint_path, str) else None
 
     def is_lora_compatible(adapter_path: str | None) -> bool:
-        """サーバの起動中モデルと LoRA の作成元が違う場合は False を返す。"""
+        """サーバーの起動中モデルと LoRA の作成元が違う場合は False を返す。"""
         base_checkpoint = lora_base_checkpoint(adapter_path)
         if not base_checkpoint:
             return True
@@ -152,17 +172,20 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
         cnfg.voice.save()
         out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt)
+        voice_select = voice_select_holder["value"]
+        selected_voice = voice_select.value if voice_select else VOICE_NONE
         lora_select = lora_select_holder["value"]
         selected_lora = lora_select.value if lora_select else LORA_NONE
         if selected_lora and not is_lora_compatible(selected_lora):
             ui.notify(
                 "選択した LoRA は起動中のベースモデルと違うモデルで作成されています。"
-                "対応するモデルでサーバを起動し直してください。",
+                "対応するモデルでサーバーを起動し直してください。",
                 type="warning",
             )
             return
         job = InferJob(
             text=text,
+            voice=selected_voice if selected_voice and selected_voice != VOICE_RELOAD else None,
             lora_adapter=selected_lora if selected_lora and selected_lora != LORA_RELOAD else None,
             cfg_scale_text=float(cfg_scale_text_slider.value or 0),
             cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
@@ -189,21 +212,25 @@ def tab_iridori_infer(ctx: VoiceCtx):
         ui.notify(f"待機中の推論を {count} 件クリアしました")
 
     def build_payload(job: InferJob) -> dict:
-        """Irodori-TTS サーバへ送る JSON payload を作る。"""
+        """Irodori-TTS サーバーへ送る JSON payload を作る。"""
         irodori = {
-            "no_ref": True,
             "num_steps": job.num_steps,
             "cfg_scale_text": job.cfg_scale_text,
             "cfg_scale_speaker": job.cfg_scale_speaker,
         }
+        if job.voice is None:
+            irodori["no_ref"] = True
         if job.lora_adapter:
             irodori["lora_adapter"] = job.lora_adapter
-        return {
+        payload = {
             "model": "irodori-tts",
             "input": job.text,
             "response_format": job.response_format,
             "irodori": irodori,
         }
+        if job.voice is not None:
+            payload["voice"] = job.voice
+        return payload
 
     async def worker():
         """推論キューを順番に処理し、返ってきた音声をファイルに保存する。"""
@@ -243,9 +270,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
         )
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # サーバステータス
+    # サーバーステータス
     # ═══════════════════════════════════════════════════════════════════════════════
-    with ui.expansion("サーバステータス", value=True).classes(
+    with ui.expansion("サーバーステータス", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
 
@@ -261,7 +288,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     else:
                         ui.label("起動していません")
                 ui.label(
-                    "Irodori-TTS サーバ起動方法：モデルを選択し、コマンドをコピーボタンを押して、クリップボードにコピーされたコマンドをターミナルで実行してください。"
+                    "Irodori-TTS サーバー起動方法：モデルを選択し、コマンドをコピーボタンを押して、クリップボードにコピーされたコマンドをターミナルで実行してください。"
                     "起動完了したら更新ボタンを押して確認してください。"
                 ).classes("infotxt")
                 with ui.row().classes("items-center gap-2"):
@@ -281,6 +308,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     with ui.expansion("推論", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
+        ui.label("推論サーバーで生成処理を行います。上記のステータスで、サーバーが起動していることを確認してください。").classes("infotxt")
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
 
         @ui.refreshable
@@ -298,10 +326,30 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 value=LORA_NONE,
                 label="LoRA選択",
             ).props("outlined dense options-dense").classes("w-full")
-            lora_select_holder["value"] = lora_select
+            lora_select_holder["value"] = lora_select # type: ignore
             lora_select.on_value_change(on_lora_change)
 
         lora_select_view()
+
+        @ui.refreshable
+        def voice_select_view():
+            def on_voice_change(e):
+                if e.value == VOICE_RELOAD:
+                    voice_select = voice_select_holder["value"]
+                    if voice_select is None:
+                        return
+                    voice_select.set_value(VOICE_NONE)
+                    voice_select_view.refresh()
+
+            voice_select = ui.select(
+                options=list_server_voices(),
+                value=VOICE_NONE,
+                label="voice",
+            ).props("outlined dense options-dense style='width: 220px;'")
+            voice_select_holder["value"] = voice_select # type: ignore
+            voice_select.on_value_change(on_voice_change)
+
+        voice_select_view()
 
         with ui.row().classes("items-center gap-4 w-full"):
             with ui.column().classes("gap-1"):
@@ -355,4 +403,10 @@ def tab_iridori_infer(ctx: VoiceCtx):
             queue_status()
 
 
-
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 生成結果
+    # ═══════════════════════════════════════════════════════════════════════════════
+    with ui.expansion("生成結果", value=True).classes(
+        "rounded-borders brdr overflow-hidden w-full"
+    ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
+        pass

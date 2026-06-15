@@ -267,16 +267,16 @@ class DACVAECodec:
         return self.model.decode(z)
 
     def encode_file(self, path: str | Path) -> torch.Tensor:
-        try:
-            wav, sr = torchaudio.load(str(path))
-        except RuntimeError:
-            import soundfile as sf
+        # try:
+        #     wav, sr = torchaudio.load(str(path))
+        # except RuntimeError:
+        import soundfile as sf
 
-            data, sr = sf.read(str(path), dtype="float32")
-            wav = torch.from_numpy(data)
-            if wav.ndim == 1:
-                wav = wav.unsqueeze(0)
-            else:
-                wav = wav.T
+        data, sr = sf.read(str(path), dtype="float32")
+        wav = torch.from_numpy(data)
+        if wav.ndim == 1:
+            wav = wav.unsqueeze(0)
+        else:
+            wav = wav.T
         wav = wav.unsqueeze(0)  # (1, C, T)
         return self.encode_waveform(wav, sr).cpu()
