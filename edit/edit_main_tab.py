@@ -69,9 +69,9 @@ def tab_main(ctx: EditCtx):
         )
         with ui.row().classes("items-center gap-4"):
             ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
-            ui.button("DAW末尾に追加", icon="playlist_add", on_click=append_to_daw)
+            # ui.button("DAW末尾に追加", icon="playlist_add", on_click=append_to_daw)
             ui.toggle(
-                {"multi": "マルチトラック", "single": "シングルトラック"},
+                {"multi": "マルチトラック", "single": "階段状に並べる"},
                 value="multi",
                 on_change=lambda e: daw_mode.update({"single": e.value == "single"}),
             ).props("dense")

@@ -20,7 +20,6 @@ import {
   Pause,
   Play,
   Redo2,
-  RefreshCw,
   Scissors,
   Server,
   Square,
@@ -317,24 +316,6 @@ function App() {
   const [loading, setLoading] = useState(Boolean(sessionId))
   const [error, setError] = useState('')
 
-  const reloadSession = async () => {
-    if (!sessionId) {
-      setError('session が指定されていません')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    try {
-      setSession(await fetchSession(sessionId))
-    } catch (err) {
-      setSession(null)
-      setError(err instanceof Error ? err.message : 'セッション取得に失敗しました')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
     let ignore = false
     if (!sessionId) {
@@ -400,10 +381,6 @@ function App() {
         <div>
           <h1>DAW</h1>
         </div>
-        <button type="button" className="toolbar-button" onClick={reloadSession}>
-          <RefreshCw size={17} />
-          再読み込み （変更は破棄されます）
-        </button>
       </header>
 
 

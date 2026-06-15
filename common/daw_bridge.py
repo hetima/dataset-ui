@@ -353,6 +353,7 @@ def create_daw_session_single_track(paths: list[str]) -> DawSession:
     全ファイルを名前順で startTime をずらして時間軸上に連続して配置した
     複数トラック（ファイルごとに1行）として渡す。ユーザーには縦に積むのではなく
     横に並ぶ一覧として機能する。
+    現在 single_track がおかしくなって階段状になっている
     """
 
     session_id = uuid4().hex
