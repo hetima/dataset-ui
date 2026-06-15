@@ -68,6 +68,17 @@ def _extract_audio_base64(messages: list[dict]) -> str:
                     return data
     raise HTTPException(status_code=400, detail="input_audio が見つかりません")
 
+@app.get("/health")
+def health() -> dict:
+    return {
+        "status": "ok",
+    }
+
+@app.get("/v1/health")
+def healthv1() -> dict:
+    return {
+        "status": "ok",
+    }
 
 @app.get("/v1/models")
 def list_models():
