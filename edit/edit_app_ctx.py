@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from nicegui import binding, ui
 from nicegui.elements.table import Table
@@ -21,6 +21,8 @@ class EditCtx:
         self.model_refresh_func: list[Callable[[], None]] = []
         self.dataset_dirs_refresh_func: list[Callable[[], None]] = []
         self.daw_refresh_func: list[Callable[[], None]] = []
+        self.daw_post_message_func: list[Callable[[dict[str, Any]], None]] = []
+        self.daw_session_id = ""
         self.daw_url = ""
         self.client = ui.context.client
         self.tabs: Tabs

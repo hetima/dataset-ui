@@ -1,7 +1,9 @@
+from dataclasses import asdict
+
 from nicegui import ui
 from common.setting import cnfg
 from edit.edit_app_ctx import EditCtx
-from edit.daw_bridge import create_daw_session, create_daw_session_single_track, get_daw_url
+from common.daw_bridge import add_daw_session_tracks, create_daw_session, create_daw_session_single_track, get_daw_url
 from common.plyr import simple_plyr_player
 from common.message_dialog import show_confirm_dialog
 
@@ -26,9 +28,38 @@ def tab_main(ctx: EditCtx):
             session = create_daw_session_single_track(paths)
         else:
             session = create_daw_session(paths)
+        ctx.daw_session_id = session.id
         ctx.daw_url = get_daw_url(session.id)
         ctx.tabs.set_value("daw")
         ui.timer(0.1, lambda: [func() for func in ctx.daw_refresh_func], once=True)
+
+    def append_to_daw() -> None:
+        """選択中のファイルを表示中の DAW セッション末尾へ追加する。"""
+
+        if not ctx.daw_session_id:
+            ui.notify("先に DAW を開いてください", type="warning")
+            return
+
+        files = ctx.target_files()
+        paths = [edit_file["path"] for edit_file in files]  # type: ignore
+        if not paths:
+            ui.notify("処理対象がありません")
+            return
+
+        try:
+            tracks = add_daw_session_tracks(ctx.daw_session_id, paths)
+        except ValueError as exc:
+            ui.notify(str(exc), type="negative")
+            return
+
+        payload = {
+            "type": "daw-add-tracks",
+            "tracks": [asdict(track) for track in tracks],
+        }
+        for func in ctx.daw_post_message_func:
+            func(payload)
+        ctx.tabs.set_value("daw")
+        ui.notify(f"{len(tracks)} 件のトラックを追加しました", type="positive")
 
     with ui.expansion("DAW", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
@@ -38,6 +69,7 @@ def tab_main(ctx: EditCtx):
         )
         with ui.row().classes("items-center gap-4"):
             ui.button("DAWで開く", icon="graphic_eq", on_click=open_daw)
+            ui.button("DAW末尾に追加", icon="playlist_add", on_click=append_to_daw)
             ui.toggle(
                 {"multi": "マルチトラック", "single": "シングルトラック"},
                 value="multi",

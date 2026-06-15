@@ -297,6 +297,19 @@ async function fetchSession(id: string) {
   return (await response.json()) as DawSession
 }
 
+function isDawTrack(value: unknown): value is DawTrack {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const track = value as Partial<DawTrack>
+  return (
+    typeof track.id === 'string' &&
+    typeof track.name === 'string' &&
+    typeof track.sourcePath === 'string' &&
+    typeof track.url === 'string'
+  )
+}
+
 function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), [])
   const sessionId = params.get('session') ?? ''
@@ -349,6 +362,35 @@ function App() {
       ignore = true
     }
   }, [sessionId])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data
+      if (!message || message.type !== 'daw-add-tracks' || !Array.isArray(message.tracks)) {
+        return
+      }
+
+      const addedTracks: DawTrack[] = (message.tracks as unknown[]).filter(isDawTrack)
+      if (addedTracks.length === 0) {
+        return
+      }
+
+      setSession((current) => {
+        if (!current) {
+          return current
+        }
+        const existingIds = new Set(current.tracks.map((track) => track.id))
+        const nextTracks = addedTracks.filter((track) => !existingIds.has(track.id))
+        if (nextTracks.length === 0) {
+          return current
+        }
+        return { ...current, tracks: [...current.tracks, ...nextTracks] }
+      })
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
   const displayError = !sessionId ? 'session が指定されていません' : error
 
@@ -443,9 +485,8 @@ function PlaylistArea({ sourceTracks, singleTrack }: { sourceTracks: DawTrack[];
           読み込み {loadedCount}/{totalCount}
         </div>
       )}
-      {!loading && tracks.length > 0 && (
+      {tracks.length > 0 && (
         <EditablePlaylist
-          key={sourceTracks.map((track) => track.id).join(':')}
           initialTracks={tracks}
           sourceTracks={sourceTracks}
         />
@@ -763,6 +804,32 @@ function EditablePlaylist({
     })
     return map
   }, [initialTracks, sourceTracks])
+
+  useEffect(() => {
+    setPlaylistTracks((current) => {
+      const next = [...current]
+      let changed = false
+
+      for (const track of initialTracks) {
+        const existingIndex = next.findIndex((item) => item.id === track.id)
+        if (existingIndex === -1) {
+          next.push(track)
+          changed = true
+          continue
+        }
+
+        const existing = next[existingIndex]
+        const existingClipIds = new Set(existing.clips.map((clip) => clip.id))
+        const newClips = track.clips.filter((clip) => !existingClipIds.has(clip.id))
+        if (newClips.length > 0) {
+          next[existingIndex] = { ...existing, clips: [...existing.clips, ...newClips] }
+          changed = true
+        }
+      }
+
+      return changed ? next : current
+    })
+  }, [initialTracks])
 
   const moveTrack = (trackIndex: number, direction: -1 | 1) => {
     const nextIndex = trackIndex + direction

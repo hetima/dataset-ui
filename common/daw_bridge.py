@@ -119,6 +119,10 @@ class AafExportRequest(BaseModel):
     aaf: AafPayload
 
 
+class DawAddTracksRequest(BaseModel):
+    paths: list[str]
+
+
 def _safe_aaf_filename(filename: str) -> str:
     """AAF 書き出し用ファイル名を安全な単一ファイル名に整える。"""
 
@@ -334,20 +338,7 @@ def create_daw_session(paths: list[str]) -> DawSession:
     """音声ファイルパスから DAW セッションを作成する（マルチトラック：1ファイル=1トラック）。"""
 
     session_id = uuid4().hex
-    tracks: list[DawTrack] = []
-
-    for index, path in enumerate(paths):
-        source = Path(path).resolve()
-        mount = f"/daw-media/{session_id}/{index}"
-        app.add_media_files(mount, str(source.parent))
-        tracks.append(
-            DawTrack(
-                id=str(index),
-                name=source.name,
-                sourcePath=str(source),
-                url=f"{mount}/{source.name}",
-            )
-        )
+    tracks = _create_daw_tracks(session_id, paths)
 
     session = DawSession(id=session_id, tracks=tracks, singleTrack=False)
     _sessions[session_id] = session
@@ -365,34 +356,80 @@ def create_daw_session_single_track(paths: list[str]) -> DawSession:
     """
 
     session_id = uuid4().hex
-    sorted_paths = sorted(paths, key=lambda p: Path(p).name)
-    tracks: list[DawTrack] = []
-    cursor = 0.0
+    tracks = _create_daw_tracks(session_id, paths, single_track=True)
 
-    for index, path in enumerate(sorted_paths):
+    session = DawSession(id=session_id, tracks=tracks, singleTrack=True)
+    _sessions[session_id] = session
+    return session
+
+
+def _audio_duration(path: str) -> float:
+    """音声ファイルの長さを秒で返す。読めない場合は 0 を返す。"""
+
+    try:
+        import soundfile as sf
+
+        return float(sf.info(path).duration)
+    except Exception:
+        return 0.0
+
+
+def _create_daw_tracks(
+    session_id: str,
+    paths: list[str],
+    *,
+    start_index: int = 0,
+    single_track: bool = False,
+    start_time: float = 0.0,
+) -> list[DawTrack]:
+    """音声ファイルパスから DAW トラック情報を作成する。"""
+
+    source_paths = sorted(paths, key=lambda p: Path(p).name) if single_track else paths
+    tracks: list[DawTrack] = []
+    cursor = start_time
+
+    for offset, path in enumerate(source_paths):
+        index = start_index + offset
         source = Path(path).resolve()
         mount = f"/daw-media/{session_id}/{index}"
         app.add_media_files(mount, str(source.parent))
-        start_time = cursor
-        try:
-            import soundfile as sf
-            info = sf.info(path)
-            cursor += info.duration
-        except Exception:
-            pass
+        track_start_time = cursor if single_track else 0.0
+        if single_track:
+            cursor += _audio_duration(str(source))
         tracks.append(
             DawTrack(
                 id=str(index),
                 name=source.name,
                 sourcePath=str(source),
                 url=f"{mount}/{source.name}",
-                startTime=start_time,
+                startTime=track_start_time,
             )
         )
 
-    session = DawSession(id=session_id, tracks=tracks, singleTrack=True)
-    _sessions[session_id] = session
-    return session
+    return tracks
+
+
+def add_daw_session_tracks(session_id: str, paths: list[str]) -> list[DawTrack]:
+    """既存 DAW セッションの末尾へトラックを追加する。"""
+
+    session = get_daw_session(session_id)
+    if session is None:
+        raise ValueError("DAW セッションが見つかりません")
+
+    start_time = 0.0
+    if session.singleTrack:
+        for track in session.tracks:
+            start_time = max(start_time, track.startTime + _audio_duration(track.sourcePath))
+
+    tracks = _create_daw_tracks(
+        session_id,
+        paths,
+        start_index=len(session.tracks),
+        single_track=session.singleTrack,
+        start_time=start_time,
+    )
+    session.tracks.extend(tracks)
+    return tracks
 
 
 def get_daw_session(session_id: str) -> DawSession | None:
@@ -421,6 +458,17 @@ def api_daw_session(session_id: str) -> dict:
         "tracks": [asdict(track) for track in session.tracks],
         "singleTrack": session.singleTrack,
     }
+
+
+@app.post("/api/daw/session/{session_id}/tracks")
+def api_daw_add_tracks(session_id: str, request: DawAddTracksRequest) -> dict:
+    """既存 DAW セッションへトラックを追加する。"""
+
+    try:
+        tracks = add_daw_session_tracks(session_id, request.paths)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"tracks": [asdict(track) for track in tracks]}
 
 
 @app.post("/api/daw/export")
