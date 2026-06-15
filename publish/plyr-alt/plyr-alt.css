@@ -1,0 +1,104 @@
+.plyr-alt {
+    background: #f6f8fb;
+    background: var(--plyr-alt-background, #f6f8fb);
+    border: 1px solid #26323f24;
+    border-radius: 8px;
+    color: #26323f;
+    color: var(--plyr-alt-text, #26323f);
+    display: block;
+    font-family: inherit;
+    height: 96px;
+    height: var(--plyr-alt-height, 96px);
+    min-width: 180px;
+    overflow: hidden;
+    position: relative;
+    width: 100%
+}
+
+.plyr-alt__audio {
+    display: none
+}
+
+.plyr-alt__waveform {
+    display: block;
+    height: 100%;
+    inset: 0;
+    position: absolute;
+    width: 100%
+}
+
+.plyr-alt__label {
+    font-size: 13px;
+    font-weight: 600;
+    left: 10px;
+    line-height: 1.3;
+    max-width: calc(100% - 20px);
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    text-overflow: ellipsis;
+    top: 8px;
+    white-space: nowrap
+}
+
+.plyr-alt__play {
+    align-items: center;
+    background: #ffffffdb;
+    background: var(--plyr-alt-control-background, #ffffffdb);
+    border: 1px solid #26323f2e;
+    border-radius: 5px;
+    color: #26323f;
+    color: var(--plyr-alt-control, #26323f);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-weight: 600;
+    height: 26px;
+    left: 8px;
+    line-height: 1;
+    padding: 0 10px
+}
+
+.plyr-alt__play,
+.plyr-alt__time {
+    bottom: 8px;
+    font-size: 12px;
+    position: absolute
+}
+
+.plyr-alt__time {
+    color: #26323f;
+    color: var(--plyr-alt-text, #26323f);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    right: 10px
+}
+
+.plyr-alt__play:focus-visible {
+    outline: 2px dashed #00b2ff;
+    outline-offset: 2px
+}
+
+.plyr-alt--playing .plyr-alt__play {
+    color: #00b2ff
+}
+
+.plyr-alt-control {
+    align-items: center;
+    color: inherit;
+    display: flex;
+    font-family: inherit;
+    gap: 8px
+}
+
+.plyr-alt-control__label {
+    align-items: center;
+    display: inline-flex;
+    font-size: 13px;
+    gap: 8px
+}
+
+.plyr-alt-control__range {
+    /* accent-color: #00b2ff; */
+    width: 140px
+}

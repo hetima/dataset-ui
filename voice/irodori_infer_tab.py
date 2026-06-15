@@ -1,14 +1,18 @@
 import asyncio
 import dataclasses
+import hashlib
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 import httpx
+from send2trash import send2trash
 from mutagen.flac import FLAC
 from mutagen.id3 import COMM, USLT
 from mutagen.wave import WAVE
-from nicegui import background_tasks, helpers, ui
+from nicegui import app, background_tasks, helpers, ui
+from common.nicegui_plyr_alt import PlyrAltControl, plyr_alt, plyr_alt_control
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
 
@@ -19,6 +23,8 @@ LORA_NONE = ""
 LORA_RELOAD = "__reload__"
 VOICE_NONE = ""
 VOICE_RELOAD = "__reload__"
+IRODORI_RESULT_MEDIA_ROUTE = "/irodori-result-media"
+_IRODORI_RESULT_MEDIA_ROUTES: set[str] = set()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,6 +46,8 @@ def tab_iridori_infer(ctx: VoiceCtx):
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
     voice_select_holder = {"value": None}
+    result_control = PlyrAltControl()
+    result_list_holder: dict[str, ui.column | None] = {"value": None}
 
     def check_health() -> tuple[bool, str | None]:
         """サーバーの /health を叩いて (起動中か, model.checkpoint) を返す。"""
@@ -62,7 +70,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     def copy_launch_command(model_name: str):
         cmd = build_launch_command(model_name)
         ui.run_javascript(f"navigator.clipboard.writeText({cmd!r})")
-        ui.notify("コマンドをコピーしました")
+        ui.notify("コマンドをコピーしました", position="bottom-right")
 
     def list_server_voices() -> dict[str, str]:
         """Irodori-TTS サーバーの voice 一覧を選択肢として返す。"""
@@ -155,6 +163,62 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 return candidate
             index += 1
 
+    def media_url_for_file(path: Path) -> str:
+        """保存済み音声ファイルをブラウザから読める URL に変換する。"""
+        resolved = path.resolve()
+        parent = resolved.parent
+        route_id = hashlib.sha1(str(parent).encode("utf-8")).hexdigest()[:10]
+        route = f"{IRODORI_RESULT_MEDIA_ROUTE}/{route_id}"
+        if route not in _IRODORI_RESULT_MEDIA_ROUTES:
+            app.add_media_files(route, str(parent))
+            _IRODORI_RESULT_MEDIA_ROUTES.add(route)
+        return f"{route}/{quote(resolved.name)}"
+
+    def format_result_params(job: InferJob, seed: str | None) -> str:
+        """生成結果欄に表示する推論パラメータを短く整形する。"""
+        voice = job.voice or "なし"
+        lora = "なし"
+        if job.lora_adapter:
+            lora_path = Path(job.lora_adapter)
+            lora = "/".join(lora_path.parts[-2:])
+        return (
+            f"steps={job.num_steps}, "
+            f"cfg_text={job.cfg_scale_text:g}, cfg_speaker={job.cfg_scale_speaker:g}, "
+            f"seed={seed or ''}, voice={voice}, lora={lora}"
+        )
+
+    def add_result_player(path: Path, job: InferJob, seed: str | None):
+        """生成結果欄の末尾に PlyrAlt プレイヤーと推論情報を追加する。"""
+        result_list = result_list_holder["value"]
+        if result_list is None:
+            return
+        with result_list:
+            with ui.column().classes("w-full gap-1 mb-3") as section:
+                with ui.row().classes("w-full items-center gap-2"):
+                    with ui.element("div").classes("flex-1 min-w-0"):
+                        plyr_alt(
+                            media_url_for_file(path),
+                            path.name,
+                            control=result_control,
+                        )
+                    delete_btn = ui.button(icon="delete").props("flat square dense color=grey")
+
+                    def on_delete_click(btn=delete_btn, p=path, s=section):
+                        if btn.text == "削除する":
+                            send2trash(p)
+                            s.delete()
+                        else:
+                            btn.text = "削除する"
+                            btn.props("color=negative")
+
+                    delete_btn.on_click(on_delete_click)
+                ui.label(f"入力: {job.text}").classes(
+                    "w-full text-xs text-grey-9"
+                ).style("white-space: pre-wrap; overflow-wrap: anywhere;")
+                ui.label(f"パラメータ: {format_result_params(job, seed)}").classes(
+                    "w-full text-xs text-grey-8"
+                ).style("overflow-wrap: anywhere;")
+
     def enqueue_infer():
         """UI の現在値をジョブ化して推論キューに追加する。"""
         text = (text_input.value or "").strip()
@@ -199,7 +263,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
         queue.put_nowait(job)
         start_worker()
         queue_status.refresh()
-        ui.notify(f"推論キューに追加しました: {out_path.name}")
+        ui.notify(f"推論キューに追加しました: {out_path.name}", position="bottom-right")
 
     def clear_queue():
         """待機中の推論ジョブだけをキューから削除する。"""
@@ -212,7 +276,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             queue.task_done()
             count += 1
         queue_status.refresh()
-        ui.notify(f"待機中の推論を {count} 件クリアしました")
+        ui.notify(f"待機中の推論を {count} 件クリアしました", position="bottom-right")
 
     def build_payload(job: InferJob) -> dict:
         """Irodori-TTS サーバーへ送る JSON payload を作る。"""
@@ -282,10 +346,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 out_path = unique_output_path(job.out_path)
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 out_path.write_bytes(res.content)
-                save_audio_metadata(out_path, job, res.headers.get("X-Irodori-Seed"))
-                ui.notify(f"推論結果を書き出しました: {out_path.name}")
+                seed = res.headers.get("X-Irodori-Seed")
+                save_audio_metadata(out_path, job, seed)
+                add_result_player(out_path, job, seed)
+                ui.notify(f"推論結果を書き出しました: {out_path.name}", position="bottom-right")
             except Exception as exc:
-                ui.notify(f"推論に失敗しました: {exc}", type="negative")
+                ui.notify(f"推論に失敗しました: {exc}", type="negative", position="bottom-right")
             finally:
                 state["current"] = None
                 queue.task_done()
@@ -441,4 +507,6 @@ def tab_iridori_infer(ctx: VoiceCtx):
     with ui.expansion("生成結果", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
-        pass
+        with ui.column().classes("w-full gap-2"):
+            plyr_alt_control(result_control)
+            result_list_holder["value"] = ui.column().classes("w-full gap-2")

@@ -3,8 +3,22 @@ from types import SimpleNamespace
 from nicegui import ui, app
 
 _PLYR_DIST = Path(__file__).parent.parent / "publish" / "plyr"
-if _PLYR_DIST.exists():
-    app.add_static_files("/plyr", str(_PLYR_DIST))
+_plyr_static_registered = False
+_plyr_head_registered = False
+
+
+def ensure_plyr_assets() -> None:
+    """plyr の静的ファイルと head タグを一度だけ登録する。"""
+    global _plyr_static_registered, _plyr_head_registered
+
+    if not _plyr_static_registered and _PLYR_DIST.exists():
+        app.add_static_files("/plyr", str(_PLYR_DIST))
+        _plyr_static_registered = True
+
+    if not _plyr_head_registered:
+        ui.add_head_html('<link rel="stylesheet" href="/plyr/plyr.css">', shared=True)
+        ui.add_head_html('<script src="/plyr/plyr.min.js"></script>', shared=True)
+        _plyr_head_registered = True
 
 
 class PlyrWidget:
@@ -18,8 +32,7 @@ class PlyrWidget:
 
     def build(self) -> "PlyrWidget":
         """audio 要素を現在のコンテキストに配置し、plyr で初期化する。"""
-        ui.add_head_html('<link rel="stylesheet" href="/plyr/plyr.css">', shared=True)
-        ui.add_head_html('<script src="/plyr/plyr.min.js"></script>', shared=True)
+        ensure_plyr_assets()
         self._audio_el = ui.element("audio").props('preload="none"')
         name = self._name
         _audio_el_id = self._audio_el.id
