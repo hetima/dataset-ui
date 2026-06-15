@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
+from pathlib import Path
+
+# lib/ をパスに追加して irodori_tts パッケージを解決する
+_lib_dir = Path(__file__).resolve().parent.parent
+if str(_lib_dir) not in sys.path:
+    sys.path.insert(0, str(_lib_dir))
 
 import uvicorn
 
@@ -21,7 +28,7 @@ def main() -> None:
     args = parser.parse_args()
 
     uvicorn.run(
-        "irodori_openai_tts.app:app",
+        "irodori_tts_server.app:app",
         host=str(args.host),
         port=int(args.port),
         reload=bool(args.reload),
