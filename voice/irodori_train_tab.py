@@ -25,7 +25,7 @@ def tab_iridori_train(ctx: VoiceCtx):
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("データセットの検証とトレーニングデータ作成を行います。複数のフォルダをまとめてひとつのトレーニングデータを作成できます")
         ui.label("「トレーニングパス/irodori-tts/プロジェクト名」に作成されます。この工程には 書き起こし.txt または mtdt.json が必要です。メインタブで生成してください。transcript が必須で capiton と speaker_id はオプションです。").classes("infotxt")
-        ui.label("最大音長（秒数）を指定すると、長いファイルはその秒数で切り詰められます。0にしておけばそのまま使用します").classes("infotxt")
+        ui.label("最大音長（秒数）を指定すると、長いファイルはその秒数で切り詰められます。0にしておけばそのまま使用します。").classes("infotxt")
         with ui.row().classes("items-center gap-2"):
             good_only_check = ui.checkbox("Goodファイルのみを対象", value=False).tooltip("dataset-ui-app で Good フラグを付けたファイルだけを対象にします。mtdt.json から読み取ります")
         with ui.row().classes("items-center gap-2"):
@@ -48,7 +48,7 @@ def tab_iridori_train(ctx: VoiceCtx):
             ).props("outlined dense style='width: 80px;'")
             create_dataset_btn =ui.button("トレーニングデータ生成", on_click=lambda: create_dataset(path_input.value, project_name.value, max_seconds.value, good_only_check.value)) # type: ignore
 
-        xterm = XtermView(title="ターミナル", rows=10).classes("w-full")
+        xterm = XtermView(title="ターミナル", rows=10, cols=120).classes("w-full")
         validate_dataset_btn.bind_enabled(xterm, "is_idle")
         create_dataset_btn.bind_enabled(xterm, "is_idle")
 

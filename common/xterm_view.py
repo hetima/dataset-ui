@@ -17,7 +17,7 @@ from common.xterm_dialog import (
 class XtermView(ui.column):
     """CLI タスクの出力を配置用 xterm にストリーミング表示する。"""
 
-    def __init__(self, title: str = "", rows: int | None = None) -> None:
+    def __init__(self, title: str = "", rows: int | None = None, cols: int | None = None) -> None:
         super().__init__()
         self._process: subprocess.Popen | None = None
         self._is_running = False
@@ -29,7 +29,11 @@ class XtermView(ui.column):
         self._part_callback: Callable[[dict], None] | None = None
         self._finish_callback: Callable[[bool], None] | None = None
 
-        opt = {**xterm_option, "rows": rows} if rows is not None else xterm_option
+        opt = dict(xterm_option)
+        if rows is not None:
+            opt["rows"] = rows
+        if cols is not None:
+            opt["cols"] = cols
         self.classes("gap-1")
         with self:
             if title:
