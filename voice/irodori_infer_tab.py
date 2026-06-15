@@ -1,4 +1,5 @@
 import asyncio
+import re
 import dataclasses
 import hashlib
 import json
@@ -145,12 +146,15 @@ def tab_iridori_infer(ctx: VoiceCtx):
             return False
         return any(p.is_file() and p.stem == path.stem for p in path.parent.iterdir())
 
-    def make_output_path(prefix: str, fmt: str) -> Path:
-        """日時展開済みプレフィクスから出力ファイルパスを作る。"""
-        expanded = datetime.now().strftime((prefix or "irodori").strip() or "irodori")
+    def make_output_path(prefix: str, fmt: str, *, voice: str | None = None, lora: str | None = None, steps: int | None = None) -> Path:
+        """日時展開済みプレフィクスから出力ファイルパスを作る。%voice %lora %step を置換する。"""
+        lora_safe = "_".join(Path(lora).parts[-2:]) if lora else ""
+        text = (prefix or "irodori").strip() or "irodori"
+        text = text.replace("%voice", voice or "").replace("%lora", lora_safe).replace("%step", str(steps) if steps is not None else "")
+        expanded = datetime.now().strftime(text.strip() or "irodori")
         relative = Path(expanded)
         parent = cnfg.outputs_dir / relative.parent
-        stem = relative.name or "irodori"
+        stem = re.sub(r'[:*?"<>|]', "_", relative.name) or "irodori"
         return parent / f"{stem}.{fmt}"
 
     def unique_output_path(path: Path) -> Path:
@@ -238,7 +242,6 @@ def tab_iridori_infer(ctx: VoiceCtx):
             return
 
         cnfg.voice.save()
-        out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt)
         voice_select = voice_select_holder["value"]
         selected_voice = voice_select.value if voice_select else VOICE_NONE
         lora_select = lora_select_holder["value"]
@@ -258,6 +261,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 return
         voice_val = selected_voice if selected_voice and selected_voice != VOICE_RELOAD else None
         for lora in lora_list:
+            out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt, voice=voice_val, lora=lora, steps=num_steps)
             job_out_path = unique_output_path(out_path) if len(lora_list) > 1 else out_path
             job = InferJob(
                 text=text,
@@ -417,7 +421,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     with ui.expansion("推論", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
-        ui.label("推論サーバーで生成処理を行います。上記のステータスで、サーバーが起動していることを確認してください。LoRAを複数選択すると、同じパラメータのキューを複数実行します。").classes("infotxt")
+        ui.label("推論サーバーで生成処理を行い書き出しフォルダに保存します。サーバーが起動していることを確認してください。LoRAを複数選択すると、同じパラメータのキューを複数実行します。ファイル名に %Y-%m-%d などの日付時刻フォーマットを入れると現在日時で置き換えられます。%voice %lora %step を入れると設定パラメータで置き換えられます。「/」を入れるとサブフォルダが作成されます。重複するファイル名は連番が付けられます。").classes("infotxt")
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
 
         @ui.refreshable
@@ -491,7 +495,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             prefix_input = ui.input(
                 label="ファイル名",
                 value=cnfg.voice.irodori_tts_output_prefix,
-            ).props("outlined dense style='width: 260px;'").tooltip("%Y-%m-%dなどの日付時刻フォーマットが使えます。/でサブフォルダを作成できます")
+            ).props("outlined dense style='width: 320px;'")
             prefix_input.bind_value(cnfg.voice, "irodori_tts_output_prefix")
             format_select = ui.select(
                 options=["wav", "flac"],

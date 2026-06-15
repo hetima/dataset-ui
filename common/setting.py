@@ -82,7 +82,7 @@ class VoiceSubSetting:
     dataset_dirs: list[str] = dataclasses.field(default_factory=list)
     recent_dirs: list[str] = dataclasses.field(default_factory=list)
     irodori_tts_model: str = ""
-    irodori_tts_output_prefix: str = "irodori"
+    irodori_tts_output_prefix: str = "%Y-%m-%d_irodori"
     
     def set_irodori_tts_model(self, name: str | None):
         if name and name != self.irodori_tts_model:
