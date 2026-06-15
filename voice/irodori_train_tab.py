@@ -141,7 +141,7 @@ def tab_iridori_train(ctx: VoiceCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label(
-            "Speaker Inversion トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
+            "LoRA と Speaker Inversion トレーニングを行います。設定タブでモデルのダウンロードを済ませておいてください。"
         )
         ui.label(
             "実行コマンドをコピーできるようにしていますので、PowerShellやcmdで実行してください。venvのpython.exeを指定してるのでアクティベートしなくても実行できます。実行されるコマンドはカスタム版で、Ctrl+Cを送信するとその時点のステップを保存してから終了します。"
