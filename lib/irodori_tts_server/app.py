@@ -160,6 +160,7 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "model": {
             "id": settings.model_name,
+            "checkpoint": settings.checkpoint,
             "hf_checkpoint": settings.hf_checkpoint,
             "model_device": settings.model_device,
             "codec_device": settings.codec_device,

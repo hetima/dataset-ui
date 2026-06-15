@@ -4,7 +4,7 @@ from voice.voice_app_ctx import VoiceCtx
 from voice.voice_main_tab import tab_main
 from voice.voice_setting_tab import tab_setting
 from voice.irodori_train_tab import tab_iridori_train
-
+from voice.irodori_infer_tab import tab_iridori_infer
 def main_page():
     ctx = VoiceCtx()
 
@@ -14,6 +14,9 @@ def main_page():
         'inline-label align="left"'
     ) as tabs:
         main_Tab = ui.tab("main", label="メイン", icon="apps")
+        iridori_infer_Tab =ui.tab(
+            "iridori_infer", label="Irodori TTS", icon="speaker"
+        )
         iridori_train_Tab = ui.tab(
             "iridori_train", label="Irodori Train", icon="terminal"
         )
@@ -23,5 +26,7 @@ def main_page():
             tab_main(ctx)
         with ui.tab_panel(iridori_train_Tab):
             tab_iridori_train(ctx)
+        with ui.tab_panel(iridori_infer_Tab):
+            tab_iridori_infer(ctx)
         with ui.tab_panel(setting_tab):
             tab_setting(ctx)
