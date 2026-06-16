@@ -1,0 +1,272 @@
+[
+  {
+    "emoji": "👂",
+    "labelJa": "囁き、耳元の音",
+    "labelEn": "Whisper, sounds close to the ear",
+    "keywords": ["囁き", "ささやき", "耳元", "sasayaki", "mimimoto", "whisper", "ear", "close"]
+  },
+  {
+    "emoji": "😮‍💨",
+    "labelJa": "吐息、溜息、寝息",
+    "labelEn": "Breath, sigh, sleeping breath",
+    "keywords": ["吐息", "溜息", "ため息", "寝息", "toiki", "tameiki", "neiki", "breath", "sigh", "sleeping"]
+  },
+  {
+    "emoji": "⏸️",
+    "labelJa": "間、沈黙",
+    "labelEn": "Pause, silence",
+    "keywords": ["間", "沈黙", "ma", "tinmoku", "pause", "silence"]
+  },
+  {
+    "emoji": "🤭",
+    "labelJa": "笑い、くすくす、含み笑い",
+    "labelEn": "Laugh, giggle, chuckle",
+    "keywords": ["笑い", "くすくす", "含み笑い", "warai", "kusukusu", "fukumijwarai", "laugh", "giggle", "chuckle"]
+  },
+  {
+    "emoji": "🥵",
+    "labelJa": "喘ぎ、うめき声、唸り声",
+    "labelEn": "Gasp, moan, groan",
+    "keywords": ["喘ぎ", "うめき声", "唸り声", "aegi", "umekigoe", "unarigoe", "gasp", "moan", "groan"]
+  },
+  {
+    "emoji": "📢",
+    "labelJa": "エコー、リバーブ",
+    "labelEn": "Echo, reverb",
+    "keywords": ["エコー", "リバーブ", "eko", "ribaabu", "echo", "reverb"]
+  },
+  {
+    "emoji": "😏",
+    "labelJa": "からかう、甘えるように",
+    "labelEn": "Teasing, affectionate",
+    "keywords": ["からかう", "甘える", "karakau", "amaeru", "teasing", "affectionate"]
+  },
+  {
+    "emoji": "🥺",
+    "labelJa": "震え声、自信なさげに",
+    "labelEn": "Trembling voice, timid",
+    "keywords": ["震え声", "自信なさげ", "furuegoe", "jisinnasage", "trembling", "timid"]
+  },
+  {
+    "emoji": "🌬️",
+    "labelJa": "息切れ、荒い息遣い、呼吸音",
+    "labelEn": "Shortness of breath, heavy breathing",
+    "keywords": ["息切れ", "荒い息遣い", "呼吸音", "ikigire", "araiikizukai", "kokyuuon", "breath", "heavy"]
+  },
+  {
+    "emoji": "😮",
+    "labelJa": "息をのむ",
+    "labelEn": "Gasp",
+    "keywords": ["息をのむ", "ikiwonomu", "gasp"]
+  },
+  {
+    "emoji": "👅",
+    "labelJa": "舐める音、咀嚼音、水音",
+    "labelEn": "Licking sound, chewing sound, water sound",
+    "keywords": ["舐める音", "咀嚼音", "水音", "nameruoto", "soshakuon", "mizuoto", "licking", "chewing", "water"]
+  },
+  {
+    "emoji": "💋",
+    "labelJa": "リップノイズ",
+    "labelEn": "Lip smack",
+    "keywords": ["リップノイズ", "rippunoizu", "lip", "lipnoise"]
+  },
+  {
+    "emoji": "🫶",
+    "labelJa": "優しく",
+    "labelEn": "Tenderly",
+    "keywords": ["優しく", "yasasiku", "tenderly"]
+  },
+  {
+    "emoji": "😭",
+    "labelJa": "泣き声、嗚咽、悲しみ",
+    "labelEn": "Crying, sobbing, sadness",
+    "keywords": ["泣き声", "嗚咽", "悲しみ", "nakigoe", "oetu", "kanasimi", "crying", "sobbing", "sadness"]
+  },
+  {
+    "emoji": "😱",
+    "labelJa": "悲鳴、叫び、絶叫",
+    "labelEn": "Scream, shriek",
+    "keywords": ["悲鳴", "叫び", "絶叫", "himei", "sakebi", "zekkyo", "scream", "shriek"]
+  },
+  {
+    "emoji": "😪",
+    "labelJa": "眠そう、気だるげに",
+    "labelEn": "Sleepy, languid",
+    "keywords": ["眠そう", "気だるげ", "nemurisu", "kedaruge", "sleepy", "languid"]
+  },
+  {
+    "emoji": "😴",
+    "labelJa": "寝言、いびき",
+    "labelEn": "Sleep talking, snore",
+    "keywords": ["寝言", "いびき", "negoto", "ibiki", "sleep talking", "snore"]
+  },
+  {
+    "emoji": "⏩",
+    "labelJa": "早口、一気に、急いで",
+    "labelEn": "Fast speech, quickly",
+    "keywords": ["早口", "一気に", "急いで", "hayaguchi", "ikkini", "isoide", "fast", "quickly"]
+  },
+  {
+    "emoji": "📞",
+    "labelJa": "電話越し、スピーカー越し",
+    "labelEn": "Over the phone, over a speaker",
+    "keywords": ["電話越し", "スピーカー越し", "denwagosi", "supiikaagosi", "phone", "speaker"]
+  },
+  {
+    "emoji": "🐢",
+    "labelJa": "ゆっくり",
+    "labelEn": "Slowly",
+    "keywords": ["ゆっくり", "yukkuri", "slowly"]
+  },
+  {
+    "emoji": "🥤",
+    "labelJa": "飲み込む、唾を飲む音",
+    "labelEn": "Swallowing, gulp sound",
+    "keywords": ["飲み込む", "唾を飲む音", "nomikomu", "tsubawonomuoto", "swallow", "gulp"]
+  },
+  {
+    "emoji": "🤧",
+    "labelJa": "咳・鼻、咳き込み、鼻すすり",
+    "labelEn": "Cough, sniffling",
+    "keywords": ["咳", "鼻", "咳き込み", "鼻すすり", "seki", "hana", "sekikomi", "hanasusuri", "cough", "sniffle"]
+  },
+  {
+    "emoji": "😒",
+    "labelJa": "舌打ち",
+    "labelEn": "Tutting",
+    "keywords": ["舌打ち", "sitauti", "tutting", "tsk"]
+  },
+  {
+    "emoji": "😰",
+    "labelJa": "慌てる、動揺、緊張、どもり",
+    "labelEn": "Flustered, nervous, stuttering",
+    "keywords": ["慌てる", "動揺", "緊張", "どもり", "ateru", "doyo", "kincho", "kintyo", "domori", "flustered", "nervous", "stutter"]
+  },
+  {
+    "emoji": "😆",
+    "labelJa": "喜び、嬉しそうに",
+    "labelEn": "Joy, happy",
+    "keywords": ["喜び", "嬉しそう", "yorokobi", "uresiso", "joy", "happy"]
+  },
+  {
+    "emoji": "💥",
+    "labelJa": "勢いよく、力強い勢い",
+    "labelEn": "Energetic, forceful",
+    "keywords": ["勢いよく", "力強い", "ikioiyoku", "tikaradzuyoi", "energetic", "forceful"]
+  },
+  {
+    "emoji": "😠",
+    "labelJa": "怒り、不満げ、拗ねる",
+    "labelEn": "Anger, displeased, sulk",
+    "keywords": ["怒り", "不満げ", "拗ねる", "ikari", "fumange", "suneru", "anger", "displeased", "sulk"]
+  },
+  {
+    "emoji": "😲",
+    "labelJa": "驚き、感嘆",
+    "labelEn": "Surprise, admiration",
+    "keywords": ["驚き", "感嘆", "odoroki", "kantan", "surprise", "admiration"]
+  },
+  {
+    "emoji": "🥱",
+    "labelJa": "あくび",
+    "labelEn": "Yawn",
+    "keywords": ["あくび", "akubi", "yawn"]
+  },
+  {
+    "emoji": "😖",
+    "labelJa": "苦しげ",
+    "labelEn": "Agonizingly",
+    "keywords": ["苦しげ", "kurusige", "agonizing", "painful"]
+  },
+  {
+    "emoji": "😟",
+    "labelJa": "心配、不安そうに",
+    "labelEn": "Worried, anxious",
+    "keywords": ["心配", "不安そう", "sinpai", "fuan", "worried", "anxious"]
+  },
+  {
+    "emoji": "🫣",
+    "labelJa": "照れ、恥ずかしそうに",
+    "labelEn": "Shy, embarrassed",
+    "keywords": ["照れ", "恥ずかしそう", "tere", "hazukasiso", "shy", "embarrassed"]
+  },
+  {
+    "emoji": "🙄",
+    "labelJa": "呆れ",
+    "labelEn": "Exasperatedly",
+    "keywords": ["呆れ", "akire", "exasperated", "weary"]
+  },
+  {
+    "emoji": "😊",
+    "labelJa": "楽しげ、嬉しそうに",
+    "labelEn": "Cheerful, happy",
+    "keywords": ["楽しげ", "嬉しそう", "tanosige", "uresiso", "cheerful", "happy"]
+  },
+  {
+    "emoji": "😎",
+    "labelJa": "得意げ、自信ありげに",
+    "labelEn": "Proud, confident",
+    "keywords": ["得意げ", "自信ありげ", "tokuige", "jisinarige", "proud", "confident"]
+  },
+  {
+    "emoji": "👌",
+    "labelJa": "相槌、頷く音",
+    "labelEn": "Backchannel, nodding sound",
+    "keywords": ["相槌", "頷く音", "aizuti", "unazuku", "backchannel", "nod"]
+  },
+  {
+    "emoji": "🙏",
+    "labelJa": "懇願、お願いするように",
+    "labelEn": "Begging, pleading",
+    "keywords": ["懇願", "お願い", "kongan", "onegai", "beg", "plead"]
+  },
+  {
+    "emoji": "🥴",
+    "labelJa": "酔う",
+    "labelEn": "Drunkenly",
+    "keywords": ["酔う", "you", "drunken", "drunk"]
+  },
+  {
+    "emoji": "🎵",
+    "labelJa": "鼻歌",
+    "labelEn": "Humming",
+    "keywords": ["鼻歌", "hanauta", "humming"]
+  },
+  {
+    "emoji": "🤐",
+    "labelJa": "口を塞ぐ",
+    "labelEn": "Muffled",
+    "keywords": ["口を塞ぐ", "kutiwofusagu", "muffled"]
+  },
+  {
+    "emoji": "😌",
+    "labelJa": "安堵、満足げに",
+    "labelEn": "Relief, satisfied",
+    "keywords": ["安堵", "満足げ", "ando", "manzokuge", "relief", "satisfied"]
+  },
+  {
+    "emoji": "🤔",
+    "labelJa": "疑問",
+    "labelEn": "Questioning",
+    "keywords": ["疑問", "gimon", "question", "wonder"]
+  },
+  {
+    "emoji": "💪",
+    "labelJa": "力強く、力を込めて",
+    "labelEn": "Strongly, forcefully",
+    "keywords": ["力強く", "力を込めて", "tkaradzuyoku", "tkarawokomete", "strong", "forceful"]
+  },
+  {
+    "emoji": "👃",
+    "labelJa": "嗅ぐ音、匂いを嗅ぐ音",
+    "labelEn": "Sniffing sound",
+    "keywords": ["嗅ぐ音", "匂いを嗅ぐ", "kaguoto", "nioiwokagu", "sniff", "smell"]
+  },
+  {
+    "emoji": "📖",
+    "labelJa": "朗読、ナレーション",
+    "labelEn": "Reading aloud, narration",
+    "keywords": ["朗読", "ナレーション", "roudoku", "nareeshon", "reading", "narration"]
+  }
+]
