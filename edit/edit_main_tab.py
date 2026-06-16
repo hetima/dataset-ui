@@ -4,7 +4,7 @@ from nicegui import ui
 from common.setting import cnfg
 from edit.edit_app_ctx import EditCtx
 from common.daw_bridge import add_daw_session_tracks, create_daw_session, create_daw_session_single_track, get_daw_url
-from common.plyr import simple_plyr_player
+from common.nicegui_audioplayer import simple_audio_player
 from common.message_dialog import show_confirm_dialog
 
 
@@ -80,10 +80,10 @@ def tab_main(ctx: EditCtx):
     # ファイル一覧
     # ═══════════════════════════════════════════════════════════════════════════════
 
-    plyr = simple_plyr_player("plyr_edit", visible=False, autoplay=True)
+    plyr = simple_audio_player("plyr_edit", visible=False, autoplay=True)
     def play_src(path: str):
         plyr.container.set_visibility(True)
-        plyr.plyr.load(path)
+        plyr.player.load(path)
 
     with ui.row().classes("w-full gap-4 items-start"):
         with ui.column().classes("flex-1 gap-1"):

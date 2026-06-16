@@ -11,7 +11,7 @@ from common.thread_task_dialog import ThreadTaskDialog
 from music.music_app_ctx import MusicCtx
 from lib.roformer.roformer import list_roformer_models
 from lib.roformer.task_infer import infer_roformer
-from common.plyr import simple_plyr_player
+from common.nicegui_audioplayer import simple_audio_player
 from common.message_dialog import show_confirm_dialog
 
 LANGUAGE_LIST = ["ja", "en", "zh", "ko"]
@@ -415,7 +415,7 @@ def tab_main(ctx: MusicCtx):
     def table_view():
         def play_src(path: str):
             plyr.container.set_visibility(True)
-            plyr.plyr.load(path)
+            plyr.player.load(path)
 
         ctx.table = ui.table(
             columns=[
@@ -497,7 +497,7 @@ def tab_main(ctx: MusicCtx):
                                 ):
                                     ui.label("エディットプールに追加").classes("padd8")
         with ctx.table.add_slot("top-left"):
-            plyr = simple_plyr_player("plyr_music", visible=False, autoplay=True)
+            plyr = simple_audio_player("plyr_music", visible=False, autoplay=True)
         with ctx.table.add_slot("top-right"):
             ui.input(placeholder="フィルタ...").bind_value(ctx.table, "filter").classes(
                 "w-80"

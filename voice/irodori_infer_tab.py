@@ -50,6 +50,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
     voice_select_holder = {"value": None}
+    voice_options = {"value": {VOICE_NONE: "なし", VOICE_RELOAD: "メニューを更新"}}
     result_control = PlyrAltControl()
     result_list_holder: dict[str, ui.column | None] = {"value": None}
 
@@ -74,7 +75,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     def copy_launch_command(model_name: str):
         cmd = build_launch_command(model_name)
         ui.run_javascript(f"navigator.clipboard.writeText({cmd!r})")
-        ui.notify("コマンドをコピーしました", position="bottom-right")
+        ui.notify("コマンドをコピーしました")
 
     def list_server_voices() -> dict[str, str]:
         """Irodori-TTS サーバーの voice 一覧を選択肢として返す。"""
@@ -397,12 +398,22 @@ def tab_iridori_infer(ctx: VoiceCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
 
+        _health: tuple[bool, str | None] = (False, None)
+
         @ui.refreshable
         def status_card():
-            running, model_id = check_health()
+            running, model_id = _health
             with ui.column():
                 with ui.row().classes("items-center gap-2"):
-                    ui.button("ステータス更新", on_click=lambda: status_card.refresh())
+                    async def on_refresh_click():
+                        nonlocal _health
+                        loop = asyncio.get_event_loop()
+                        _health = await loop.run_in_executor(None, check_health)
+                        status_card.refresh()
+                        if _health[0]:
+                            voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
+                            voice_select_view.refresh()
+                    ui.button("ステータス更新", on_click=on_refresh_click)
                     if running:
                         ui.label("起動しています")
                         ui.label(f"model: {model_id}")
@@ -422,6 +433,13 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     )
 
         status_card()
+
+        async def _initial_health_check():
+            nonlocal _health
+            loop = asyncio.get_event_loop()
+            _health = await loop.run_in_executor(None, check_health)
+            status_card.refresh()
+        ui.timer(0, _initial_health_check, once=True)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 推論
@@ -460,16 +478,18 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
         @ui.refreshable
         def voice_select_view():
-            def on_voice_change(e):
+            async def on_voice_change(e):
                 if e.value == VOICE_RELOAD:
                     voice_select = voice_select_holder["value"]
                     if voice_select is None:
                         return
                     voice_select.set_value(VOICE_NONE)
+                    loop = asyncio.get_event_loop()
+                    voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
                     voice_select_view.refresh()
 
             voice_select = ui.select(
-                options=list_server_voices(),
+                options=voice_options["value"],
                 value=VOICE_NONE,
                 label="voice",
             ).props("outlined dense options-dense style='width: 220px;'")
@@ -477,6 +497,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
             voice_select.on_value_change(on_voice_change)
 
         voice_select_view()
+
+        async def _initial_voice_options_load():
+            loop = asyncio.get_event_loop()
+            voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
+            voice_select_view.refresh()
+        ui.timer(0, _initial_voice_options_load, once=True)
 
         with ui.row().classes("items-center gap-4 w-full"):
             with ui.column().classes("gap-1"):

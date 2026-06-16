@@ -148,7 +148,7 @@
       playBtn.className = 'audio-player__play-btn';
       playBtn.type = 'button';
       playBtn.setAttribute('aria-label', '再生');
-      playBtn.innerHTML = '&#9654;';
+      playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
 
       const seek = document.createElement('input');
       seek.className = 'audio-player__seek';
@@ -166,7 +166,7 @@
       muteBtn.className = 'audio-player__mute-btn';
       muteBtn.type = 'button';
       muteBtn.setAttribute('aria-label', 'ミュート');
-      muteBtn.innerHTML = '&#128266;';
+      muteBtn.innerHTML = '<span class="material-icons">volume_up</span>';
 
       const volumeSlider = document.createElement('input');
       volumeSlider.className = 'audio-player__volume';
@@ -238,7 +238,9 @@
 
     _updateButton() {
       const paused = this.audio.paused || this.audio.ended;
-      this.playBtn.innerHTML = paused ? '&#9654;' : '&#9646;&#9646;';
+      this.playBtn.innerHTML = paused
+        ? '<span class="material-icons">play_arrow</span>'
+        : '<span class="material-icons">pause</span>';
       this.playBtn.setAttribute('aria-label', paused ? '再生' : '一時停止');
     }
 
@@ -305,7 +307,9 @@
 
     toggleMute() {
       this.audio.muted = !this.audio.muted;
-      this.muteBtn.innerHTML = this.audio.muted ? '&#128263;' : '&#128266;';
+      this.muteBtn.innerHTML = this.audio.muted
+        ? '<span class="material-icons">volume_off</span>'
+        : '<span class="material-icons">volume_up</span>';
       this.muteBtn.setAttribute('aria-label', this.audio.muted ? 'ミュート解除' : 'ミュート');
     }
 
