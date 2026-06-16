@@ -58,11 +58,7 @@ pip install -r requirements.txt
 
 モデルを選択するコンボボックスでは、リポジトリ形式のモデルID（user/model）を指定すると huggingface からダウンロードします（デフォルトのキャッシュにダウンロードされ再利用されます）。「ダウンロード」を押すとモデルフォルダにダウンロードされます。
 
-ダウンロードが途中で止まる場合は手動でダウンロードして配置してください。hf-xetをアンインストールすると改善する場合があります。
-
-```
-pip uninstall hf-xet
-```
+ダウンロードが途中で止まる場合は手動でダウンロードして配置してください。hf-xetをアンインストールすると改善する場合があります（`pip uninstall hf-xet`）。
 
 
 ## スクリーンショット
@@ -98,7 +94,6 @@ pnpm deploy
 - [Aratako/Irodori-TTS](https://github.com/Aratako/Irodori-TTS)
 - [Aratako/Irodori-TTS-Server](https://github.com/Aratako/Irodori-TTS-Server)
 - [naomiaro/waveform-playlist](https://github.com/naomiaro/waveform-playlist)
-- [sampotts/plyr](https://github.com/sampotts/plyr)
 - [Qwen3-ASR support-transformers-v5.4](https://github.com/One-sixth/Qwen3-ASR/tree/support-transformers-v5.4)
 
 
