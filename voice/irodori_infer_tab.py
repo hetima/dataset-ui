@@ -381,6 +381,11 @@ def tab_iridori_infer(ctx: VoiceCtx):
             helpers.await_with_context(worker(), ui.context.client),
             name="irodori_infer_worker",
         )
+    ui.markdown(
+        f"**モデルデータパス** → `{cnfg.models_dir.as_posix()}/irodori-tts`<br>"
+        f"**LoRAパス** → `{cnfg.models_dir.as_posix()}/irodori-tts_lora`<br>"
+        f"**Voicesパス** → `{cnfg.models_dir.as_posix()}/irodori-tts_voices`<br>"
+    )
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # サーバーステータス
