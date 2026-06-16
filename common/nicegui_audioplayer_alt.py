@@ -1,4 +1,4 @@
-"""NiceGUI で PlyrAlt を使うための薄いラッパーです。"""
+"""NiceGUI で AudioPlayerAlt（波形表示付きプレイヤー）を使うための薄いラッパーです。"""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from uuid import uuid4
 from nicegui import app, ui
 
 
-ASSET_ROUTE = "/plyr-alt"
-ASSET_DIR = Path(__file__).resolve().parent.parent / "publish" / "plyr-alt"
+ASSET_ROUTE = "/audioplayer-alt"
+ASSET_DIR = Path(__file__).resolve().parent.parent / "publish" / "audioplayer_alt"
 _assets_registered = False
 _head_registered = False
 
@@ -21,7 +21,7 @@ def _json(value: object) -> str:
 
 
 def ensure_plyr_alt_assets() -> None:
-    """PlyrAlt の JS/CSS を NiceGUI に一度だけ登録します。"""
+    """AudioPlayerAlt の JS/CSS を NiceGUI に一度だけ登録します。"""
     global _assets_registered, _head_registered
 
     if not _assets_registered:
@@ -29,25 +29,25 @@ def ensure_plyr_alt_assets() -> None:
         _assets_registered = True
 
     if not _head_registered:
-        ui.add_head_html(f'<link rel="stylesheet" href="{ASSET_ROUTE}/plyr-alt.css">', shared=True)
-        ui.add_head_html(f'<script src="{ASSET_ROUTE}/plyr-alt.js"></script>', shared=True)
+        ui.add_head_html(f'<link rel="stylesheet" href="{ASSET_ROUTE}/audioplayer_alt.css">', shared=True)
+        ui.add_head_html(f'<script src="{ASSET_ROUTE}/audioplayer_alt.js"></script>', shared=True)
         _head_registered = True
 
 
 def _load_assets_script() -> str:
     """head 読み込みが間に合わない場合にも JS/CSS を読み込む JavaScript を返します。"""
     return f"""
-    if (!document.querySelector('link[data-plyr-alt-css]')) {{
+    if (!document.querySelector('link[data-audioplayer-alt-css]')) {{
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = {_json(f"{ASSET_ROUTE}/plyr-alt.css")};
-      link.dataset.plyrAltCss = 'true';
+      link.href = {_json(f"{ASSET_ROUTE}/audioplayer_alt.css")};
+      link.dataset.audioplayerAltCss = 'true';
       document.head.appendChild(link);
     }}
-    if (!window.PlyrAlt && !document.querySelector('script[data-plyr-alt-js]')) {{
+    if (!window.PlyrAlt && !document.querySelector('script[data-audioplayer-alt-js]')) {{
       const script = document.createElement('script');
-      script.src = {_json(f"{ASSET_ROUTE}/plyr-alt.js")};
-      script.dataset.plyrAltJs = 'true';
+      script.src = {_json(f"{ASSET_ROUTE}/audioplayer_alt.js")};
+      script.dataset.audioplayerAltJs = 'true';
       document.head.appendChild(script);
     }}
     """

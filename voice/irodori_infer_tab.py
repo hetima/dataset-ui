@@ -13,7 +13,7 @@ from mutagen.flac import FLAC
 from mutagen.id3 import COMM, USLT
 from mutagen.wave import WAVE
 from nicegui import app, background_tasks, helpers, ui
-from common.nicegui_plyr_alt import PlyrAltControl, plyr_alt, plyr_alt_control
+from common.nicegui_audioplayer_alt import PlyrAltControl, plyr_alt, plyr_alt_control
 from common.nicegui_emoji_picker import attach_emoji_picker
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
