@@ -448,6 +448,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
         ui.label("推論サーバーで生成処理を行い書き出しフォルダに保存します。サーバーが起動していることを確認してください。LoRAを複数選択すると、同じパラメータのキューを複数実行します。ファイル名に %Y-%m-%d などの日付時刻フォーマットを入れると現在日時で置き換えられます。%voice %lora %step を入れると設定パラメータで置き換えられます。「/」を入れるとサブフォルダが作成されます。重複するファイル名は連番が付けられます。").classes("infotxt")
+        ui.label("voice は上記 Voices パスに .wav や .flac や .speaker.safetensors ファイルを置くことで認識されます。").classes("infotxt")
         ui.label("テキストに「:」と入力すると絵文字補完のポップアップが表示されます。続けて入力（英語、ローマ字対応）していくと候補が絞られます↑↓キーで選択しEnterで入力できます。").classes("infotxt")
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
         attach_emoji_picker(text_input, EMOJI_JSON_PATH)
