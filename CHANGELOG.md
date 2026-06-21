@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-06-21
+- Irodori-TTS 推論で Speaker Inversion に対応
+
 ## 2026-06-16
 - Irodori-TTS 推論
 
