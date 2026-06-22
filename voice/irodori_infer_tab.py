@@ -509,7 +509,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
         with ui.row().classes("items-center gap-4 w-full"):
             with ui.column().classes("gap-1"):
-                ui.label("cfg_scale_text").classes("text-sm")
+                with ui.row().classes("items-center gap-1"):
+                    ui.label("cfg_scale_text").classes("text-base")
+                    ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_text_slider.set_value(3.0))
                 with ui.row().classes("items-center gap-2"):
                     cfg_scale_text_slider = (
                         ui.slider(min=0, max=10, step=0.1, value=3.0)
@@ -518,7 +520,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     )
                     ui.label().bind_text_from(cfg_scale_text_slider, "value", lambda v: f"{v:.1f}")
             with ui.column().classes("gap-1"):
-                ui.label("cfg_scale_speaker").classes("text-sm")
+                with ui.row().classes("items-center gap-1"):
+                    ui.label("cfg_scale_speaker").classes("text-base")
+                    ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_speaker_slider.set_value(5.0))
                 with ui.row().classes("items-center gap-2"):
                     cfg_scale_speaker_slider = (
                         ui.slider(min=0, max=10, step=0.1, value=5.0)
