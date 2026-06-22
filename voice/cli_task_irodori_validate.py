@@ -21,7 +21,7 @@ def has_value(value: str | None) -> bool:
     return bool(value and value.strip())
 
 
-def validate_folder(path: Path, *, good_only: bool = False) -> None:
+def validate_folder(path: Path, *, good_only: bool = False, exclude_bad: bool = False) -> None:
     """1つのフォルダ内の音声ファイルとメタデータ件数を表示する。"""
     print(path, flush=True)
     if not path.is_dir():
@@ -34,6 +34,8 @@ def validate_folder(path: Path, *, good_only: bool = False) -> None:
     files = [VoiceFile.from_audio_file(file, mtdt) for file in audio_files_in_folder(path)]
     if good_only:
         files = [f for f in files if f.good]
+    if exclude_bad:
+        files = [f for f in files if not f.bad]
 
     transcript_count = sum(1 for file in files if has_value(file.transcript))
     caption_count = sum(1 for file in files if has_value(file.caption))
@@ -55,17 +57,21 @@ def main() -> None:
     if isinstance(data, list):
         paths = data
         good_only = False
+        exclude_bad = False
     else:
         paths = data["paths"]
         good_only = data.get("good_only", False)
+        exclude_bad = data.get("exclude_bad", False)
     print("オーディファイルに設定されているメタデータを検証します", flush=True)
     print("transcriptはすべてのファイルに必須です。他のプロパティはオプションです", flush=True)
     if good_only:
         print("good=True のファイルのみを対象とします", flush=True)
+    if exclude_bad:
+        print("bad=True のファイルを除外します", flush=True)
     print("", flush=True)
 
     for path in paths:
-        validate_folder(Path(path), good_only=good_only)
+        validate_folder(Path(path), good_only=good_only, exclude_bad=exclude_bad)
 
 
 if __name__ == "__main__":

@@ -154,7 +154,7 @@ def _prepare_voice_file(idx: int, voice_file: VoiceFile, args: SimpleNamespace) 
         )
 
 
-def _load_voice_files(paths: list[str], *, good_only: bool = False) -> list[VoiceFile]:
+def _load_voice_files(paths: list[str], *, good_only: bool = False, exclude_bad: bool = False) -> list[VoiceFile]:
     """フォルダパス一覧から mtdt.json を考慮して VoiceFile を読み込む。"""
     voice_files: list[VoiceFile] = []
     for path in paths:
@@ -164,6 +164,8 @@ def _load_voice_files(paths: list[str], *, good_only: bool = False) -> list[Voic
         for file in audio_files_in_folder(folder):
             vf = VoiceFile.from_audio_file(file, mtdt)
             if good_only and not vf.good:
+                continue
+            if exclude_bad and vf.bad:
                 continue
             voice_files.append(vf)
     return voice_files
@@ -202,7 +204,7 @@ def _run_worker(args: SimpleNamespace) -> None:
     latent_dir = output_path / "latent"
     latent_dir.mkdir(parents=True, exist_ok=True)
 
-    voice_files = _load_voice_files(args.paths, good_only=args.good_only)
+    voice_files = _load_voice_files(args.paths, good_only=args.good_only, exclude_bad=args.exclude_bad)
 
     codec = DACVAECodec.load(
         repo_id=CODEC_REPO,
@@ -350,9 +352,12 @@ def main() -> None:
         output_path=data["output_path"],
         max_seconds=data.get("max_seconds"),
         good_only=data.get("good_only", False),
+        exclude_bad=data.get("exclude_bad", False),
     )
     if args.good_only:
         print("good=True のファイルのみを対象とします", flush=True)
+    if args.exclude_bad:
+        print("bad=True のファイルを除外します", flush=True)
     print("トレーニングデータ作成開始", flush=True)
     _run_worker(args)
 
