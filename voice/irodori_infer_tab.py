@@ -23,9 +23,9 @@ EMOJI_JSON_PATH = Path(__file__).resolve().parent / "emoji.json"
 SERVER_URL = "http://127.0.0.1:7867"
 KNOWN_MODELS = ["Irodori-TTS-500M-v3", "Irodori-TTS-600M-v3-VoiceDesign"]
 IRODORI_LORA_SUB_DIR = "irodori-tts_lora"
-LORA_NONE = ""
+LORA_EXPLICIT_NONE = "__none__"
 LORA_RELOAD = "__reload__"
-VOICE_NONE = ""
+VOICE_EXPLICIT_NONE = "__none__"
 VOICE_RELOAD = "__reload__"
 IRODORI_RESULT_MEDIA_ROUTE = "/irodori-result-media"
 _IRODORI_RESULT_MEDIA_ROUTES: set[str] = set()
@@ -50,7 +50,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
     voice_select_holder = {"value": None}
-    voice_options = {"value": {VOICE_NONE: "なし", VOICE_RELOAD: "メニューを更新"}}
+    voice_options = {"value": {VOICE_EXPLICIT_NONE: "なし（voiceなし）", VOICE_RELOAD: "メニューを更新"}}
     result_control = PlyrAltControl()
     result_list_holder: dict[str, ui.column | None] = {"value": None}
 
@@ -79,7 +79,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
     def list_server_voices() -> dict[str, str]:
         """Irodori-TTS サーバーの voice 一覧を選択肢として返す。"""
-        options = {VOICE_NONE: "なし"}
+        options = {VOICE_EXPLICIT_NONE: "なし（voiceなし）"}
         try:
             res = httpx.get(f"{SERVER_URL}/v1/audio/voices", timeout=3.0)
             res.raise_for_status()
@@ -96,7 +96,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     def list_lora_adapters() -> dict[str, str]:
         """models_dir/irodori-tts_lora/*/checkpoint_* を選択肢として返す。"""
         base = cnfg.models_dir / IRODORI_LORA_SUB_DIR
-        options = {LORA_NONE: "なし（デフォルト）"}
+        options = {LORA_EXPLICIT_NONE: "なし（LoRAなし）"}
         if base.exists():
             paths = sorted(
                 p
@@ -249,12 +249,19 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
         cnfg.voice.save()
         voice_select = voice_select_holder["value"]
-        selected_voice = voice_select.value if voice_select else VOICE_NONE
+        selected_voices: list[str] = voice_select.value if voice_select else []
         lora_select = lora_select_holder["value"]
         selected_loras: list[str] = lora_select.value if lora_select else []
-        # 有効なLoRAだけ残す（空リストの場合はLoRAなし1件として扱う）
-        valid_loras: list[str | None] = [v for v in selected_loras if v and v not in (LORA_NONE, LORA_RELOAD)]
+        # 有効なLoRAだけ残す。EXPLICIT_NONEはNone（LoRAなし）に変換。空リストの場合はLoRAなし1件として扱う
+        def _normalize_lora(v: str) -> str | None:
+            return None if v == LORA_EXPLICIT_NONE else v
+        valid_loras: list[str | None] = [_normalize_lora(v) for v in selected_loras if v not in (LORA_RELOAD,)]
         lora_list: list[str | None] = valid_loras if valid_loras else [None]
+        # 有効なvoiceだけ残す。EXPLICIT_NONEはNone（voiceなし）に変換。空リストの場合はvoiceなし1件として扱う
+        def _normalize_voice(v: str) -> str | None:
+            return None if v == VOICE_EXPLICIT_NONE else v
+        valid_voices: list[str | None] = [_normalize_voice(v) for v in selected_voices if v not in (VOICE_RELOAD,)]
+        voice_list: list[str | None] = valid_voices if valid_voices else [None]
         for lora in lora_list:
             if lora and not is_lora_compatible(lora):
                 lora_path = Path(lora)
@@ -265,25 +272,28 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     type="warning",
                 )
                 return
-        voice_val = selected_voice if selected_voice and selected_voice != VOICE_RELOAD else None
+        # lora × voice の直積でジョブを積む
+        jobs: list[InferJob] = []
         for lora in lora_list:
-            out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt, voice=voice_val, lora=lora, steps=num_steps)
-            job_out_path = unique_output_path(out_path) if len(lora_list) > 1 else out_path
-            job = InferJob(
-                text=text,
-                voice=voice_val,
-                lora_adapter=lora,
-                cfg_scale_text=float(cfg_scale_text_slider.value or 0),
-                cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
-                num_steps=num_steps,
-                response_format=fmt,
-                out_path=job_out_path,
-            )
+            for voice_val in voice_list:
+                out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt, voice=voice_val, lora=lora, steps=num_steps)
+                job_out_path = unique_output_path(out_path) if (len(lora_list) * len(voice_list)) > 1 else out_path
+                jobs.append(InferJob(
+                    text=text,
+                    voice=voice_val,
+                    lora_adapter=lora,
+                    cfg_scale_text=float(cfg_scale_text_slider.value or 0),
+                    cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
+                    num_steps=num_steps,
+                    response_format=fmt,
+                    out_path=job_out_path,
+                ))
+        for job in jobs:
             queue.put_nowait(job)
         start_worker()
         queue_status.refresh()
-        count = len(lora_list)
-        msg = f"推論キューに{count}件追加しました" if count > 1 else f"推論キューに追加しました: {out_path.name}"
+        count = len(jobs)
+        msg = f"推論キューに{count}件追加しました" if count > 1 else f"推論キューに追加しました: {jobs[0].out_path.name}"
         ui.notify(msg, position="bottom-right")
 
     def clear_queue():
@@ -449,7 +459,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
     with ui.expansion("推論", value=True).classes(
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
-        ui.label("推論サーバーで生成処理を行い書き出しフォルダに保存します。サーバーが起動していることを確認してください。LoRAを複数選択すると、同じパラメータのキューを複数実行します。ファイル名に %Y-%m-%d などの日付時刻フォーマットを入れると現在日時で置き換えられます。%voice %lora %step を入れると設定パラメータで置き換えられます。「/」を入れるとサブフォルダが作成されます。重複するファイル名は連番が付けられます。").classes("infotxt")
+        ui.label("推論サーバーで生成処理を行い書き出しフォルダに保存します。サーバーが起動していることを確認してください。LoRAやVoiceを複数選択すると、それぞれのパラメータのキューを複数実行します。「なし」の項目を明示することで、不使用のキューを含ませることができます。ファイル名に %Y-%m-%d などの日付時刻フォーマットを入れると現在日時で置き換えられます。%voice %lora %step を入れると設定パラメータで置き換えられます。「/」を入れるとサブフォルダが作成されます。重複するファイル名は連番が付けられます。").classes("infotxt")
         ui.label("voice は上記 Voices パスに .wav や .flac や .speaker.safetensors ファイルを置くことで認識されます。").classes("infotxt")
         ui.label("テキストに「:」と入力すると絵文字補完のポップアップが表示されます。続けて入力（英語、ローマ字対応）していくと候補が絞られます↑↓キーで選択しEnterで入力できます。").classes("infotxt")
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
@@ -462,9 +472,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 if lora_select is None:
                     return
                 values: list = e.value if isinstance(e.value, list) else []
-                if LORA_NONE in values:
-                    lora_select.set_value([])
-                elif LORA_RELOAD in values:
+                if LORA_RELOAD in values:
                     lora_select.set_value([])
                     lora_select_view.refresh()
 
@@ -482,20 +490,22 @@ def tab_iridori_infer(ctx: VoiceCtx):
         @ui.refreshable
         def voice_select_view():
             async def on_voice_change(e):
-                if e.value == VOICE_RELOAD:
-                    voice_select = voice_select_holder["value"]
-                    if voice_select is None:
-                        return
-                    voice_select.set_value(VOICE_NONE)
+                voice_select = voice_select_holder["value"]
+                if voice_select is None:
+                    return
+                values: list = e.value if isinstance(e.value, list) else []
+                if VOICE_RELOAD in values:
+                    voice_select.set_value([])
                     loop = asyncio.get_event_loop()
                     voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
                     voice_select_view.refresh()
 
             voice_select = ui.select(
                 options=voice_options["value"],
-                value=VOICE_NONE,
+                value=[],
                 label="voice",
-            ).props("outlined dense options-dense style='width: 220px;'")
+                multiple=True,
+            ).props("outlined dense options-dense use-chips").classes("w-full")
             voice_select_holder["value"] = voice_select # type: ignore
             voice_select.on_value_change(on_voice_change)
 
