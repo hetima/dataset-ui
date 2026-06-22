@@ -41,7 +41,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from voice.cli_task_lfm_asr import LFMASRPipeline, analyze_audio_data
+from voice.cli_task_lfm_asr import LFMASRPipeline, analyze_audio, analyze_audio_data
 
 app = FastAPI()
 
@@ -55,18 +55,31 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = 0.0
 
 
-def _extract_audio_base64(messages: list[dict]) -> str:
-    """messages から最初の input_audio の base64 データを取り出す。"""
+def _extract_audio_source(messages: list[dict]) -> tuple[str, str]:
+    """messages から音声ソースを取り出す。
+    input_audio がある場合は ("base64", <data>) を返す。
+    ない場合は text をファイルパスとして ("path", <path>) を返す。
+    """
+    audio_b64 = None
+    text_path = None
     for msg in messages:
         content = msg.get("content")
         if not isinstance(content, list):
             continue
         for part in content:
-            if isinstance(part, dict) and part.get("type") == "input_audio":
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "input_audio":
                 data = part.get("input_audio", {}).get("data")
                 if data:
-                    return data
-    raise HTTPException(status_code=400, detail="input_audio が見つかりません")
+                    audio_b64 = data
+            elif part.get("type") == "text" and text_path is None:
+                text_path = part.get("text")
+    if audio_b64:
+        return ("base64", audio_b64)
+    if text_path:
+        return ("path", text_path)
+    raise HTTPException(status_code=400, detail="input_audio またはファイルパスが見つかりません")
 
 @app.get("/health")
 def health() -> dict:
@@ -95,13 +108,16 @@ def chat_completions(req: ChatCompletionRequest):
     if _pipe is None:
         raise HTTPException(status_code=503, detail="モデルが読み込まれていません")
 
-    audio_b64 = _extract_audio_base64(req.messages)
-    try:
-        audio_bytes = base64.b64decode(audio_b64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="input_audio の base64 デコードに失敗しました")
-
-    transcript = analyze_audio_data(_pipe, audio_bytes)
+    source_type, source_value = _extract_audio_source(req.messages)
+    if source_type == "base64":
+        try:
+            audio_bytes = base64.b64decode(source_value)
+        except Exception:
+            raise HTTPException(status_code=400, detail="input_audio の base64 デコードに失敗しました")
+        transcript = analyze_audio_data(_pipe, audio_bytes)
+    else:
+        result = analyze_audio(_pipe, source_value)
+        transcript = result.get("transcript", "")
 
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex}",
