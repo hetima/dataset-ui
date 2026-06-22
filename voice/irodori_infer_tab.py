@@ -180,7 +180,8 @@ def tab_iridori_infer(ctx: VoiceCtx):
         if route not in _IRODORI_RESULT_MEDIA_ROUTES:
             app.add_media_files(route, str(parent))
             _IRODORI_RESULT_MEDIA_ROUTES.add(route)
-        return f"{route}/{quote(resolved.name)}"
+        ts = int(path.stat().st_mtime * 1000) if path.exists() else int(datetime.now().timestamp() * 1000)
+        return f"{route}/{quote(resolved.name)}?t={ts}"
 
     def format_result_params(job: InferJob, seed: str | None) -> str:
         """生成結果欄に表示する推論パラメータを短く整形する。"""
