@@ -84,14 +84,61 @@ window.EmojiPicker = (() => {
       });
     }
 
+    // textarea と同じ見た目の非表示要素を使ってカーソル座標を求める
+    function getCaretPosition() {
+      const style = getComputedStyle(ta);
+      const mirror = document.createElement('div');
+      const copiedProperties = [
+        'boxSizing', 'width', 'fontFamily', 'fontSize', 'fontStyle',
+        'fontWeight', 'letterSpacing', 'lineHeight', 'paddingTop',
+        'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth',
+        'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+        'textAlign', 'textIndent', 'textTransform', 'wordSpacing',
+      ];
+
+      Object.assign(mirror.style, {
+        position: 'fixed',
+        visibility: 'hidden',
+        top: '0',
+        left: '-9999px',
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'break-word',
+        overflow: 'hidden',
+      });
+      copiedProperties.forEach(property => {
+        mirror.style[property] = style[property];
+      });
+
+      mirror.textContent = ta.value.slice(0, ta.selectionStart);
+      const marker = document.createElement('span');
+      marker.textContent = '\u200b';
+      mirror.appendChild(marker);
+      document.body.appendChild(mirror);
+
+      const taRect = ta.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const borderTop = parseFloat(style.borderTopWidth) || 0;
+      const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize);
+      const position = {
+        top: taRect.top - wrapperRect.top + borderTop
+          + marker.offsetTop - ta.scrollTop + lineHeight,
+        left: taRect.left - wrapperRect.left + borderLeft
+          + marker.offsetLeft - ta.scrollLeft,
+      };
+
+      mirror.remove();
+      return position;
+    }
+
     function open(filtered) {
       items = filtered;
       activeIndex = 0;
       renderItems();
       dropdown.style.display = 'block';
-      // textarea の下端に合わせる
-      dropdown.style.top = (ta.offsetTop + ta.offsetHeight) + 'px';
-      dropdown.style.left = ta.offsetLeft + 'px';
+      const caret = getCaretPosition();
+      dropdown.style.top = caret.top + 'px';
+      dropdown.style.left = caret.left + 'px';
     }
 
     function close() {
@@ -117,6 +164,9 @@ window.EmojiPicker = (() => {
       // カーソルを絵文字の直後に移動
       const newPos = trigger.colonIndex + emoji.length;
       nativeInput.setSelectionRange(newPos, newPos);
+      requestAnimationFrame(() => {
+        nativeInput.setSelectionRange(newPos, newPos);
+      });
       close();
     }
 
