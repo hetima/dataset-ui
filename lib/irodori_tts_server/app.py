@@ -37,6 +37,9 @@ class IrodoriOptions(BaseModel):
     ref_wav: str | None = None
     ref_latent: str | None = None
     ref_embed: str | None = None
+    ref_embeds: list[str] | None = None
+    ref_embed_weights: list[float] | None = None
+    ref_embed_method: Literal["linear", "slerp"] | None = None
     no_ref: bool | None = None
     seconds: float | None = None
     duration_scale: float | None = None
@@ -408,6 +411,12 @@ def _validate_speech_payload(payload: SpeechRequest) -> None:
 
 def _resolve_voice(payload: SpeechRequest) -> VoiceSpec:
     options = payload.irodori
+    explicit_ref_embeds = options.ref_embeds
+    if explicit_ref_embeds is None:
+        explicit_ref_embeds = _extra(payload, "ref_embeds")
+    if explicit_ref_embeds is not None:
+        return VoiceSpec(voice_id="request")
+
     explicit_ref_wav = options.ref_wav
     explicit_ref_latent = options.ref_latent
     explicit_ref_embed = options.ref_embed
@@ -763,6 +772,27 @@ def _audio_as_channels_first(audio: torch.Tensor) -> torch.Tensor:
 
 def _build_sampling_request(payload: SpeechRequest, voice: VoiceSpec) -> SamplingRequest:
     opts = payload.irodori
+    ref_embeds = _as_optional_str_list(
+        _coalesce(opts.ref_embeds, _extra(payload, "ref_embeds"), None),
+        "ref_embeds",
+    )
+    ref_embed_weights = _as_optional_float_list(
+        _coalesce(
+            opts.ref_embed_weights,
+            _extra(payload, "ref_embed_weights"),
+            None,
+        ),
+        "ref_embed_weights",
+    )
+    ref_embed_method = str(
+        _coalesce(
+            opts.ref_embed_method,
+            _extra(payload, "ref_embed_method"),
+            "linear",
+        )
+    )
+    if ref_embed_method not in {"linear", "slerp"}:
+        raise ValueError("ref_embed_method must be 'linear' or 'slerp'.")
 
     duration_scale = _as_float(
         _coalesce(
@@ -784,6 +814,9 @@ def _build_sampling_request(payload: SpeechRequest, voice: VoiceSpec) -> Samplin
         ref_wav=voice.ref_wav,
         ref_latent=voice.ref_latent,
         ref_embed=voice.ref_embed,
+        ref_embeds=ref_embeds,
+        ref_embed_weights=ref_embed_weights,
+        ref_embed_method=ref_embed_method,
         no_ref=bool(voice.no_ref),
         ref_normalize_db=_as_optional_float(
             _explicit_option(
@@ -1017,6 +1050,28 @@ def _as_optional_str(value: Any, name: str) -> str | None:
     if text == "":
         raise ValueError(f"{name} must be non-empty when specified.")
     return text
+
+
+def _as_optional_str_list(value: Any, name: str) -> list[str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError(f"{name} must be an array.")
+    values: list[str] = []
+    for index, item in enumerate(value):
+        text = _as_optional_str(item, f"{name}[{index}]")
+        if text is None:
+            raise ValueError(f"{name}[{index}] must be non-empty.")
+        values.append(text)
+    return values
+
+
+def _as_optional_float_list(value: Any, name: str) -> list[float] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError(f"{name} must be an array.")
+    return [_as_float(item, f"{name}[{index}]") for index, item in enumerate(value)]
 
 
 def _coalesce(*values: Any) -> Any:

@@ -197,6 +197,9 @@ class SamplingRequest:
     ref_wav: str | None = None
     ref_latent: str | None = None
     ref_embed: str | None = None
+    ref_embeds: list[str] | None = None
+    ref_embed_weights: list[float] | None = None
+    ref_embed_method: str = "linear"
     no_ref: bool = False
     ref_normalize_db: float | None = -16.0
     ref_ensure_max: bool = True
@@ -773,21 +776,88 @@ class InferenceRuntime:
         torch.Tensor | None,
         torch.Tensor | None,
     ]:
-        if req.ref_embed is None:
+        if req.ref_embeds is None and req.ref_embed is None:
             return None, None
         if not self.model_cfg.use_speaker_condition_resolved:
             messages.append(
                 "info: speaker conditioning is disabled for this checkpoint; ignoring speaker embedding."
             )
             return None, None
-        if req.ref_wav is not None or req.ref_latent is not None or req.no_ref:
+        if req.ref_embeds is None and (
+            req.ref_wav is not None or req.ref_latent is not None or req.no_ref
+        ):
             raise ValueError(
                 "ref_embed/--ref-embed cannot be combined with ref_wav/ref_latent/no_ref. "
                 "Use exactly one speaker conditioning source."
             )
 
         runtime_dtype = next(self.model.parameters()).dtype
-        speaker_embedding = load_speaker_inversion_payload(req.ref_embed)["speaker_embedding"]
+        if req.ref_embeds is not None:
+            if not req.ref_embeds:
+                raise ValueError("ref_embeds must contain at least one path.")
+            weights = req.ref_embed_weights
+            if weights is None:
+                weights = [1.0] * len(req.ref_embeds)
+            if len(weights) != len(req.ref_embeds):
+                raise ValueError("ref_embed_weights must have the same length as ref_embeds.")
+            if any(weight < 0 for weight in weights):
+                raise ValueError("ref_embed_weights must not contain negative values.")
+            weight_sum = sum(weights)
+            if weight_sum <= 0:
+                raise ValueError("ref_embed_weights must have a positive total.")
+
+            embeddings = [
+                load_speaker_inversion_payload(path)["speaker_embedding"]
+                for path in req.ref_embeds
+            ]
+            expected_shape = embeddings[0].shape
+            if any(embedding.shape != expected_shape for embedding in embeddings[1:]):
+                raise ValueError(
+                    "All ref_embeds must have the same speaker_embedding shape."
+                )
+            normalized_weights = [weight / weight_sum for weight in weights]
+            if req.ref_embed_method == "slerp" and len(embeddings) == 2:
+                first = embeddings[0].float()
+                second = embeddings[1].float()
+                first_flat = first.flatten()
+                second_flat = second.flatten()
+                first_norm = torch.linalg.vector_norm(first_flat)
+                second_norm = torch.linalg.vector_norm(second_flat)
+                if first_norm > 0 and second_norm > 0:
+                    dot = torch.dot(first_flat, second_flat) / (first_norm * second_norm)
+                    dot = torch.clamp(dot, -1.0, 1.0)
+                    theta = torch.acos(dot)
+                    sin_theta = torch.sin(theta)
+                else:
+                    sin_theta = torch.zeros((), dtype=first.dtype)
+                if sin_theta.abs() > 1e-6:
+                    t = normalized_weights[1]
+                    speaker_embedding = (
+                        torch.sin((1.0 - t) * theta) / sin_theta * first
+                        + torch.sin(t * theta) / sin_theta * second
+                    )
+                else:
+                    speaker_embedding = (
+                        first * normalized_weights[0]
+                        + second * normalized_weights[1]
+                    )
+                applied_method = "slerp"
+            else:
+                speaker_embedding = sum(
+                    embedding.float() * weight
+                    for embedding, weight in zip(
+                        embeddings, normalized_weights, strict=True
+                    )
+                )
+                applied_method = "linear"
+            messages.append(
+                f"info: mixing {len(embeddings)} speaker inversion embeddings "
+                f"with method={applied_method}."
+            )
+        else:
+            speaker_embedding = load_speaker_inversion_payload(req.ref_embed)[
+                "speaker_embedding"
+            ]
         state, mask = speaker_inversion_batch_tensors(
             speaker_embedding,
             batch_size=batch_size,

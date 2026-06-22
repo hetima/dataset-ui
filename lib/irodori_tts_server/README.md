@@ -285,6 +285,9 @@ Common `irodori` options:
 | `cfg_scale_text` | Strength of text guidance. |
 | `cfg_scale_speaker` | Strength of speaker/reference-voice guidance. |
 | `lora_adapter` | PEFT LoRA adapter directory to load dynamically for this request. The adapter is not merged into the base checkpoint. |
+| `ref_embeds` | Speaker inversion embedding paths to mix. When specified, this takes priority over `voice`, `ref_wav`, `ref_latent`, `ref_embed`, and `no_ref`. |
+| `ref_embed_weights` | Optional non-negative weights corresponding to `ref_embeds`. Weights are normalized automatically; omitted weights are equal. |
+| `ref_embed_method` | Embedding mixing method: `linear` (default) or `slerp`. SLERP is used only with exactly two embeddings; other counts use linear mixing. |
 | `t_schedule_mode` | Sampling schedule, usually `linear` or `sway`. |
 | `sway_coeff` | Sway schedule coefficient when using `t_schedule_mode: "sway"`. |
 | `chunking_enabled` | Enable or disable automatic long text chunking for this request. |
