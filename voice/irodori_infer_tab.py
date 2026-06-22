@@ -196,36 +196,37 @@ def tab_iridori_infer(ctx: VoiceCtx):
         )
 
     def add_result_player(path: Path, job: InferJob, seed: str | None):
-        """生成結果欄の末尾に PlyrAlt プレイヤーと推論情報を追加する。"""
+        """生成結果欄の先頭に PlyrAlt プレイヤーと推論情報を追加する。"""
         result_list = result_list_holder["value"]
         if result_list is None:
             return
-        with result_list:
-            with ui.column().classes("w-full gap-1 mb-3") as section:
-                with ui.row().classes("w-full items-center gap-2"):
-                    with ui.element("div").classes("flex-1 min-w-0"):
-                        plyr_alt(
-                            media_url_for_file(path),
-                            path.name,
-                            control=result_control,
-                        )
-                    delete_btn = ui.button(icon="delete").props("flat square dense color=grey")
+        with ui.column() as section:
+            section.classes("w-full gap-1 mb-3")
+            with ui.row().classes("w-full items-center gap-2"):
+                with ui.element("div").classes("flex-1 min-w-0"):
+                    plyr_alt(
+                        media_url_for_file(path),
+                        path.name,
+                        control=result_control,
+                    )
+                delete_btn = ui.button(icon="delete").props("flat square dense color=grey")
 
-                    def on_delete_click(btn=delete_btn, p=path, s=section):
-                        if btn.text == "削除する":
-                            send2trash(p)
-                            s.delete()
-                        else:
-                            btn.text = "削除する"
-                            btn.props("color=negative")
+                def on_delete_click(btn=delete_btn, p=path, s=section):
+                    if btn.text == "削除する":
+                        send2trash(p)
+                        s.delete()
+                    else:
+                        btn.text = "削除する"
+                        btn.props("color=negative")
 
-                    delete_btn.on_click(on_delete_click)
-                ui.label(f"入力: {job.text}").classes(
-                    "w-full text-xs text-grey-9"
-                ).style("white-space: pre-wrap; overflow-wrap: anywhere;")
-                ui.label(f"パラメータ: {format_result_params(job, seed)}").classes(
-                    "w-full text-xs text-grey-8"
-                ).style("overflow-wrap: anywhere;")
+                delete_btn.on_click(on_delete_click)
+            ui.label(f"入力: {job.text}").classes(
+                "w-full text-xs text-grey-9"
+            ).style("white-space: pre-wrap; overflow-wrap: anywhere;")
+            ui.label(f"パラメータ: {format_result_params(job, seed)}").classes(
+                "w-full text-xs text-grey-8"
+            ).style("overflow-wrap: anywhere;")
+        section.move(result_list, target_index=0)
 
     def enqueue_infer():
         """UI の現在値をジョブ化して推論キューに追加する。"""
