@@ -23,10 +23,12 @@ EMOJI_JSON_PATH = Path(__file__).resolve().parent / "emoji.json"
 SERVER_URL = "http://127.0.0.1:7867"
 KNOWN_MODELS = ["Irodori-TTS-500M-v3", "Irodori-TTS-600M-v3-VoiceDesign"]
 IRODORI_LORA_SUB_DIR = "irodori-tts_lora"
+IRODORI_VOICES_SUB_DIR = "irodori-tts_voices"
 LORA_EXPLICIT_NONE = "__none__"
 LORA_RELOAD = "__reload__"
 VOICE_EXPLICIT_NONE = "__none__"
 VOICE_RELOAD = "__reload__"
+REF_EMBED_RELOAD = "__reload__"
 IRODORI_RESULT_MEDIA_ROUTE = "/irodori-result-media"
 _IRODORI_RESULT_MEDIA_ROUTES: set[str] = set()
 
@@ -37,6 +39,9 @@ class InferJob:
 
     text: str
     voice: str | None
+    ref_embeds: tuple[str, str] | None
+    ref_embed_weights: tuple[float, float] | None
+    ref_embed_method: str
     lora_adapter: str | None
     cfg_scale_text: float
     cfg_scale_speaker: float
@@ -50,6 +55,19 @@ def tab_iridori_infer(ctx: VoiceCtx):
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
     voice_select_holder = {"value": None}
+    mixed_ref_enabled = {"value": False}
+    ref_embed_a_holder = {"value": None}
+    ref_embed_b_holder = {"value": None}
+    ref_embed_ratio_holder = {"value": None}
+    ref_embed_method_holder = {"value": None}
+    speaker_condition_values = {
+        "voices": [],
+        "ref_embed_a": None,
+        "ref_embed_b": None,
+        "ratio_a": 0.5,
+        "method": "linear",
+    }
+    ref_embed_options = {"value": {REF_EMBED_RELOAD: "メニューを更新"}}
     voice_options = {"value": {VOICE_EXPLICIT_NONE: "なし（voiceなし）", VOICE_RELOAD: "メニューを更新"}}
     result_control = PlyrAltControl()
     result_list_holder: dict[str, ui.column | None] = {"value": None}
@@ -108,6 +126,17 @@ def tab_iridori_infer(ctx: VoiceCtx):
         options[LORA_RELOAD] = "再読み込み"
         return options
 
+    def list_speaker_embeddings() -> dict[str, str]:
+        """models_dir/irodori-tts_voices 内の Speaker Inversion を列挙する。"""
+        base = cnfg.models_dir / IRODORI_VOICES_SUB_DIR
+        options: dict[str, str] = {}
+        if base.exists():
+            for path in sorted(base.rglob("*.speaker.safetensors")):
+                if path.is_file():
+                    options[str(path.resolve())] = path.relative_to(base).as_posix()
+        options[REF_EMBED_RELOAD] = "メニューを更新"
+        return options
+
     def normalize_path_text(path: str | None) -> str:
         """比較用にパス文字列を正規化する。"""
         if not path:
@@ -161,6 +190,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
         stem = re.sub(r'[:*?"<>|]', "_", relative.name) or "irodori"
         return parent / f"{stem}.{fmt}"
 
+    def speaker_embedding_name(path: str) -> str:
+        """Speaker Inversion のファイル名から表示用の名前を返す。"""
+        suffix = ".speaker.safetensors"
+        name = Path(path).name
+        return name[:-len(suffix)] if name.endswith(suffix) else Path(path).stem
+
     def unique_output_path(path: Path) -> Path:
         """保存直前の実ファイル状態を見て、未使用の出力ファイルパスを作る。"""
         index = 0
@@ -185,7 +220,15 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
     def format_result_params(job: InferJob, seed: str | None) -> str:
         """生成結果欄に表示する推論パラメータを短く整形する。"""
-        voice = job.voice or "なし"
+        if job.ref_embeds and job.ref_embed_weights:
+            voice = ", ".join(
+                f"{speaker_embedding_name(path)}:{weight:g}"
+                for path, weight in zip(
+                    job.ref_embeds, job.ref_embed_weights, strict=True
+                )
+            )
+        else:
+            voice = job.voice or "なし"
         lora = "なし"
         if job.lora_adapter:
             lora_path = Path(job.lora_adapter)
@@ -248,6 +291,27 @@ def tab_iridori_infer(ctx: VoiceCtx):
             return
 
         cnfg.voice.save()
+        ref_embeds: tuple[str, str] | None = None
+        ref_embed_weights: tuple[float, float] | None = None
+        ref_embed_method = "linear"
+        if mixed_ref_enabled["value"]:
+            ref_embed_a = ref_embed_a_holder["value"]
+            ref_embed_b = ref_embed_b_holder["value"]
+            path_a = ref_embed_a.value if ref_embed_a else None
+            path_b = ref_embed_b.value if ref_embed_b else None
+            if not path_a or path_a == REF_EMBED_RELOAD or not path_b or path_b == REF_EMBED_RELOAD:
+                ui.notify("混合する Speaker Inversion を2つ選択してください", type="warning")
+                return
+            if normalize_path_text(path_a) == normalize_path_text(path_b):
+                ui.notify("異なる Speaker Inversion を選択してください", type="warning")
+                return
+            ratio_slider = ref_embed_ratio_holder["value"]
+            ratio_a = float(ratio_slider.value if ratio_slider else 0.5)
+            ref_embeds = (path_a, path_b)
+            ref_embed_weights = (ratio_a, 1.0 - ratio_a)
+            method_toggle = ref_embed_method_holder["value"]
+            ref_embed_method = str(method_toggle.value if method_toggle else "linear")
+
         voice_select = voice_select_holder["value"]
         selected_voices: list[str] = voice_select.value if voice_select else []
         lora_select = lora_select_holder["value"]
@@ -261,7 +325,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
         def _normalize_voice(v: str) -> str | None:
             return None if v == VOICE_EXPLICIT_NONE else v
         valid_voices: list[str | None] = [_normalize_voice(v) for v in selected_voices if v not in (VOICE_RELOAD,)]
-        voice_list: list[str | None] = valid_voices if valid_voices else [None]
+        voice_list: list[str | None] = [None] if ref_embeds else (valid_voices if valid_voices else [None])
         for lora in lora_list:
             if lora and not is_lora_compatible(lora):
                 lora_path = Path(lora)
@@ -276,11 +340,19 @@ def tab_iridori_infer(ctx: VoiceCtx):
         jobs: list[InferJob] = []
         for lora in lora_list:
             for voice_val in voice_list:
-                out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt, voice=voice_val, lora=lora, steps=num_steps)
+                output_voice = voice_val
+                if ref_embeds:
+                    output_voice = "+".join(
+                        speaker_embedding_name(path) for path in ref_embeds
+                    )
+                out_path = make_output_path(cnfg.voice.irodori_tts_output_prefix, fmt, voice=output_voice, lora=lora, steps=num_steps)
                 job_out_path = unique_output_path(out_path) if (len(lora_list) * len(voice_list)) > 1 else out_path
                 jobs.append(InferJob(
                     text=text,
                     voice=voice_val,
+                    ref_embeds=ref_embeds,
+                    ref_embed_weights=ref_embed_weights,
+                    ref_embed_method=ref_embed_method,
                     lora_adapter=lora,
                     cfg_scale_text=float(cfg_scale_text_slider.value or 0),
                     cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
@@ -316,7 +388,11 @@ def tab_iridori_infer(ctx: VoiceCtx):
             "cfg_scale_text": job.cfg_scale_text,
             "cfg_scale_speaker": job.cfg_scale_speaker,
         }
-        if job.voice is None:
+        if job.ref_embeds:
+            irodori["ref_embeds"] = list(job.ref_embeds)
+            irodori["ref_embed_weights"] = list(job.ref_embed_weights or ())
+            irodori["ref_embed_method"] = job.ref_embed_method
+        elif job.voice is None:
             irodori["no_ref"] = True
         if job.lora_adapter:
             irodori["lora_adapter"] = job.lora_adapter
@@ -424,7 +500,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                         status_card.refresh()
                         if _health[0]:
                             voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
-                            voice_select_view.refresh()
+                            speaker_condition_view.refresh()
                     ui.button("ステータス更新", on_click=on_refresh_click)
                     if running:
                         ui.label("起動しています")
@@ -488,7 +564,81 @@ def tab_iridori_infer(ctx: VoiceCtx):
         lora_select_view()
 
         @ui.refreshable
-        def voice_select_view():
+        def speaker_condition_view():
+            if mixed_ref_enabled["value"]:
+                async def reload_ref_embeds():
+                    loop = asyncio.get_event_loop()
+                    ref_embed_options["value"] = await loop.run_in_executor(
+                        None, list_speaker_embeddings
+                    )
+                    speaker_condition_view.refresh()
+
+                async def on_ref_embed_change(e):
+                    if e.value == REF_EMBED_RELOAD:
+                        await reload_ref_embeds()
+                with ui.card().classes("gap-2 w-full"):
+                    ui.label("ふたつの .speaker.safetensors を適用します。異なるモデルを選び、スライダーで割合を調整してください。").classes("infotxt")
+                    with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                        ref_embed_a = ui.select(
+                            options=ref_embed_options["value"],
+                            value=speaker_condition_values["ref_embed_a"],
+                            label="モデルA",
+                        ).props("outlined dense options-dense").classes("flex-grow")
+                        ref_embed_a_holder["value"] = ref_embed_a # type: ignore
+                        ref_embed_a.on_value_change(on_ref_embed_change)
+                        ref_embed_a.on_value_change(
+                            lambda e: speaker_condition_values.__setitem__(
+                                "ref_embed_a",
+                                None if e.value == REF_EMBED_RELOAD else e.value,
+                            )
+                        )
+
+                        ratio_a_label = ui.label().classes("w-8 text-right")
+                        ratio_slider = ui.slider(
+                            min=0,
+                            max=1,
+                            step=0.05,
+                            value=speaker_condition_values["ratio_a"],
+                        ).classes("w-56").props('track-color="orange" color="green" thumb-color="blue"')
+                        ref_embed_ratio_holder["value"] = ratio_slider # type: ignore
+                        ratio_b_label = ui.label().classes("w-8")
+                        ratio_a_label.bind_text_from(
+                            ratio_slider, "value", lambda v: f"{float(v):.2g}"
+                        )
+                        ratio_b_label.bind_text_from(
+                            ratio_slider, "value", lambda v: f"{1.0 - float(v):.2g}"
+                        )
+                        ratio_slider.on_value_change(
+                            lambda e: speaker_condition_values.__setitem__(
+                                "ratio_a", float(e.value) # type: ignore
+                            )
+                        )
+
+                        ref_embed_b = ui.select(
+                            options=ref_embed_options["value"],
+                            value=speaker_condition_values["ref_embed_b"],
+                            label="モデルB",
+                        ).props("outlined dense options-dense").classes("flex-grow")
+                        ref_embed_b_holder["value"] = ref_embed_b # type: ignore
+                        ref_embed_b.on_value_change(on_ref_embed_change)
+                        ref_embed_b.on_value_change(
+                            lambda e: speaker_condition_values.__setitem__(
+                                "ref_embed_b",
+                                None if e.value == REF_EMBED_RELOAD else e.value,
+                            )
+                        )
+                    with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                        ui.label("混合方法: ")
+                        method_toggle = ui.toggle(
+                            {"linear": "linear", "slerp": "slerp"},
+                            value=speaker_condition_values["method"],
+                        ).props("")
+                        ref_embed_method_holder["value"] = method_toggle # type: ignore
+                        method_toggle.on_value_change(
+                            lambda e: speaker_condition_values.__setitem__("method", e.value)
+                        )
+                    return
+
             async def on_voice_change(e):
                 voice_select = voice_select_holder["value"]
                 if voice_select is None:
@@ -498,23 +648,33 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     voice_select.set_value([])
                     loop = asyncio.get_event_loop()
                     voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
-                    voice_select_view.refresh()
+                    speaker_condition_view.refresh()
+                    return
+                speaker_condition_values["voices"] = values
 
             voice_select = ui.select(
                 options=voice_options["value"],
-                value=[],
+                value=speaker_condition_values["voices"],
                 label="voice",
                 multiple=True,
             ).props("outlined dense options-dense use-chips").classes("w-full")
             voice_select_holder["value"] = voice_select # type: ignore
             voice_select.on_value_change(on_voice_change)
 
-        voice_select_view()
+        def on_mixed_ref_change(e):
+            mixed_ref_enabled["value"] = bool(e.value)
+            speaker_condition_view.refresh()
+
+        ui.checkbox("混合 Speaker Inversion", on_change=on_mixed_ref_change)
+        speaker_condition_view()
 
         async def _initial_voice_options_load():
             loop = asyncio.get_event_loop()
             voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
-            voice_select_view.refresh()
+            ref_embed_options["value"] = await loop.run_in_executor(
+                None, list_speaker_embeddings
+            )
+            speaker_condition_view.refresh()
         ui.timer(0, _initial_voice_options_load, once=True)
 
         with ui.row().classes("items-center gap-4 w-full"):
