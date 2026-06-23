@@ -841,16 +841,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
             current = state["current"]
             with ui.column().classes("gap-1 w-full"):
                 with ui.row().classes("items-center gap-4"):
-                    ui.label(f"推論：")
+                    ui.button("キューをクリア", on_click=clear_queue).props("dense").set_enabled(queue.qsize() > 0)
                     ui.label(f"待機中: {queue.qsize()} 件")
                     if current:
                         ui.label(f"処理中: {current.out_path.name}")
                     else:
                         ui.label("処理中: なし")
-                    ui.button("キューをクリア", on_click=clear_queue).props("dense").set_enabled(queue.qsize() > 0)
-        with infer_expansion.add_slot("header"):
-            queue_status()
-
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 生成結果
@@ -859,5 +855,6 @@ def tab_iridori_infer(ctx: VoiceCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"')as infer_expansion:
         with ui.column().classes("w-full gap-2"):
+            queue_status()
             plyr_alt_control(result_control)
             result_list_holder["value"] = ui.column().classes("w-full gap-2")
