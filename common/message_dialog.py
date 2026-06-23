@@ -16,10 +16,13 @@ async def show_input_dialog(txt: str, placeholder: str = "") -> str | None:
     dialog = ui.dialog()
     with dialog, ui.card().classes("w-120"):
         ui.markdown(txt)
-        input_field = ui.input(placeholder=placeholder).classes("w-full")
+        input_field = ui.input(placeholder=placeholder).props("outlined dense").classes("w-full")
+        input_field.on("keydown.enter", lambda: dialog.submit(input_field.value))
         with ui.row().classes("w-full justify-end"):
             ui.button("キャンセル", on_click=lambda: dialog.submit(None))
             ui.button("OK", on_click=lambda: dialog.submit(input_field.value))
+    dialog.open()
+    await ui.run_javascript(f"document.getElementById('c{input_field.id}').focus()")
     return await dialog
 
 
