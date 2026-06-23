@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-06-23
+- Irodori-TTS 推論でプリセット対応
+
 ## 2026-06-22
 - Irodori-TTS 推論で Speaker Inversion の混合に対応
 
