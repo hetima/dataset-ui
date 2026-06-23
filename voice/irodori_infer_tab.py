@@ -117,14 +117,14 @@ def tab_iridori_infer(ctx: VoiceCtx):
         return options
 
     def list_lora_adapters() -> dict[str, str]:
-        """models_dir/irodori-tts_lora/*/checkpoint_* を選択肢として返す。"""
+        """models_dir/irodori-tts_lora 内の LoRA アダプターを選択肢として返す。"""
         base = cnfg.models_dir / IRODORI_LORA_SUB_DIR
         options = {LORA_EXPLICIT_NONE: "なし（LoRAなし）"}
         if base.exists():
             paths = sorted(
-                p
-                for p in base.glob("*/checkpoint_*")
-                if p.is_dir()
+                metadata.parent
+                for metadata in base.rglob("irodori_lora_metadata.json")
+                if metadata.is_file()
             )
             for path in paths:
                 options[str(path)] = path.relative_to(base).as_posix()
