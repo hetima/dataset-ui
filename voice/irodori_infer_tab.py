@@ -40,6 +40,7 @@ class InferJob:
     """Irodori-TTS 推論キューに積む設定一式。"""
 
     text: str
+    caption: str | None
     voice: str | None
     ref_embeds: tuple[str, str] | None
     ref_embed_weights: tuple[float, float] | None
@@ -48,6 +49,7 @@ class InferJob:
     lora_scale: float
     cfg_scale_text: float
     cfg_scale_speaker: float
+    cfg_scale_caption: float
     num_steps: int
     response_format: str
     out_path: Path
@@ -59,6 +61,10 @@ def tab_iridori_infer(ctx: VoiceCtx):
     lora_select_holder = {"value": None}
     lora_scale_holder = {"value": None}
     lora_scale_value = {"value": 1.0}
+    server_model_state = {"voice_design": False}
+    caption_value = {"value": ""}
+    cfg_scale_values = {"text": 3.0, "speaker": 5.0}
+    cfg_scale_caption_value = {"value": 3.0}
     voice_select_holder = {"value": None}
     mixed_ref_enabled = {"value": False}
     ref_embed_a_holder = {"value": None}
@@ -357,6 +363,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 job_out_path = unique_output_path(out_path) if (len(lora_list) * len(voice_list)) > 1 else out_path
                 jobs.append(InferJob(
                     text=text,
+                    caption=caption_value["value"].strip() if server_model_state["voice_design"] else None,
                     voice=voice_val,
                     ref_embeds=ref_embeds,
                     ref_embed_weights=ref_embed_weights,
@@ -367,8 +374,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
                         if lora_scale_holder["value"] is not None
                         else 1.0
                     ),
-                    cfg_scale_text=float(cfg_scale_text_slider.value or 0),
-                    cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
+                    cfg_scale_text=float(cfg_scale_values["text"]),
+                    cfg_scale_speaker=float(cfg_scale_values["speaker"]),
+                    cfg_scale_caption=float(cfg_scale_caption_value["value"]),
                     num_steps=num_steps,
                     response_format=fmt,
                     out_path=job_out_path,
@@ -401,6 +409,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
             "cfg_scale_text": job.cfg_scale_text,
             "cfg_scale_speaker": job.cfg_scale_speaker,
         }
+        if job.caption:
+            irodori["caption"] = job.caption
+            irodori["cfg_scale_caption"] = job.cfg_scale_caption
         if job.ref_embeds:
             irodori["ref_embeds"] = list(job.ref_embeds)
             irodori["ref_embed_weights"] = list(job.ref_embed_weights or ())
@@ -511,7 +522,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
                         nonlocal _health
                         loop = asyncio.get_event_loop()
                         _health = await loop.run_in_executor(None, check_health)
+                        server_model_state["voice_design"] = bool(
+                            _health[1] and "voicedesign" in _health[1].casefold()
+                        )
                         status_card.refresh()
+                        caption_input_view.refresh()
+                        cfg_scale_view.refresh()
                         if _health[0]:
                             voice_options["value"] = await loop.run_in_executor(None, list_server_voices)
                             speaker_condition_view.refresh()
@@ -540,7 +556,12 @@ def tab_iridori_infer(ctx: VoiceCtx):
             nonlocal _health
             loop = asyncio.get_event_loop()
             _health = await loop.run_in_executor(None, check_health)
+            server_model_state["voice_design"] = bool(
+                _health[1] and "voicedesign" in _health[1].casefold()
+            )
             status_card.refresh()
+            caption_input_view.refresh()
+            cfg_scale_view.refresh()
         ui.timer(0, _initial_health_check, once=True)
 
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -560,6 +581,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             warnings: list[str] = []
 
             text_input.set_value(preset.text)
+            caption_value["value"] = preset.caption
 
             lora_sel = lora_select_holder["value"]
             if lora_sel is not None:
@@ -600,6 +622,11 @@ def tab_iridori_infer(ctx: VoiceCtx):
             speaker_condition_view.refresh()
             cfg_scale_text_slider.set_value(preset.cfg_scale_text)
             cfg_scale_speaker_slider.set_value(preset.cfg_scale_speaker)
+            cfg_scale_values["text"] = preset.cfg_scale_text
+            cfg_scale_values["speaker"] = preset.cfg_scale_speaker
+            cfg_scale_caption_value["value"] = preset.cfg_scale_caption
+            caption_input_view.refresh()
+            cfg_scale_view.refresh()
             num_steps_input.set_value(preset.num_steps)
             format_select.set_value(preset.response_format)
 
@@ -617,6 +644,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             preset = IrodoriPreset(
                 name=name,
                 text=text_input.value or "",
+                caption=caption_value["value"],
                 lora_adapter=list(lora_sel.value) if lora_sel else [],
                 lora_scale=float(lora_scale_value["value"]),
                 mixed_ref_enabled=mixed_ref_enabled["value"],
@@ -625,8 +653,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 ratio_a=float(speaker_condition_values.get("ratio_a", 0.5)),
                 ref_embed_method=str(speaker_condition_values.get("method", "linear")),
                 voices=list(speaker_condition_values.get("voices", [])),
-                cfg_scale_text=float(cfg_scale_text_slider.value or 3.0),
-                cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 5.0),
+                cfg_scale_text=float(cfg_scale_values["text"]),
+                cfg_scale_speaker=float(cfg_scale_values["speaker"]),
+                cfg_scale_caption=float(cfg_scale_caption_value["value"]),
                 num_steps=int(float(num_steps_input.value or 40)),
                 response_format=format_select.value or "wav",
             )
@@ -675,6 +704,20 @@ def tab_iridori_infer(ctx: VoiceCtx):
 
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
         attach_emoji_picker(text_input, EMOJI_JSON_PATH)
+
+        @ui.refreshable
+        def caption_input_view():
+            if not server_model_state["voice_design"]:
+                return
+            caption_input = ui.textarea(
+                label="キャプション",
+                value=caption_value["value"],
+            ).props("outlined autogrow").classes("w-full")
+            caption_input.on_value_change(
+                lambda e: caption_value.__setitem__("value", e.value or "")
+            )
+
+        caption_input_view()
 
         @ui.refreshable
         def lora_select_view():
@@ -837,29 +880,63 @@ def tab_iridori_infer(ctx: VoiceCtx):
             speaker_condition_view.refresh()
         ui.timer(0, _initial_voice_options_load, once=True)
 
-        with ui.row().classes("items-center gap-4 w-full"):
-            with ui.column().classes("gap-1"):
-                with ui.row().classes("items-center gap-1"):
-                    ui.label("cfg_scale_text").classes("text-base")
-                    ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_text_slider.set_value(3.0))
-                with ui.row().classes("items-center gap-2"):
-                    cfg_scale_text_slider = (
-                        ui.slider(min=0, max=10, step=0.1, value=3.0)
-                        .props("label")
-                        .classes("w-56")
-                    )
-                    ui.label().bind_text_from(cfg_scale_text_slider, "value", lambda v: f"{v:.1f}")
-            with ui.column().classes("gap-1"):
-                with ui.row().classes("items-center gap-1"):
-                    ui.label("cfg_scale_speaker").classes("text-base")
-                    ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_speaker_slider.set_value(5.0))
-                with ui.row().classes("items-center gap-2"):
-                    cfg_scale_speaker_slider = (
-                        ui.slider(min=0, max=10, step=0.1, value=5.0)
-                        .props("label")
-                        .classes("w-56")
-                    )
-                    ui.label().bind_text_from(cfg_scale_speaker_slider, "value", lambda v: f"{v:.1f}")
+        @ui.refreshable
+        def cfg_scale_view():
+            nonlocal cfg_scale_text_slider, cfg_scale_speaker_slider
+            with ui.row().classes("items-center gap-4 w-full"):
+                with ui.column().classes("gap-1"):
+                    with ui.row().classes("items-center gap-1"):
+                        ui.label("cfg_scale_text").classes("text-base")
+                        ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_text_slider.set_value(3.0))
+                    with ui.row().classes("items-center gap-2"):
+                        cfg_scale_text_slider = ui.slider(
+                            min=0, max=10, step=0.1, value=cfg_scale_values["text"]
+                        ).props("label").classes("w-56")
+                        cfg_scale_text_slider.on_value_change(
+                            lambda e: cfg_scale_values.__setitem__("text", float(e.value))
+                        )
+                        ui.label().bind_text_from(cfg_scale_text_slider, "value", lambda v: f"{v:.1f}")
+                with ui.column().classes("gap-1"):
+                    with ui.row().classes("items-center gap-1"):
+                        ui.label("cfg_scale_speaker").classes("text-base")
+                        ui.button(icon="restart_alt").props("flat dense round size=sm color=grey").on_click(lambda: cfg_scale_speaker_slider.set_value(5.0))
+                    with ui.row().classes("items-center gap-2"):
+                        cfg_scale_speaker_slider = ui.slider(
+                            min=0, max=10, step=0.1, value=cfg_scale_values["speaker"]
+                        ).props("label").classes("w-56")
+                        cfg_scale_speaker_slider.on_value_change(
+                            lambda e: cfg_scale_values.__setitem__("speaker", float(e.value))
+                        )
+                        ui.label().bind_text_from(cfg_scale_speaker_slider, "value", lambda v: f"{v:.1f}")
+                if server_model_state["voice_design"]:
+                    with ui.column().classes("gap-1"):
+                        with ui.row().classes("items-center gap-1"):
+                            ui.label("cfg_scale_caption").classes("text-base")
+                            ui.button(icon="restart_alt").props(
+                                "flat dense round size=sm color=grey"
+                            ).on_click(lambda: cfg_scale_caption_slider.set_value(3.0))
+                        with ui.row().classes("items-center gap-2"):
+                            cfg_scale_caption_slider = ui.slider(
+                                min=0,
+                                max=10,
+                                step=0.1,
+                                value=cfg_scale_caption_value["value"],
+                            ).props("label").classes("w-56")
+                            cfg_scale_caption_slider.on_value_change(
+                                lambda e: cfg_scale_caption_value.__setitem__(
+                                    "value", float(e.value)
+                                )
+                            )
+                            ui.label().bind_text_from(
+                                cfg_scale_caption_slider,
+                                "value",
+                                lambda v: f"{v:.1f}",
+                            )
+
+        cfg_scale_text_slider = None
+        cfg_scale_speaker_slider = None
+        cfg_scale_caption_slider = None
+        cfg_scale_view()
 
         with ui.row().classes("items-center gap-4"):
             num_steps_input = ui.number(label="ステップ数", value=40, min=1, format="%d").props(

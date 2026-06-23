@@ -6,6 +6,7 @@ class IrodoriPreset:
     """推論セクションのオプション設定1件分。"""
     name: str = ""
     text: str = ""
+    caption: str = ""
     lora_adapter: list[str] = dataclasses.field(default_factory=list)
     lora_scale: float = 1.0
     mixed_ref_enabled: bool = False
@@ -16,6 +17,7 @@ class IrodoriPreset:
     voices: list[str] = dataclasses.field(default_factory=list)
     cfg_scale_text: float = 3.0
     cfg_scale_speaker: float = 5.0
+    cfg_scale_caption: float = 3.0
     num_steps: int = 40
     response_format: str = "wav"
 
