@@ -73,6 +73,7 @@ class IrodoriOptions(BaseModel):
     tail_mean_threshold: float | None = None
     max_text_len: int | None = None
     lora_adapter: str | None = None
+    lora_scale: float | None = None
     chunking_enabled: bool | None = None
     chunk_min_chars: int | None = None
     first_sentence_chunk_min_chars: int | None = None
@@ -989,6 +990,10 @@ def _build_sampling_request(payload: SpeechRequest, voice: VoiceSpec) -> Samplin
             _coalesce(opts.lora_adapter, _extra(payload, "lora_adapter"), None),
             "lora_adapter",
         ),
+        lora_scale=_as_float(
+            _coalesce(opts.lora_scale, _extra(payload, "lora_scale"), 1.0),
+            "lora_scale",
+        ),
     )
 
 
@@ -999,6 +1004,8 @@ def _validate_sampling_request(request: SamplingRequest) -> None:
         raise HTTPException(
             status_code=400, detail="max_seconds must be greater than or equal to min_seconds."
         )
+    if request.lora_scale < 0:
+        raise HTTPException(status_code=400, detail="lora_scale must not be negative.")
 
 
 def _extra(payload: SpeechRequest, key: str) -> Any:

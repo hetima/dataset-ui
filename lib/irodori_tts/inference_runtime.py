@@ -8,7 +8,7 @@ import secrets
 import threading
 import time
 from collections.abc import Callable
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -236,6 +236,7 @@ class SamplingRequest:
     tail_std_threshold: float = 0.05
     tail_mean_threshold: float = 0.1
     lora_adapter: str | None = None
+    lora_scale: float = 1.0
 
 
 @dataclass
@@ -603,6 +604,7 @@ class InferenceRuntime:
     def _prepare_lora_for_request(
         self,
         adapter_path: str | None,
+        scale: float,
         *,
         messages: list[str],
         stage_timings: list[tuple[str, float]],
@@ -613,6 +615,7 @@ class InferenceRuntime:
         try:
             return self._prepare_lora_for_request_inner(
                 adapter_path,
+                scale,
                 messages=messages,
                 log_fn=log_fn,
             )
@@ -625,6 +628,7 @@ class InferenceRuntime:
     def _prepare_lora_for_request_inner(
         self,
         adapter_path: str | None,
+        scale: float,
         *,
         messages: list[str],
         log_fn: Callable[[str], None],
@@ -667,7 +671,23 @@ class InferenceRuntime:
             dtype=self._model_dtype,
         )
         self.model.eval()
-        return nullcontext()
+        return self._scale_lora_adapter(adapter_name, scale)
+
+    @contextmanager
+    def _scale_lora_adapter(self, adapter_name: str, scale: float):
+        """指定LoRAの倍率を推論中だけ変更し、終了時に元へ戻す。"""
+        original_scaling: list[tuple[dict[str, float], float]] = []
+        for module in self.model.modules():
+            scaling = getattr(module, "scaling", None)
+            if isinstance(scaling, dict) and adapter_name in scaling:
+                original = float(scaling[adapter_name])
+                original_scaling.append((scaling, original))
+                scaling[adapter_name] = original * float(scale)
+        try:
+            yield
+        finally:
+            for scaling, original in original_scaling:
+                scaling[adapter_name] = original
 
     def _load_reference_latent(
         self,
@@ -1021,6 +1041,7 @@ class InferenceRuntime:
             self._infer_lock,
             self._prepare_lora_for_request(
                 req.lora_adapter,
+                req.lora_scale,
                 messages=messages,
                 stage_timings=stage_timings,
                 log_fn=_log,

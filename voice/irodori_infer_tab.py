@@ -45,6 +45,7 @@ class InferJob:
     ref_embed_weights: tuple[float, float] | None
     ref_embed_method: str
     lora_adapter: str | None
+    lora_scale: float
     cfg_scale_text: float
     cfg_scale_speaker: float
     num_steps: int
@@ -56,6 +57,8 @@ def tab_iridori_infer(ctx: VoiceCtx):
     queue: asyncio.Queue[InferJob] = asyncio.Queue()
     state = {"current": None, "worker_started": False}
     lora_select_holder = {"value": None}
+    lora_scale_holder = {"value": None}
+    lora_scale_value = {"value": 1.0}
     voice_select_holder = {"value": None}
     mixed_ref_enabled = {"value": False}
     ref_embed_a_holder = {"value": None}
@@ -238,7 +241,8 @@ def tab_iridori_infer(ctx: VoiceCtx):
         return (
             f"steps={job.num_steps}, "
             f"cfg_text={job.cfg_scale_text:g}, cfg_speaker={job.cfg_scale_speaker:g}, "
-            f"seed={seed or ''}, voice={voice}, lora={lora}"
+            f"seed={seed or ''}, voice={voice}, lora={lora}, "
+            f"lora_scale={job.lora_scale:g}"
         )
 
     def add_result_player(path: Path, job: InferJob, seed: str | None):
@@ -356,6 +360,11 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     ref_embed_weights=ref_embed_weights,
                     ref_embed_method=ref_embed_method,
                     lora_adapter=lora,
+                    lora_scale=float(
+                        lora_scale_holder["value"].value
+                        if lora_scale_holder["value"] is not None
+                        else 1.0
+                    ),
                     cfg_scale_text=float(cfg_scale_text_slider.value or 0),
                     cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 0),
                     num_steps=num_steps,
@@ -398,6 +407,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             irodori["no_ref"] = True
         if job.lora_adapter:
             irodori["lora_adapter"] = job.lora_adapter
+            irodori["lora_scale"] = job.lora_scale
         payload = {
             "model": "irodori-tts",
             "input": job.text,
@@ -418,7 +428,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
         if job.lora_adapter:
             lora_path = Path(job.lora_adapter)
             lora_label = "/".join(lora_path.parts[-2:])
-            description += f" ,lora:{lora_label}"
+            description += f" ,lora:{lora_label}, lora_scale:{job.lora_scale}"
         if job.response_format == "flac":
             audio = FLAC(path)
             audio["lyrics"] = job.text
@@ -557,6 +567,9 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 lora_sel.set_value(valid_lora)
                 if missing_lora:
                     warnings.append(f"LoRA: {', '.join(missing_lora)}")
+            lora_scale_value["value"] = preset.lora_scale
+            if lora_scale_holder["value"] is not None:
+                lora_scale_holder["value"].set_value(preset.lora_scale)
 
             mixed_ref_enabled["value"] = preset.mixed_ref_enabled
             mixed_ref_checkbox.set_value(preset.mixed_ref_enabled)
@@ -603,6 +616,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 name=name,
                 text=text_input.value or "",
                 lora_adapter=list(lora_sel.value) if lora_sel else [],
+                lora_scale=float(lora_scale_value["value"]),
                 mixed_ref_enabled=mixed_ref_enabled["value"],
                 ref_embed_a=speaker_condition_values.get("ref_embed_a"),
                 ref_embed_b=speaker_condition_values.get("ref_embed_b"),
@@ -671,14 +685,39 @@ def tab_iridori_infer(ctx: VoiceCtx):
                     lora_select.set_value([])
                     lora_select_view.refresh()
 
-            lora_select = ui.select(
-                options=list_lora_adapters(),
-                value=[],
-                label="LoRA選択",
-                multiple=True,
-            ).props("outlined dense options-dense use-chips").classes("w-full")
-            lora_select_holder["value"] = lora_select # type: ignore
-            lora_select.on_value_change(on_lora_change)
+            with ui.row().classes("items-center gap-3 w-full no-wrap"):
+                lora_select = ui.select(
+                    options=list_lora_adapters(),
+                    value=[],
+                    label="LoRA選択",
+                    multiple=True,
+                ).props("outlined dense options-dense use-chips").classes("flex-grow")
+                lora_select_holder["value"] = lora_select # type: ignore
+                lora_select.on_value_change(on_lora_change)
+                with ui.column().classes("gap-1"):
+                    with ui.row().classes("items-center gap-1"):
+                        ui.label("LoRA適用率").classes("text-xs")
+                        ui.button(icon="restart_alt").props(
+                            "flat dense round size=sm color=grey"
+                        ).on_click(lambda: lora_scale_slider.set_value(1.0))
+                    with ui.row().classes("items-center gap-2"):
+                        lora_scale_slider = ui.slider(
+                            min=0,
+                            max=2,
+                            step=0.05,
+                            value=lora_scale_value["value"],
+                        ).classes("w-48")
+                        lora_scale_holder["value"] = lora_scale_slider # type: ignore
+                        lora_scale_slider.on_value_change(
+                            lambda e: lora_scale_value.__setitem__(
+                                "value", float(e.value) # type: ignore
+                            )
+                        )
+                        ui.label().bind_text_from(
+                            lora_scale_slider,
+                            "value",
+                            lambda v: f"{float(v):.2g}",
+                        ).classes("w-4")
 
         lora_select_view()
 

@@ -2,6 +2,7 @@
 
 ## 2026-06-23
 - Irodori-TTS 推論でプリセット対応
+- Irodori-TTS 推論でLoRA適用率
 
 ## 2026-06-22
 - Irodori-TTS 推論で Speaker Inversion の混合に対応

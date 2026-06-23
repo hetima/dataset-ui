@@ -7,6 +7,7 @@ class IrodoriPreset:
     name: str = ""
     text: str = ""
     lora_adapter: list[str] = dataclasses.field(default_factory=list)
+    lora_scale: float = 1.0
     mixed_ref_enabled: bool = False
     ref_embed_a: str | None = None
     ref_embed_b: str | None = None
