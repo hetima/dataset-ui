@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 from nicegui import binding
+from common.irodori_preset import IrodoriPreset
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 定数
@@ -75,7 +76,7 @@ class VoiceSubSetting:
     """voice 固有の設定。Setting._root 経由で save/load する。"""
 
     _root: "Setting" = dataclasses.field(default=None, init=False, repr=False) # type: ignore
-    
+
     asr_model: str = ""
     lfm_model: str = ""
     last_dataset_path: str = ""
@@ -83,6 +84,7 @@ class VoiceSubSetting:
     recent_dirs: list[str] = dataclasses.field(default_factory=list)
     irodori_tts_model: str = ""
     irodori_tts_output_prefix: str = "%Y-%m-%d_irodori"
+    irodori_presets: list[dict] = dataclasses.field(default_factory=list)
     
     def set_irodori_tts_model(self, name: str | None):
         if name and name != self.irodori_tts_model:
@@ -125,6 +127,16 @@ class VoiceSubSetting:
         self.dataset_dirs = new_list
         self.save()
         return True
+
+    def add_irodori_preset(self, preset: IrodoriPreset) -> None:
+        """同名のプリセットは上書きして保存。"""
+        self.irodori_presets = [p for p in self.irodori_presets if p.get("name") != preset.name]
+        self.irodori_presets.append(preset.to_dict())
+        self.save()
+
+    def delete_irodori_preset(self, name: str) -> None:
+        self.irodori_presets = [p for p in self.irodori_presets if p.get("name") != name]
+        self.save()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -15,6 +15,8 @@ from mutagen.wave import WAVE
 from nicegui import app, background_tasks, helpers, ui
 from common.nicegui_audioplayer_alt import PlyrAltControl, plyr_alt, plyr_alt_control
 from common.nicegui_emoji_picker import attach_emoji_picker
+from common.irodori_preset import IrodoriPreset
+from common.message_dialog import show_input_dialog
 from common.setting import cnfg
 from voice.voice_app_ctx import VoiceCtx
 
@@ -538,6 +540,123 @@ def tab_iridori_infer(ctx: VoiceCtx):
         ui.label("推論サーバーで生成処理を行い書き出しフォルダに保存します。サーバーが起動していることを確認してください。LoRAやVoiceを複数選択すると、それぞれのパラメータのキューを複数実行します。「なし」の項目を明示することで、不使用のキューを含ませることができます。ファイル名に %Y-%m-%d などの日付時刻フォーマットを入れると現在日時で置き換えられます。%voice %lora %step を入れると設定パラメータで置き換えられます。「/」を入れるとサブフォルダが作成されます。重複するファイル名は連番が付けられます。").classes("infotxt")
         ui.label("voice は上記 Voices パスに .wav や .flac や .speaker.safetensors ファイルを置くことで認識されます。").classes("infotxt")
         ui.label("テキストに「:」と入力すると絵文字補完のポップアップが表示されます。続けて入力（英語、ローマ字対応）していくと候補が絞られます↑↓キーで選択しEnterで入力できます。").classes("infotxt")
+        # ── プリセット ───────────────────────────────────────────
+        delete_confirm_state: dict[str, bool] = {}
+
+        def apply_preset(p: dict) -> None:
+            preset = IrodoriPreset.from_dict(p)
+            warnings: list[str] = []
+
+            text_input.set_value(preset.text)
+
+            lora_sel = lora_select_holder["value"]
+            if lora_sel is not None:
+                available_lora = set(lora_sel.options.keys()) if isinstance(lora_sel.options, dict) else set(lora_sel.options)
+                missing_lora = [v for v in preset.lora_adapter if v not in available_lora]
+                valid_lora = [v for v in preset.lora_adapter if v in available_lora]
+                lora_sel.set_value(valid_lora)
+                if missing_lora:
+                    warnings.append(f"LoRA: {', '.join(missing_lora)}")
+
+            mixed_ref_enabled["value"] = preset.mixed_ref_enabled
+            mixed_ref_checkbox.set_value(preset.mixed_ref_enabled)
+            available_ref = set(ref_embed_options["value"].keys()) if isinstance(ref_embed_options["value"], dict) else set(ref_embed_options["value"])
+            missing_ref: list[str] = []
+            def _check_ref(val: str | None, label: str) -> str | None:
+                if val is None or val in available_ref:
+                    return val
+                missing_ref.append(f"{label}: {val}")
+                return None
+            speaker_condition_values["ref_embed_a"] = _check_ref(preset.ref_embed_a, "モデルA")
+            speaker_condition_values["ref_embed_b"] = _check_ref(preset.ref_embed_b, "モデルB")
+            if missing_ref:
+                warnings.append(f"Speaker Inversion ({', '.join(missing_ref)})")
+            speaker_condition_values["ratio_a"] = preset.ratio_a
+            speaker_condition_values["method"] = preset.ref_embed_method
+
+            opts = voice_options["value"]
+            available_voices = set(opts.keys()) if isinstance(opts, dict) else set(opts)
+            missing_voices = [v for v in preset.voices if v not in available_voices]
+            valid_voices = [v for v in preset.voices if v in available_voices]
+            speaker_condition_values["voices"] = valid_voices
+            if missing_voices:
+                warnings.append(f"voice: {', '.join(missing_voices)}")
+
+            speaker_condition_view.refresh()
+            cfg_scale_text_slider.set_value(preset.cfg_scale_text)
+            cfg_scale_speaker_slider.set_value(preset.cfg_scale_speaker)
+            num_steps_input.set_value(preset.num_steps)
+            format_select.set_value(preset.response_format)
+
+            if warnings:
+                ui.notify(f"プリセット「{preset.name}」を適用しました（見つからなかった項目: {' / '.join(warnings)}）", type="warning", timeout=6000)
+            else:
+                ui.notify(f"プリセット「{preset.name}」を適用しました")
+
+        async def on_add_preset() -> None:
+            name = await show_input_dialog("プリセット名を入力してください", placeholder="プリセット名")
+            if not name or not name.strip():
+                return
+            name = name.strip()
+            lora_sel = lora_select_holder["value"]
+            preset = IrodoriPreset(
+                name=name,
+                text=text_input.value or "",
+                lora_adapter=list(lora_sel.value) if lora_sel else [],
+                mixed_ref_enabled=mixed_ref_enabled["value"],
+                ref_embed_a=speaker_condition_values.get("ref_embed_a"),
+                ref_embed_b=speaker_condition_values.get("ref_embed_b"),
+                ratio_a=float(speaker_condition_values.get("ratio_a", 0.5)),
+                ref_embed_method=str(speaker_condition_values.get("method", "linear")),
+                voices=list(speaker_condition_values.get("voices", [])),
+                cfg_scale_text=float(cfg_scale_text_slider.value or 3.0),
+                cfg_scale_speaker=float(cfg_scale_speaker_slider.value or 5.0),
+                num_steps=int(float(num_steps_input.value or 40)),
+                response_format=format_select.value or "wav",
+            )
+            cnfg.voice.add_irodori_preset(preset)
+            preset_menu_view.refresh()
+            ui.notify(f"プリセット「{name}」を保存しました")
+
+        @ui.refreshable
+        def preset_menu_view() -> None:
+            delete_confirm_state.clear()
+            with ui.row().classes("items-center"):
+                preset_btn = ui.button("プリセット", icon="tune").props("flat dense")
+                with preset_btn, ui.menu():
+                    presets: list[dict] = cnfg.voice.irodori_presets
+                    if not presets:
+                        with ui.menu_item(auto_close=False):
+                            ui.label("プリセットがありません").classes("text-grey-6 text-sm")
+                    for p in presets:
+                        pname: str = p.get("name", "")
+                        with ui.menu_item(auto_close=False):
+                            with ui.row().classes("items-center gap-2 w-full"):
+                                ui.label(pname).classes("flex-1 cursor-pointer").on(
+                                    "click", lambda _e, _p=p: apply_preset(_p)
+                                )
+                                trash_btn = ui.button(icon="delete").props(
+                                    "flat dense size=sm color=grey"
+                                )
+                                def _on_trash(btn=trash_btn, name=pname):
+                                    if delete_confirm_state.get(name):
+                                        cnfg.voice.delete_irodori_preset(name)
+                                        preset_menu_view.refresh()
+                                    else:
+                                        delete_confirm_state[name] = True
+                                        btn.set_text("削除する")
+                                        btn.props("color=negative")
+                                trash_btn.on_click(_on_trash)
+                    ui.separator()
+                    with ui.menu_item(on_click=on_add_preset, auto_close=True):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("add")
+                            ui.label("プリセットを追加")
+
+        with ui.row().classes("justify-end w-full"):
+            preset_menu_view()
+        # ────────────────────────────────────────────────────────
+
         text_input = ui.textarea(label="テキスト").props("outlined autogrow").classes("w-full")
         attach_emoji_picker(text_input, EMOJI_JSON_PATH)
 
@@ -665,7 +784,7 @@ def tab_iridori_infer(ctx: VoiceCtx):
             mixed_ref_enabled["value"] = bool(e.value)
             speaker_condition_view.refresh()
 
-        ui.checkbox("混合 Speaker Inversion", on_change=on_mixed_ref_change)
+        mixed_ref_checkbox = ui.checkbox("混合 Speaker Inversion", on_change=on_mixed_ref_change)
         speaker_condition_view()
 
         async def _initial_voice_options_load():
