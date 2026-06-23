@@ -233,17 +233,19 @@ def tab_iridori_infer(ctx: VoiceCtx):
                 )
             )
         else:
-            voice = job.voice or "なし"
-        lora = "なし"
+            voice = job.voice
+        params = (
+            f"steps={job.num_steps}, "
+            f"cfg_text={job.cfg_scale_text:g}, cfg_speaker={job.cfg_scale_speaker:g}, "
+            f"seed={seed or ''}"
+        )
+        if voice:
+            params += f", voice={voice}"
         if job.lora_adapter:
             lora_path = Path(job.lora_adapter)
             lora = "/".join(lora_path.parts[-2:])
-        return (
-            f"steps={job.num_steps}, "
-            f"cfg_text={job.cfg_scale_text:g}, cfg_speaker={job.cfg_scale_speaker:g}, "
-            f"seed={seed or ''}, voice={voice}, lora={lora}, "
-            f"lora_scale={job.lora_scale:g}"
-        )
+            params += f", lora={lora}, lora_scale={job.lora_scale:g}"
+        return params
 
     def add_result_player(path: Path, job: InferJob, seed: str | None):
         """生成結果欄の先頭に PlyrAlt プレイヤーと推論情報を追加する。"""
