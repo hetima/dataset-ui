@@ -496,7 +496,7 @@ def tab_main(ctx: VoiceCtx):
                 options={"librosa": "librosa", "rubberband": "rubberband"},
                 value="librosa",
             ).props("outlined dense options-dense style='width: 170px;'")
-            input_format = ui.select(
+            input_format_speed = ui.select(
                 label="出力",
                 options={"wav": "wav", "flac": "flac", "mp3": "mp3"},
                 value="wav",
@@ -506,7 +506,7 @@ def tab_main(ctx: VoiceCtx):
                     from_fps=from_fps.value,  # type: ignore
                     method=method.value,  # type: ignore
                     to_fps=to_fps.value,  # type: ignore
-                    output_format=input_format.value,
+                    output_format=input_format_speed.value,
                 )
             )
 
