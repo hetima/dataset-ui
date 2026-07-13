@@ -5,6 +5,7 @@ from collections import namedtuple
 import os
 import torch
 from torch import nn, einsum
+from torch.nn.attention import SDPBackend, sdpa_kernel
 import torch.nn.functional as F
 
 from einops import rearrange, reduce
@@ -86,7 +87,17 @@ class Attend(nn.Module):
 
         # pytorch 2.0 flash attn: q, k, v, mask, dropout, softmax_scale
 
-        with torch.backends.cuda.sdp_kernel(**config._asdict()):
+        backends = [
+            backend
+            for enabled, backend in (
+                (config.enable_flash, SDPBackend.FLASH_ATTENTION),
+                (config.enable_math, SDPBackend.MATH),
+                (config.enable_mem_efficient, SDPBackend.EFFICIENT_ATTENTION),
+            )
+            if enabled
+        ]
+
+        with sdpa_kernel(backends):
             out = F.scaled_dot_product_attention(
                 q, k, v,
                 dropout_p = self.dropout if self.training else 0.
