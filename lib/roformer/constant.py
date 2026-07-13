@@ -152,11 +152,11 @@ KNOWN_MODELS = [
     },
     # ── Karaoke ────────────────────────────────────────
     {
-        "display_name": "Karaoke - aufr33/viperx ⭐",
-        "repo_id": "jarredou/aufr33-viperx-karaoke-melroformer-model",
-        "filename": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
-        "config": "config_mel_band_roformer_karaoke.yaml",
-        "size": "913MB",
+        "display_name": "[BS] Karaoke - becruily",
+        "repo_id": "becruily/bs-roformer-karaoke",
+        "filename": "bs_roformer_karaoke_frazer_becruily.ckpt",
+        "config": "config_karaoke_frazer_becruily.yaml",
+        "size": "204MB",
         "type": "karaoke",
         "recommend": True,
     },
@@ -199,7 +199,7 @@ KNOWN_MODELS = [
     },
     # ── Dereverb ─────────────────────────────────────────────
     {
-        "display_name": "Dereverb - anvuew ⭐ (SDR 19.17)",
+        "display_name": "Dereverb - anvuew (SDR 19.17)",
         "repo_id": "anvuew/dereverb_mel_band_roformer",
         "filename": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
         "config": "dereverb_mel_band_roformer_anvuew.yaml",
@@ -320,7 +320,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "[BS] Leap Voc - pcunwa",
+        "display_name": "[BS] Leap Voc - pcunwa⭐",
         "repo_id": "pcunwa/BS-Roformer-Leap",
         "filename": "bs_roformer_leap_voc.ckpt",
         "config": "bs_leap_voc_conf.yaml",
@@ -329,7 +329,7 @@ KNOWN_MODELS = [
         "recommend": False,
     },
     {
-        "display_name": "[BS] Leap Inst - pcunwa",
+        "display_name": "[BS] Leap Inst - pcunwa⭐",
         "repo_id": "pcunwa/BS-Roformer-Leap",
         "filename": "bs_roformer_leap_inst.ckpt",
         "config": "bs_leap_inst_conf.yaml",
