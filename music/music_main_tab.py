@@ -277,10 +277,7 @@ def tab_main(ctx: MusicCtx):
             with roformer_model_input.add_slot('append'):
                 with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
                     roformer_menu = ui.menu()
-
-            roformer_cache = ui.checkbox("モデルをキャッシュ", value=True).tooltip(
-                "メモリに読み込んだままにしておき連続して生成するときの時間を節約します。効いてるのかどうかよく分かりません"
-            )
+        with ui.row().classes("items-center gap-4"):
             roformer_target_only = ui.checkbox("Vocalのみ出力", value=False).tooltip(
                 "メインターゲットのみ書き出します。ほとんどのモデルでVocalです。例外があるかもしれません"
             )
@@ -331,6 +328,7 @@ def tab_main(ctx: MusicCtx):
                 )
             )
 
+        with ui.row().classes("items-center gap-4"):
             ui.label("フォーマット: ")
             roformer_format = ui.toggle(
                 {".wav": ".wav", ".flac": ".flac"},
@@ -351,7 +349,6 @@ def tab_main(ctx: MusicCtx):
                 roformer_suffix_input.value or "",
                 roformer_format.value,
                 roformer_dest.value,
-                roformer_cache.value or False,
                 int(roformer_overlap.value or 2),
                 roformer_target_only.value or False,
                 roformer_subfolder.value or False,
@@ -374,7 +371,7 @@ def tab_main(ctx: MusicCtx):
                 ui.separator()
                 ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
 
-        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, cache: bool, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0, use_prefix_num: bool = False) -> None:
+        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0, use_prefix_num: bool = False) -> None:
             if not model:
                 ui.notify("モデルを選択してください")
                 return
@@ -389,7 +386,6 @@ def tab_main(ctx: MusicCtx):
                 "suffix": effective_suffix,
                 "fmt": fmt,
                 "dest": dest,
-                "cache": cache,
                 "overlap": overlap,
                 "chunk_size": chunk_size,
                 "target_only": target_only,

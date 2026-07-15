@@ -374,52 +374,29 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
       suffix    : str   (出力ファイル名サフィックス)
       fmt       : str   (".wav" | ".flac")
       dest      : str   ("output_dir" | "same")
-      cache     : bool  (モデルをキャッシュするか)
       files     : list[str]  (処理対象ファイルパス)
       output_dir: str   (dest=="output_dir" のときの出力先、空なら same 扱い)
     """
     import torch
     import torchaudio.functional as TAF
     import soundfile as sf
-    from common.model_cache import model_cache
 
     model_info: dict = data["model"]
     suffix: str = data["suffix"]
     fmt: str = data["fmt"]
-    cache: bool = data["cache"]
     files: list[str] = data["files"]
     output_dir: str = data.get("output_dir", "")
 
     model_name: str = model_info.get("name", "")
     model_path: str = model_info.get("path", "")
 
-    # モデルロード（キャッシュ確認）
-    entry = model_cache.get_entry(model_name)
-    if cache and entry and entry.cached:
-        _log(q, f"キャッシュ済みモデルを使用: {model_name}")
-        model = entry.value
-    else:
-        # キャッシュオフ、またはキャッシュが取れなかった場合は既存キャッシュを全破棄
-        if model_cache.entries:
-            _log(q, "メモリ確保のため既存キャッシュを破棄します")
-            model_cache.dispose_all()
-            import gc
-            gc.collect()
-            torch.cuda.empty_cache()
-        _log(q, f"モデルをロード中: {model_name}")
-        try:
-            model = load_model(model_path)
-        except Exception as e:
-            _log(q, f"[エラー] モデルロード失敗: {e}")
-            return None
-        _log(q, "モデルロード完了")
-        if cache:
-            model_cache.model_loaded(
-                name=model_name,
-                value=model,
-                get_func=lambda: load_model(model_path),
-                dispose_func=lambda _: None,
-            )
+    _log(q, f"モデルをロード中: {model_name}")
+    try:
+        model = load_model(model_path)
+    except Exception as e:
+        _log(q, f"[エラー] モデルロード失敗: {e}")
+        return None
+    _log(q, "モデルロード完了")
 
     sr_target = 44100
     if q is not None:
@@ -454,21 +431,17 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
             audio_tensor = TAF.resample(audio_tensor, orig_freq=sr, new_freq=sr_target) # type: ignore
 
         # 推論
-        if q is not None:
-            def on_progress(step: int, total: int) -> None:
-                _log(q, f"  チャンク {step}/{total}")
-        else:
-            from tqdm import tqdm as _tqdm
-            _chunk_bar: Any = None
-            def on_progress(step: int, total: int) -> None:
-                nonlocal _chunk_bar
-                if _chunk_bar is None:
-                    _chunk_bar = _tqdm(total=total, desc="  チャンク", unit="chunk", leave=False)
-                _chunk_bar.n = step
-                _chunk_bar.refresh()
-                if step >= total and _chunk_bar is not None:
-                    _chunk_bar.close()
-                    _chunk_bar = None
+        from tqdm import tqdm as _tqdm
+        _chunk_bar: Any = None
+        def on_progress(step: int, total: int) -> None:
+            nonlocal _chunk_bar
+            if _chunk_bar is None:
+                _chunk_bar = _tqdm(total=total, desc="  チャンク", unit="chunk", leave=False)
+            _chunk_bar.n = step
+            _chunk_bar.refresh()
+            if step >= total and _chunk_bar is not None:
+                _chunk_bar.close()
+                _chunk_bar = None
 
         try:
             stems = _run_inference(model, audio_tensor, chunk_size=float(data.get("chunk_size", 8.0)), overlap=data.get("overlap", 2), progress_callback=on_progress, stop_event=stop_event)
