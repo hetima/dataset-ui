@@ -266,21 +266,41 @@ def tab_main(ctx: MusicCtx):
         "rounded-borders brdr overflow-hidden w-full"
     ).props('header-class="bg-grey-2 text-black"'):
         ui.label("処理対象ファイルを Roformer で分離処理します。各パラメータの詳細はマウスオーバーしてツールチップを参照してください。"
+                 "1回の処理で最大3個のモデルを順番に適用することができます（ボーカル抽出→コーラス除去（Karaoke）→Dereverbなど）。"
                  "いくつかのモデルは設定タブからダウンロードできます。また表示名の編集などもできます。")
-        selected_roformer_model: dict = {}
+        selected_roformer_models: list[dict] = [{}, {}, {}]
+        roformer_model_inputs = []
+        roformer_target_only_inputs = []
+        roformer_menus = []
+
+        def select_roformer_model(index: int, model: dict) -> None:
+            selected_roformer_models[index].clear()
+            selected_roformer_models[index].update(model)
+            roformer_model_inputs[index].value = model["name"]
+
+        def clear_roformer_model(index: int) -> None:
+            selected_roformer_models[index].clear()
+            roformer_model_inputs[index].value = ""
+            roformer_target_only_inputs[index].value = False
+
+        for index in range(3):
+            with ui.row().classes("items-center gap-4"):
+                roformer_model_input = ui.input(
+                    label=f"roformer model {index + 1}",
+                    placeholder="モデルを選択",
+                ).props('style="min-width: 380px" outlined dense')
+                with roformer_model_input.add_slot('append'):
+                    with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
+                        roformer_menu = ui.menu()
+                roformer_target_only = ui.checkbox("Vocalのみ出力", value=False).tooltip(
+                    "メインターゲットは次のモデルへ渡します。オフの場合は、それ以外のstemをこの段階で書き出します"
+                )
+                ui.button("クリア", on_click=lambda _, index=index: clear_roformer_model(index)).props("outline dense")
+                roformer_model_inputs.append(roformer_model_input)
+                roformer_target_only_inputs.append(roformer_target_only)
+                roformer_menus.append(roformer_menu)
 
         with ui.row().classes("items-center gap-4"):
-            roformer_model_input = ui.input(
-                label="roformer model",
-                placeholder="モデルを選択",
-            ).props('style="min-width: 380px" outlined dense')
-            with roformer_model_input.add_slot('append'):
-                with ui.button(icon="arrow_drop_down").props('flat').classes("padd4"):
-                    roformer_menu = ui.menu()
-        with ui.row().classes("items-center gap-4"):
-            roformer_target_only = ui.checkbox("Vocalのみ出力", value=False).tooltip(
-                "メインターゲットのみ書き出します。ほとんどのモデルでVocalです。例外があるかもしれません"
-            )
 
             ui.label("オーバーラップ: ")
             roformer_overlap = (
@@ -345,34 +365,40 @@ def tab_main(ctx: MusicCtx):
             ).tooltip("ファイル名のサブフォルダを作りその中に書き出します")
 
             ui.button("開始", on_click=lambda: roformer_start(
-                selected_roformer_model,
+                selected_roformer_models,
                 roformer_suffix_input.value or "",
                 roformer_format.value,
                 roformer_dest.value,
                 int(roformer_overlap.value or 2),
-                roformer_target_only.value or False,
                 roformer_subfolder.value or False,
                 float(roformer_chunk_size.value or 8),
                 roformer_prefix_num.value or False,
             ))
 
-        def select_roformer_model(m: dict):
-            selected_roformer_model.clear()
-            selected_roformer_model.update(m)
-            roformer_model_input.value = m["name"]
-
         def reload_roformer_models():
             models = list_roformer_models()
-            roformer_menu.clear()
-            with roformer_menu:
-                for m in models:
-                    label = m["name"] + (f"  {m['size']}" if m.get("size") else "")
-                    ui.menu_item(label, lambda _, m=m: select_roformer_model(m)).classes("padd8")
-                ui.separator()
-                ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
+            for index, roformer_menu in enumerate(roformer_menus):
+                roformer_menu.clear()
+                with roformer_menu:
+                    for model in models:
+                        label = model["name"] + (f"  {model['size']}" if model.get("size") else "")
+                        ui.menu_item(
+                            label,
+                            lambda _, index=index, model=model: select_roformer_model(index, model),
+                        ).classes("padd8")
+                    ui.separator()
+                    ui.menu_item("メニューを更新", lambda _: reload_roformer_models()).classes("padd8")
 
-        def roformer_start(model: dict, suffix: str, fmt: str, dest: str, overlap: int, target_only: bool = False, subfolder: bool = False, chunk_size: float = 8.0, use_prefix_num: bool = False) -> None:
-            if not model:
+        def roformer_start(models: list[dict], suffix: str, fmt: str, dest: str, overlap: int, subfolder: bool = False, chunk_size: float = 8.0, use_prefix_num: bool = False) -> None:
+            selected_models = [
+                {
+                    "model": model.copy(),
+                    "target_only": bool(roformer_target_only_inputs[index].value),
+                }
+                for index, model in enumerate(models)
+                if model
+            ]
+            if not selected_models:
                 ui.notify("モデルを選択してください")
                 return
             files = ctx.target_files()
@@ -380,15 +406,13 @@ def tab_main(ctx: MusicCtx):
             if not paths:
                 ui.notify("処理対象がありません")
                 return
-            effective_suffix = suffix or model.get("output_suffix", "")
             data = {
-                "model": model,
-                "suffix": effective_suffix,
+                "models": selected_models,
+                "suffix": suffix,
                 "fmt": fmt,
                 "dest": dest,
                 "overlap": overlap,
                 "chunk_size": chunk_size,
-                "target_only": target_only,
                 "subfolder": subfolder,
                 "use_prefix_num": use_prefix_num,
                 "files": paths,
@@ -397,7 +421,7 @@ def tab_main(ctx: MusicCtx):
             ThreadTaskDialog(
                 fn=infer_roformer,
                 data=data,
-                title=f"分離: {model.get('name', '')}",
+                title="分離: " + " → ".join(entry["model"].get("name", "") for entry in selected_models),
                 part_callback=lambda d: ctx.add_dst_to_src(d),
             ).open()
 

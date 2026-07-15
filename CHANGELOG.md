@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-15
+- Roformer 最大3個のモデルを順列処理
+
 ## 2026-06-23
 - Irodori-TTS 推論でプリセット対応
 - Irodori-TTS 推論でLoRA適用率

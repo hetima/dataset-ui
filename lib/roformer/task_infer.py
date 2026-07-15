@@ -327,7 +327,7 @@ def _run_inference(
 # Utilities
 # ---------------------------------------------------------------------------
 def _unique_output_path(out_dir: str, stem_base: str, fmt: str) -> Path:
-    """wav/flac 両方をチェックして重複しない出力パスを返す。"""
+    """wav/flac 両方をチェックし、重複時は末尾に連番を付ける。"""
     def exists_any(base: Path) -> bool:
         return base.with_suffix(".wav").exists() or base.with_suffix(".flac").exists()
 
@@ -336,7 +336,7 @@ def _unique_output_path(out_dir: str, stem_base: str, fmt: str) -> Path:
         return candidate
     n = 1
     while True:
-        candidate = Path(out_dir) / (f"{stem_base}_{n}" + fmt)
+        candidate = Path(out_dir) / (f"{stem_base}_{n:02d}" + fmt)
         if not exists_any(candidate.with_suffix("")):
             return candidate
         n += 1
@@ -370,7 +370,7 @@ def _log(q: queue.Queue | None, text: str) -> None:  # type: ignore[type-arg]
 def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threading.Event | None = None) -> dict | None:  # type: ignore[type-arg]
     """
     data keys:
-      model     : dict  (list_roformer_models の1エントリ)
+      models    : list[dict]  ({"model": list_roformer_models の1エントリ, "target_only": bool})
       suffix    : str   (出力ファイル名サフィックス)
       fmt       : str   (".wav" | ".flac")
       dest      : str   ("output_dir" | "same")
@@ -381,21 +381,23 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
     import torchaudio.functional as TAF
     import soundfile as sf
 
-    model_info: dict = data["model"]
+    model_entries: list[dict] = data["models"]
     suffix: str = data["suffix"]
     fmt: str = data["fmt"]
     files: list[str] = data["files"]
     output_dir: str = data.get("output_dir", "")
 
-    model_name: str = model_info.get("name", "")
-    model_path: str = model_info.get("path", "")
-
-    _log(q, f"モデルをロード中: {model_name}")
-    try:
-        model = load_model(model_path)
-    except Exception as e:
-        _log(q, f"[エラー] モデルロード失敗: {e}")
-        return None
+    loaded_models: list[tuple[dict, bool, Any]] = []
+    for model_index, entry in enumerate(model_entries):
+        model_info: dict = entry["model"]
+        model_name: str = model_info.get("name", "")
+        _log(q, f"モデルをロード中 [{model_index + 1}/{len(model_entries)}]: {model_name}")
+        try:
+            model = load_model(model_info.get("path", ""))
+        except Exception as e:
+            _log(q, f"[エラー] モデルロード失敗: {e}")
+            return None
+        loaded_models.append((model_info, bool(entry.get("target_only", False)), model))
     _log(q, "モデルロード完了")
 
     sr_target = 44100
@@ -430,53 +432,81 @@ def infer_roformer(data: dict, q: queue.Queue | None = None, stop_event: threadi
             _log(q, f"  リサンプル {sr} → {sr_target}")
             audio_tensor = TAF.resample(audio_tensor, orig_freq=sr, new_freq=sr_target) # type: ignore
 
-        # 推論
-        from tqdm import tqdm as _tqdm
-        _chunk_bar: Any = None
-        def on_progress(step: int, total: int) -> None:
-            nonlocal _chunk_bar
-            if _chunk_bar is None:
-                _chunk_bar = _tqdm(total=total, desc="  チャンク", unit="chunk", leave=False)
-            _chunk_bar.n = step
-            _chunk_bar.refresh()
-            if step >= total and _chunk_bar is not None:
-                _chunk_bar.close()
-                _chunk_bar = None
-
-        try:
-            stems = _run_inference(model, audio_tensor, chunk_size=float(data.get("chunk_size", 8.0)), overlap=data.get("overlap", 2), progress_callback=on_progress, stop_event=stop_event)
-        except Exception as e:
-            _log(q, f"  推論エラー: {e}")
-            continue
-
-        if not stems:
-            return None
-
         # 出力先決定
         base_dir = output_dir if output_dir else str(Path(file_path).parent)
         if data.get("subfolder", False):
             out_dir = str(Path(base_dir) / Path(file_path).stem)
         else:
             out_dir = base_dir
-        stem_base = Path(file_path).stem + suffix
-
-        # 書き出し
-        target_only: bool = data.get("target_only", False)
         use_prefix_num: bool = data.get("use_prefix_num", False)
-        stem_labels = _get_stem_labels(model_path, len(stems))
         prefix = (_next_prefix_num(out_dir) + "_") if use_prefix_num else ""
         dst_paths: list[str] = []
-        for stem_idx, stem in enumerate(stems):
-            if target_only and stem_idx > 0:
-                continue
+        current_audio = audio_tensor
+        inference_failed = False
+
+        for model_index, (model_info, target_only, model) in enumerate(loaded_models):
             if stop_event is not None and stop_event.is_set():
                 return None
-            stem_label = stem_labels[stem_idx] if stem_idx < len(stem_labels) else f"_stem{stem_idx + 1}"
-            out_path = _unique_output_path(out_dir, prefix + stem_base + stem_label, fmt)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            sf.write(str(out_path), stem.numpy().T, sr_target)
-            dst_paths.append(str(out_path))
-            _log(q, f"  → {out_path.name}")
+
+            model_name = model_info.get("name", "")
+            model_path = model_info.get("path", "")
+            _log(q, f"  モデル適用 [{model_index + 1}/{len(loaded_models)}]: {model_name}")
+
+            from tqdm import tqdm as _tqdm
+            _chunk_bar: Any = None
+
+            def on_progress(step: int, total: int) -> None:
+                nonlocal _chunk_bar
+                if _chunk_bar is None:
+                    _chunk_bar = _tqdm(total=total, desc="  チャンク", unit="chunk", leave=False)
+                _chunk_bar.n = step
+                _chunk_bar.refresh()
+                if step >= total and _chunk_bar is not None:
+                    _chunk_bar.close()
+                    _chunk_bar = None
+
+            try:
+                stems = _run_inference(
+                    model,
+                    current_audio,
+                    chunk_size=float(data.get("chunk_size", 8.0)),
+                    overlap=data.get("overlap", 2),
+                    progress_callback=on_progress,
+                    stop_event=stop_event,
+                )
+            except Exception as e:
+                if _chunk_bar is not None:
+                    _chunk_bar.close()
+                _log(q, f"  推論エラー: {e}")
+                inference_failed = True
+                break
+
+            if not stems:
+                return None
+
+            is_last = model_index == len(loaded_models) - 1
+            if is_last:
+                write_indexes = [0] if target_only else list(range(len(stems)))
+            else:
+                write_indexes = [] if target_only else list(range(1, len(stems)))
+
+            model_suffix = suffix or model_info.get("output_suffix", "")
+            stem_base = Path(file_path).stem + model_suffix
+            stem_labels = _get_stem_labels(model_path, len(stems))
+            for stem_idx in write_indexes:
+                if stop_event is not None and stop_event.is_set():
+                    return None
+                stem_label = stem_labels[stem_idx] if stem_idx < len(stem_labels) else f"_stem{stem_idx + 1}"
+                out_path = _unique_output_path(out_dir, prefix + stem_base + stem_label, fmt)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                sf.write(str(out_path), stems[stem_idx].numpy().T, sr_target)
+                dst_paths.append(str(out_path))
+                _log(q, f"  → {out_path.name}")
+
+            current_audio = stems[0]
+
+        if inference_failed:
+            continue
 
         if q is not None:
             q.put({"type": "part", "data": {"src": file_path, "dst": dst_paths}})
