@@ -14,7 +14,7 @@ from music.index import main_page as page_music
 from voice.index import main_page as page_voice
 from edit.index import main_page as page_edit
 from testpage.index import main_page as page_testpage
-
+from ying_music_svc.index import main_page as page_ying
 
 def header():
     ui.query('body').style('font-family: Roboto, "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;')
@@ -169,6 +169,12 @@ def test_page():
     model_cache_sticky()
     efit_file_footer()
 
+@ui.page("/ying", title="ying - dataset-ui")
+def ying_page():
+    header()
+    page_ying()
+    footer()
+    efit_file_footer()
 
 def make_startup_message(host: str, port: int):
     async def startup_message():

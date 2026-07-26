@@ -138,6 +138,33 @@ class VoiceSubSetting:
         self.irodori_presets = [p for p in self.irodori_presets if p.get("name") != name]
         self.save()
 
+@dataclasses.dataclass
+class YingSubSetting:
+    """ying 固有の設定。Setting._root 経由で save/load する。"""
+
+    _root: "Setting" = dataclasses.field(default=None, init=False, repr=False) # type: ignore
+    repository_dir: str = ""
+    venv_dir: str = ""
+
+    def save(self):
+        self._root.save()
+
+    def set_repository_dir(self, path: str) -> bool:
+        path = path.strip().strip('"')
+        if self.repository_dir == path:
+            return False
+        self.repository_dir = path
+        self.save()
+        return True
+
+    def set_venv_dir(self, path: str) -> bool:
+        path = path.strip().strip('"')
+        if self.venv_dir == path:
+            return False
+        self.venv_dir = path
+        self.save()
+        return True
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ルート設定クラス
@@ -164,11 +191,13 @@ class Setting:
 
     music: MusicSubSetting = dataclasses.field(default_factory=MusicSubSetting)
     voice: VoiceSubSetting = dataclasses.field(default_factory=VoiceSubSetting)
+    ying: YingSubSetting = dataclasses.field(default_factory=YingSubSetting)
 
     def __post_init__(self):
         # サブ設定に自身の参照を渡す
         self.music._root = self
         self.voice._root = self
+        self.ying._root = self
         self.load()
 
     # ── save / load ─────────────────────────────────────────────────────────
@@ -187,6 +216,12 @@ class Setting:
                 }
             elif isinstance(value, VoiceSubSetting):
                 data["voice"] = {
+                    sf.name: _serialize(getattr(value, sf.name))
+                    for sf in dataclasses.fields(value)
+                    if not sf.name.startswith("_")
+                }
+            elif isinstance(value, YingSubSetting):
+                data["ying"] = {
                     sf.name: _serialize(getattr(value, sf.name))
                     for sf in dataclasses.fields(value)
                     if not sf.name.startswith("_")
@@ -213,7 +248,7 @@ class Setting:
         for f in dataclasses.fields(self):
             if f.name in self._EXCLUDED_SETTINGS or f.name.startswith("_"):
                 continue
-            if f.name in ("music", "voice"):
+            if f.name in ("music", "voice", "ying"):
                 continue
             if f.name not in data:
                 continue
@@ -239,6 +274,15 @@ class Setting:
             if f.name not in voice_data:
                 continue
             setattr(self.voice, f.name, voice_data[f.name])
+
+        # ying サブ
+        ying_data = data.get("ying", {})
+        for f in dataclasses.fields(self.ying):
+            if f.name.startswith("_"):
+                continue
+            if f.name not in ying_data:
+                continue
+            setattr(self.ying, f.name, ying_data[f.name])
 
         if not self.models_dir:
             self.models_dir = MODELS_DIR
