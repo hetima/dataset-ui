@@ -152,6 +152,15 @@ KNOWN_MODELS = [
     },
     # ── Karaoke ────────────────────────────────────────
     {
+        "display_name": "[BS] Karaoke - anvuew",
+        "repo_id": "anvuew/karaoke_bs_roformer",
+        "filename": "karaoke_bs_roformer_anvuew.ckpt",
+        "config": "karaoke_bs_roformer_anvuew.yaml",
+        "size": "204MB",
+        "type": "karaoke",
+        "recommend": True,
+    },
+    {
         "display_name": "[BS] Karaoke - becruily",
         "repo_id": "becruily/bs-roformer-karaoke",
         "filename": "bs_roformer_karaoke_frazer_becruily.ckpt",
@@ -176,7 +185,7 @@ KNOWN_MODELS = [
         "config": "melbandroformers/karaoke/karaokegabox_1750911344.yaml",
         "size": "913MB",
         "type": "karaoke",
-        "recommend": True,
+        "recommend": False,
     },
     {
         "display_name": "Karaoke - GaboxR67 V1 Small",
@@ -185,7 +194,7 @@ KNOWN_MODELS = [
         "config": "melbandroformers/karaoke/config_karaoke_small.yaml",
         "size": "203MB",
         "type": "karaoke",
-        "recommend": True,
+        "recommend": False,
     },
     # ── Vocals + Inst 2-stem ────────────────────────────────────────
     {
