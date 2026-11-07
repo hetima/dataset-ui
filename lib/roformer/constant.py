@@ -346,4 +346,22 @@ KNOWN_MODELS = [
         "type": "vocals",
         "recommend": False,
     },
+    {
+        "display_name": "[BS] Leap Xe Voc - pcunwa⭐",
+        "repo_id": "pcunwa/BS-Roformer-Leap",
+        "filename": "Xe/bs_leap_xe_voc.ckpt",
+        "config": "Xe/leap_xe_config_voc.yaml",
+        "size": "268MB",
+        "type": "vocals",
+        "recommend": False,
+    },
+    {
+        "display_name": "[BS] Leap Xe Inst - pcunwa⭐",
+        "repo_id": "pcunwa/BS-Roformer-Leap",
+        "filename": "Xe/bs_leap_xe_inst.ckpt",
+        "config": "Xe/leap_xe_config_inst.yaml",
+        "size": "268MB",
+        "type": "vocals",
+        "recommend": False,
+    },
 ]
