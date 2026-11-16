@@ -184,11 +184,20 @@ def tab_iridori_infer(ctx: VoiceCtx):
             return True
         return normalize_path_text(base_checkpoint) == normalize_path_text(server_checkpoint)
 
-    def stem_exists(path: Path) -> bool:
-        """同じ親フォルダに同じ stem のファイルがあるか調べる。"""
-        if not path.parent.exists():
-            return False
-        return any(p.is_file() and p.stem == path.stem for p in path.parent.iterdir())
+    def max_stem_index(parent: Path, base_stem: str) -> int:
+        """親フォルダ内の base_stem / base_stem_NN の最大連番を返す（本体のみなら 0、無ければ -1）。"""
+        if not parent.exists():
+            return -1
+        prefix = f"{base_stem}_"
+        max_index = -1
+        for p in parent.iterdir():
+            if not p.is_file():
+                continue
+            if p.stem == base_stem:
+                max_index = max(max_index, 0)
+            elif p.stem.startswith(prefix) and p.stem[len(prefix):].isdigit():
+                max_index = max(max_index, int(p.stem[len(prefix):]))
+        return max_index
 
     def make_output_path(prefix: str, fmt: str, *, voice: str | None = None, lora: str | None = None, steps: int | None = None) -> Path:
         """日時展開済みプレフィクスから出力ファイルパスを作る。%voice %lora %step を置換する。"""
@@ -208,14 +217,10 @@ def tab_iridori_infer(ctx: VoiceCtx):
         return name[:-len(suffix)] if name.endswith(suffix) else Path(path).stem
 
     def unique_output_path(path: Path) -> Path:
-        """保存直前の実ファイル状態を見て、未使用の出力ファイルパスを作る。"""
-        index = 0
-        while True:
-            stem = path.stem if index == 0 else f"{path.stem}_{index:02d}"
-            candidate = path.with_name(f"{stem}{path.suffix}")
-            if not stem_exists(candidate):
-                return candidate
-            index += 1
+        """保存直前の実ファイル状態を見て、既存の最大連番の次の番号を出力ファイルパスに使う。"""
+        index = max_stem_index(path.parent, path.stem) + 1
+        stem = path.stem if index == 0 else f"{path.stem}_{index:02d}"
+        return path.with_name(f"{stem}{path.suffix}")
 
     def media_url_for_file(path: Path) -> str:
         """保存済み音声ファイルをブラウザから読める URL に変換する。"""
